@@ -1,191 +1,164 @@
-# Chef iQ - 智能菜单管理应用
+# Chef iQ RN - Recipe Management App
 
-一个基于React Native + Expo的移动端菜单创建和分享应用。
+A modern React Native recipe management application built with Expo, TypeScript, and Context API.
 
-## 功能特性
+## 🚀 Features
 
-### 🍽️ 菜单管理
-- **创建菜单**: 轻松创建和管理多个菜单
-- **菜品管理**: 添加、编辑、删除菜品信息
-- **分类管理**: 支持菜品分类（开胃菜、主菜、甜点、饮品等）
-- **价格管理**: 设置菜品价格
-- **可用性控制**: 控制菜品的可用状态
+- **Recipe Management**: Create, edit, and manage your recipes
+- **Smart Navigation**: Intuitive bottom tab navigation with custom components
+- **Social Features**: Like, favorite, and share recipes
+- **Grocery Lists**: Generate shopping lists from recipes
+- **Modern UI**: Clean, responsive design with Material Design principles
+- **TypeScript**: Full type safety and better development experience
+- **Context API**: Efficient state management with React Context
 
-### 📱 现代化界面
-- **响应式设计**: 适配不同屏幕尺寸
-- **直观操作**: 简洁易用的用户界面
-- **实时预览**: 实时查看菜单效果
-- **状态指示**: 清晰的状态显示
+## 📱 Screens
 
-### 🔗 分享功能
-- **系统分享**: 通过系统分享功能发送菜单
-- **分享码**: 生成唯一分享码供他人访问
-- **文本复制**: 复制菜单内容到剪贴板
-- **公开/私有**: 控制菜单的可见性
+- **Home**: Dashboard with quick actions and recent recipes
+- **Explore**: Discover new recipes and browse categories
+- **Groceries**: Manage your shopping lists
+- **Profile**: User settings and statistics
+- **Recipe Detail**: Detailed recipe view with ingredients and instructions
+- **Create Recipe**: Comprehensive recipe creation interface
 
-## 技术栈
+## 🛠️ Tech Stack
 
-- **React Native**: 跨平台移动应用开发
-- **Expo**: 开发工具链和运行时
-- **TypeScript**: 类型安全的JavaScript
-- **React Navigation**: 导航管理
-- **Context API**: 状态管理
-- **Expo Vector Icons**: 图标库
+- **React Native 0.81.5** - Cross-platform mobile framework
+- **Expo SDK 54** - Development tools and runtime
+- **TypeScript 5.9.2** - Type-safe JavaScript
+- **React Navigation 7.x** - Declarative navigation
+- **Context API** - State management
+- **AsyncStorage** - Local data persistence
 
-## 项目结构
+## 🏗️ Architecture
 
 ```
-src/
-├── components/          # 可复用组件
-├── contexts/           # React Context (状态管理)
-│   └── MenuContext.tsx
-├── navigation/         # 导航配置
-│   └── AppNavigator.tsx
-├── screens/           # 页面组件
-│   ├── HomeScreen.tsx
-│   ├── MenuListScreen.tsx
-│   ├── CreateMenuScreen.tsx
-│   ├── MenuDetailScreen.tsx
-│   └── ShareMenuScreen.tsx
-├── types/             # TypeScript 类型定义
-│   └── index.ts
-└── utils/             # 工具函数
+📱 App Layer (App.tsx)
+├── 🧭 Navigation Layer (AppNavigator.tsx)
+├── 🎯 Screen Layer (screens/)
+├── 🧩 Component Layer (components/)
+├── 🔄 Context Layer (contexts/)
+├── 📊 Data Layer (data/)
+└── 🎨 Types Layer (types/)
 ```
 
-## 快速开始
+## 🚀 Getting Started
 
-### 环境要求
-- Node.js 16+
-- npm 或 yarn
+### Prerequisites
+
+- Node.js (v16 or higher)
+- npm or yarn
 - Expo CLI
-- iOS Simulator 或 Android Emulator (可选)
-- 物理设备 + Expo Go 应用
+- iOS Simulator or Android Emulator (optional)
 
-### 安装依赖
+### Installation
+
+1. Clone the repository:
 ```bash
+git clone <your-repo-url>
 cd MenuApp
+```
+
+2. Install dependencies:
+```bash
 npm install
 ```
 
-### 启动开发服务器
+3. Start the development server:
 ```bash
 npm start
 ```
 
-### 在设备上运行
-1. 在手机上安装 Expo Go 应用
-2. 扫描终端中显示的二维码
-3. 应用将在你的设备上运行
-
-### 在模拟器上运行
+4. Run on your preferred platform:
 ```bash
-# iOS 模拟器
-npm run ios
-
-# Android 模拟器
-npm run android
+npm run ios     # iOS
+npm run android # Android
+npm run web     # Web
 ```
 
-## 使用指南
+## 📁 Project Structure
 
-### 创建菜单
-1. 点击首页的"创建新菜单"按钮
-2. 填写菜单标题和描述
-3. 设置菜单为公开或私有
-4. 添加菜品信息（名称、描述、价格、分类）
-5. 点击保存
+```
+MenuApp/
+├── src/
+│   ├── components/          # Reusable UI components
+│   ├── contexts/           # React Context providers
+│   ├── data/              # Sample data and schemas
+│   ├── navigation/         # Navigation configuration
+│   ├── screens/           # Screen components
+│   └── types/              # TypeScript type definitions
+├── assets/                 # Images and static assets
+├── App.tsx                 # Main app component
+└── package.json           # Dependencies and scripts
+```
 
-### 管理菜品
-- 在菜单详情页面可以编辑菜品
-- 控制菜品的可用状态
-- 按分类筛选菜品
-- 删除不需要的菜品
+## 🎨 Key Features
 
-### 分享菜单
-1. 在菜单详情页面点击分享按钮
-2. 选择分享方式：
-   - 系统分享：通过其他应用分享
-   - 复制文本：复制到剪贴板
-   - 生成分享码：创建唯一分享码
+### Recipe Management
+- Create recipes with ingredients and instructions
+- Add images and metadata
+- Categorize and tag recipes
+- Public/private recipe sharing
 
-## 主要功能
+### Social Features
+- Like and favorite recipes
+- Social statistics tracking
+- Points and achievement system
+- Recipe sharing capabilities
 
-### 菜单管理
-- ✅ 创建、编辑、删除菜单
-- ✅ 菜品管理（增删改查）
-- ✅ 分类管理
-- ✅ 价格设置
-- ✅ 可用性控制
+### Smart UI
+- Custom bottom tab navigator
+- Full-screen recipe detail view
+- Responsive design for all screen sizes
+- Modern Material Design components
 
-### 分享功能
-- ✅ 系统分享
-- ✅ 分享码生成
-- ✅ 文本复制
-- ✅ 公开/私有控制
+## 🔧 Development
 
-### 用户体验
-- ✅ 现代化UI设计
-- ✅ 响应式布局
-- ✅ 直观的操作流程
-- ✅ 实时状态更新
+### Available Scripts
 
-## 开发说明
+- `npm start` - Start Expo development server
+- `npm run ios` - Run on iOS simulator
+- `npm run android` - Run on Android emulator
+- `npm run web` - Run on web browser
 
-### 状态管理
-应用使用React Context进行状态管理，主要状态包括：
-- 菜单列表
-- 当前菜单
-- 加载状态
+### State Management
 
-### 导航结构
-- Home: 主页面
-- MenuList: 菜单列表
-- CreateMenu: 创建/编辑菜单
-- MenuDetail: 菜单详情
-- ShareMenu: 分享菜单
+The app uses React Context API for state management:
 
-### 类型定义
-所有TypeScript类型定义在 `src/types/index.ts` 中，包括：
-- MenuItem: 菜品信息
-- Menu: 菜单信息
-- RootStackParamList: 导航参数类型
+- **RecipeContext**: Recipe CRUD operations
+- **FavoriteContext**: Favorite recipes management
+- **GroceriesContext**: Shopping list management
+- **LikeContext**: Recipe likes and social features
+- **PointsContext**: User points and achievements
+- **SocialStatsContext**: Social statistics tracking
 
-## 扩展功能
+## 📱 Platform Support
 
-### 计划中的功能
-- [ ] 图片上传支持
-- [ ] 二维码分享
-- [ ] 菜单模板
-- [ ] 数据导出
-- [ ] 云端同步
+- **iOS**: Full support with native features
+- **Android**: Full support with Material Design
+- **Web**: Progressive Web App support
 
-### 自定义开发
-- 添加新的菜品分类
-- 自定义分享格式
-- 集成第三方服务
-- 添加用户认证
+## 🤝 Contributing
 
-## 故障排除
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### 常见问题
-1. **依赖安装失败**: 尝试清除缓存 `npm cache clean --force`
-2. **Expo Go连接失败**: 确保设备和电脑在同一网络
-3. **TypeScript错误**: 检查类型定义是否正确
+## 📄 License
 
-### 调试技巧
-- 使用 `console.log` 进行调试
-- 检查React Native调试器
-- 查看Expo开发工具日志
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 许可证
+## 👥 Team
 
-MIT License - 详见 LICENSE 文件
+- **Developer**: Ruoyuan Gao
+- **Project**: Chef iQ RN Recipe Management App
 
-## 贡献
+## 📞 Support
 
-欢迎提交Issue和Pull Request来改进这个项目！
+For support, email support@chefiq.com or create an issue in this repository.
 
 ---
 
-**Chef iQ** - 让菜单管理变得简单高效 🍽️✨
-
+Made with ❤️ using React Native and Expo
