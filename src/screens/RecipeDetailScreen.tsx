@@ -10,6 +10,9 @@ import {
   Image,
   StatusBar,
   Platform,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
@@ -19,6 +22,7 @@ import { useLike } from '../contexts/LikeContext';
 import { useTried } from '../contexts/TriedContext';
 import { usePoints } from '../contexts/PointsContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
+import { useComment } from '../contexts/CommentContext';
 import { sampleRecipes } from '../data/sampleRecipes';
 import { MenuItem, Ingredient, Instruction } from '../types';
 
@@ -38,9 +42,14 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const { toggleTried, isTried, getTriedCount } = useTried();
   const { addPoints } = usePoints();
   const { getStats } = useSocialStats();
+  const { getComments, addComment, toggleCommentLike } = useComment();
   
   // 添加份数调整状态
   const [currentServings, setCurrentServings] = useState(4);
+  
+  // 留言相关状态
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [commentText, setCommentText] = useState('');
   
   // 根据ID判断数据来源
   const recipeId = route.params.recipeId;
@@ -178,9 +187,34 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     }
   };
 
+  const handleAddComment = () => {
+    if (commentText.trim()) {
+      addComment(recipe.id, commentText.trim());
+      setCommentText('');
+      setShowCommentModal(false);
+      addPoints('add_comment', `Commented on ${recipe.title}`, recipe.id);
+      Alert.alert('Comment Added', 'Your comment has been added successfully!');
+    } else {
+      Alert.alert('Empty Comment', 'Please enter a comment before submitting.');
+    }
+  };
+
+  const handleCommentLike = (commentId: string) => {
+    toggleCommentLike(recipe.id, commentId);
+  };
+
+  // Cook step by step 处理函数
+  const handleStartCooking = () => {
+    navigation.navigate('CookStep', { recipeId: recipe.id });
+  };
+
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+    >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       {/* Custom Header with Back Button and Share Button */}
       <View style={styles.customHeader}>
@@ -205,7 +239,10 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+      >
         {/* Recipe Main Image */}
         {recipe.imageUri && (
           <View style={styles.recipeImageSection}>
@@ -411,6 +448,17 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         {recipe.instructions && recipe.instructions.length > 0 && (
           <View style={styles.instructionsSection}>
             <Text style={styles.sectionTitle}>Instructions</Text>
+            
+            <View style={styles.cookStepButtonContainer}>
+              <TouchableOpacity
+                style={styles.cookStepButton}
+                onPress={handleStartCooking}
+              >
+                <Ionicons name="play-circle" size={20} color="white" />
+                <Text style={styles.cookStepButtonText}>Cook Step by Step</Text>
+              </TouchableOpacity>
+            </View>
+            
             <View style={styles.instructionsList}>
               {recipe.instructions.map((instruction: Instruction, index: number) => (
                 <View key={index} style={styles.instructionItem}>
@@ -429,10 +477,51 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           </View>
         )}
 
+        {/* Comments Section at the end of detail page */}
+        <View style={styles.commentsSectionInline}>
+          <Text style={styles.sectionTitle}>Comments</Text>
+
+          {getComments(recipe.id).length === 0 ? (
+            <Text style={styles.commentsEmptyText}>No comments yet. Be the first to comment!</Text>
+          ) : (
+            <View style={styles.commentsInlineList}>
+              {getComments(recipe.id).map((comment) => (
+                <View key={comment.id} style={styles.commentItem}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+                    <Text style={styles.commentDate}>
+                      {comment.createdAt.toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.commentContent}>{comment.content}</Text>
+                  <TouchableOpacity
+                    style={styles.commentLikeButton}
+                    onPress={() => handleCommentLike(comment.id)}
+                  >
+                    <Ionicons
+                      name={comment.isLiked ? "heart" : "heart-outline"}
+                      size={16}
+                      color={comment.isLiked ? "#FF6B35" : "#999"}
+                    />
+                    <Text style={[
+                      styles.commentLikeText,
+                      { color: comment.isLiked ? "#FF6B35" : "#999" }
+                    ]}>
+                      {comment.likes}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
       </ScrollView>
 
-      {/* Social Stats */}
-      <View style={styles.socialStatsFooter}>
+      {/* Bottom fixed bar: Social stats + Comment input */}
+      <View style={styles.bottomBarContainer}>
+        {/* Social Stats */}
+        <View style={styles.socialStatsFooter}>
         <TouchableOpacity 
           style={styles.socialStatButton}
           onPress={handleLike}
@@ -488,26 +577,99 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             {getStats(recipe.id).tried}
           </Text>
         </TouchableOpacity>
+        </View>
+        {/* Comment Input Row */}
+        <View style={styles.commentInputRowBottom}>
+          <TextInput
+            style={styles.commentInputBottom}
+            placeholder="Write a comment..."
+            value={commentText}
+            onChangeText={setCommentText}
+            maxLength={500}
+            returnKeyType="send"
+            onSubmitEditing={handleAddComment}
+            multiline={true}
+            textAlignVertical="top"
+          />
+          <TouchableOpacity
+            style={styles.commentSendButtonBottom}
+            onPress={handleAddComment}
+          >
+            <Ionicons name="send" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.footer}>
-        {isUserCreated ? (
-          // 自己的菜谱：编辑、收藏、加groceries、分享
-          <>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('EditRecipe', { recipeId: recipe.id })}
-            >
-              <Ionicons name="create-outline" size={16} color="white" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          // 别人的菜谱：无额外按钮
-          <></>
-        )}
-      </View>
-    </View>
+      {/* Comments Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showCommentModal}
+        onRequestClose={() => setShowCommentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Comments</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowCommentModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.commentsList}>
+              {getComments(recipe.id).map((comment) => (
+                <View key={comment.id} style={styles.commentItem}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+                    <Text style={styles.commentDate}>
+                      {comment.createdAt.toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.commentContent}>{comment.content}</Text>
+                  <TouchableOpacity
+                    style={styles.commentLikeButton}
+                    onPress={() => handleCommentLike(comment.id)}
+                  >
+                    <Ionicons
+                      name={comment.isLiked ? "heart" : "heart-outline"}
+                      size={16}
+                      color={comment.isLiked ? "#FF6B35" : "#999"}
+                    />
+                    <Text style={[
+                      styles.commentLikeText,
+                      { color: comment.isLiked ? "#FF6B35" : "#999" }
+                    ]}>
+                      {comment.likes}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.commentInputContainer}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Write a comment..."
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleAddComment}
+              >
+                <Ionicons name="send" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+    </KeyboardAvoidingView>
   );
 };
 
@@ -542,9 +704,13 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16, // 为header留出空间
+    paddingBottom: 24,
   },
   // Recipe Image Section
   recipeImageSection: {
@@ -909,10 +1075,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
     paddingVertical: 12,
     paddingHorizontal: 20,
+  },
+  bottomBarContainer: {
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 10,
   },
   socialStatButton: {
     flexDirection: 'row',
@@ -929,50 +1103,33 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     color: '#999',
   },
-  footer: {
+  // Bottom Comment Input Row
+  commentInputRowBottom: {
     flexDirection: 'row',
-    padding: 16,
+    alignItems: 'center',
     backgroundColor: 'white',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  shareFooterButton: {
+  commentInputBottom: {
     flex: 1,
-    backgroundColor: '#FF9800',
-    flexDirection: 'row',
+    fontSize: 14,
+    color: '#333',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 12,
+    minHeight: 40,
+    maxHeight: 100,
+  },
+  commentSendButtonBottom: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  shareButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  shareFooterButtonFull: {
-    flex: 2,
-    marginLeft: 0,
-  },
-  actionButton: {
-    backgroundColor: '#FF9800',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-    borderRadius: 6,
-    marginHorizontal: 2,
-    minWidth: 70,
-    flex: 1,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
   },
   errorContainer: {
     flex: 1,
@@ -1001,6 +1158,165 @@ const styles = StyleSheet.create({
   },
   favoritedButton: {
     backgroundColor: '#FF6B35', // 使用橙色表示已收藏状态
+  },
+  // Comment Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  // Inline comments section at end of page
+  commentsSectionInline: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  commentInputInline: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    marginRight: 12,
+  },
+  commentSendButton: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentsEmptyText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  commentsInlineList: {
+    marginTop: 4,
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 20,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  commentsList: {
+    maxHeight: 300,
+    marginBottom: 20,
+  },
+  commentItem: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  commentDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  commentContent: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  commentLikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentLikeText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+  },
+  commentInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    maxHeight: 100,
+    marginRight: 12,
+  },
+  submitButton: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Cook Step by Step Styles
+  cookStepButtonContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cookStepButton: {
+    backgroundColor: '#FF6B35',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  cookStepButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  cookStepButtonCompleted: {
+    backgroundColor: '#4CAF50',
   },
 });
 

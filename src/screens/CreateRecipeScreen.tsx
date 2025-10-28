@@ -716,7 +716,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       <KeyboardAvoidingView 
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 50}
       >
         <ScrollView 
           ref={scrollViewRef}
@@ -772,7 +772,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               value={recipeData.title}
               onChangeText={text => setRecipeData({ ...recipeData, title: text })}
               placeholder="Enter recipe title"
-              onFocus={() => scrollToInput(titleInputRef)}
+              onFocus={() => scrollToInput(titleInputRef, 200)}
             />
           </View>
           <View style={styles.inputGroup}>
@@ -785,7 +785,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               placeholder="Every dish tells a story. What's yours? Capture its taste, texture, and the moment behind it..."
               multiline
               numberOfLines={3}
-              onFocus={() => scrollToInput(descriptionInputRef, 50)}
+              onFocus={() => scrollToInput(descriptionInputRef, 200)}
             />
           </View>
           <View style={styles.switchGroup}>
@@ -810,7 +810,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               onSubmitEditing={addTag}
               onFocus={() => {
                 setShowTagSuggestions(true);
-                scrollToInput(tagInputRef, 100);
+                scrollToInput(tagInputRef, 200);
               }}
               onBlur={() => setTimeout(() => setShowTagSuggestions(false), 300)}
               returnKeyType="done"
@@ -820,9 +820,9 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
             </TouchableOpacity>
           </View>
             {showTagSuggestions && (
-              <View style={[styles.tagSuggestions, { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 999999, maxHeight: 200 }]}>
+              <View style={styles.tagSuggestions}>
                 <Text style={styles.suggestionsTitle}>Popular Tags:</Text>
-                <ScrollView showsVerticalScrollIndicator={true}>
+                <ScrollView showsVerticalScrollIndicator={true} style={styles.tagSuggestionsScroll}>
                   <View style={styles.suggestionsList}>
                     {commonTags
                       .filter(tag => !recipeData.tags.includes(tag))
@@ -874,7 +874,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               />
             </TouchableOpacity>
             {showCookwareDropdown && (
-              <View style={[styles.dropdownList, { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 999999, maxHeight: 200 }]}>
+              <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
                 <ScrollView showsVerticalScrollIndicator={true}>
                   {[
                     'Regular Pan/Pot',
@@ -923,7 +923,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
                 />
               </TouchableOpacity>
               {showCookingTimeDropdown && (
-                <View style={[styles.dropdownList, { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 999999, maxHeight: 200 }]}>
+                <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
                   <ScrollView showsVerticalScrollIndicator={true}>
                     {cookingTimeOptions.map((option, index) => (
                       <TouchableOpacity
@@ -959,7 +959,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
                 />
               </TouchableOpacity>
               {showServingsDropdown && (
-                <View style={[styles.dropdownList, { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 999999, maxHeight: 200 }]}>
+                <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
                   <ScrollView showsVerticalScrollIndicator={true}>
                     {servingsOptions.map((option, index) => (
                       <TouchableOpacity
@@ -1023,7 +1023,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
                   />
                 </TouchableOpacity>
                   {showUnitDropdown && (
-                    <View style={[styles.unitDropdownList, { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 999999, maxHeight: 200 }]}>
+                    <View style={[styles.unitDropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
                       <ScrollView showsVerticalScrollIndicator={true}>
                         {unitOptions.map((unit, index) => (
                           <TouchableOpacity
@@ -1338,7 +1338,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    zIndex: 3000,
   },
   cookingDetailsSection: {
     backgroundColor: 'white',
@@ -1653,8 +1652,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#e9ecef',
-    zIndex: 99999,
-    elevation: 50,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  tagSuggestionsScroll: {
+    maxHeight: 150,
   },
   suggestionsTitle: {
     fontSize: 14,
@@ -1710,12 +1716,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 4,
     maxHeight: 200,
-    zIndex: 99999,
+    zIndex: 999999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 50,
+    elevation: 100,
   },
   dropdownItem: {
     flexDirection: 'row',

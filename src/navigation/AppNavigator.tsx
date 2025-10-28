@@ -5,11 +5,13 @@ import { RootStackParamList } from '../types';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import RecipeListScreen from '../screens/RecipeListScreen';
 import RecipeNameScreen from '../screens/RecipeNameScreen';
 import CreateRecipeScreen from '../screens/CreateRecipeScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
+import CookStepScreen from '../screens/CookStepScreen';
 import ShareRecipeScreen from '../screens/ShareRecipeScreen';
 import FavoriteRecipeScreen from '../screens/FavoriteRecipeScreen';
 import ExploreScreen from '../screens/ExploreScreen';
@@ -41,6 +43,13 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen
           name="Login"
           component={LoginScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="Register"
+          component={RegisterScreen}
           options={{
             headerShown: false,
           }}
@@ -88,6 +97,13 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen
           name="RecipeDetail"
           component={RecipeDetailScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="CookStep"
+          component={CookStepScreen}
           options={{
             headerShown: false,
           }}

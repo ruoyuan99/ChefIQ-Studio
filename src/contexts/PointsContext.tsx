@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface PointsActivity {
   id: string;
-  type: 'create_recipe' | 'try_recipe' | 'favorite_recipe' | 'like_recipe' | 'share_recipe' | 'complete_profile';
+  type: 'create_recipe' | 'try_recipe' | 'favorite_recipe' | 'like_recipe' | 'share_recipe' | 'complete_profile' | 'add_comment';
   points: number;
   description: string;
   timestamp: Date;
@@ -37,6 +37,7 @@ export const POINTS_RULES = {
   like_recipe: 5,
   share_recipe: 15,
   complete_profile: 25,
+  add_comment: 8,
 };
 
 // 等级系统

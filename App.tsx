@@ -7,6 +7,7 @@ import { LikeProvider } from './src/contexts/LikeContext';
 import { TriedProvider } from './src/contexts/TriedContext';
 import { PointsProvider } from './src/contexts/PointsContext';
 import { SocialStatsProvider } from './src/contexts/SocialStatsContext';
+import { CommentProvider } from './src/contexts/CommentContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
@@ -18,8 +19,10 @@ export default function App() {
             <TriedProvider>
               <PointsProvider>
                 <SocialStatsProvider>
-                  <AppNavigator />
-                  <StatusBar style="auto" />
+                  <CommentProvider>
+                    <AppNavigator />
+                    <StatusBar style="auto" />
+                  </CommentProvider>
                 </SocialStatsProvider>
               </PointsProvider>
             </TriedProvider>

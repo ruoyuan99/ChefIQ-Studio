@@ -51,12 +51,14 @@ export interface Category {
 
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
   Home: { initialTab?: string };
   RecipeList: undefined;
   RecipeName: undefined;
   CreateRecipe: { recipeName?: string };
   EditRecipe: { recipeId: string };
   RecipeDetail: { recipeId: string; returnTo?: string };
+  CookStep: { recipeId: string };
   ShareRecipe: { recipeId: string };
   FavoriteRecipe: undefined;
   Explore: undefined;

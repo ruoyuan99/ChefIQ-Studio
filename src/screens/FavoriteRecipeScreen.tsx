@@ -106,7 +106,6 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
             </View>
           </View>
         </View>
-        <Ionicons name="heart" size={24} color="#FF9800" />
       </View>
     </TouchableOpacity>
   );
@@ -305,13 +304,10 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   favoriteContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 20,
   },
   favoriteInfo: {
     flex: 1,
-    marginRight: 16,
   },
   favoriteTitle: {
     fontSize: 18,

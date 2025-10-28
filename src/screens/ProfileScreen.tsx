@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
+import { useSocialStats } from '../contexts/SocialStatsContext';
 import PointsDisplay from '../components/PointsDisplay';
 
 interface ProfileScreenProps {
@@ -18,12 +19,39 @@ interface ProfileScreenProps {
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { state } = useRecipe();
+  const { getStats } = useSocialStats();
+
+  // 计算用户所有食谱的社交统计
+  const calculateSocialStats = () => {
+    let totalLikes = 0;
+    let totalFavorites = 0;
+    let totalTried = 0;
+    let totalViews = 0;
+
+    state.recipes.forEach(recipe => {
+      const stats = getStats(recipe.id);
+      totalLikes += stats.likes;
+      totalFavorites += stats.favorites;
+      totalTried += stats.tried;
+      totalViews += stats.views;
+    });
+
+    return {
+      totalLikes,
+      totalFavorites,
+      totalTried,
+      totalViews,
+    };
+  };
+
+  const socialStats = calculateSocialStats();
 
   const userStats = {
     totalRecipes: state.recipes.length,
     publicRecipes: state.recipes.filter(recipe => recipe.isPublic).length,
     draftRecipes: state.recipes.filter(recipe => !recipe.isPublic).length,
     totalDishes: state.recipes.reduce((acc, recipe) => acc + recipe.items.length, 0),
+    ...socialStats,
   };
 
   const menuItems = [
@@ -82,20 +110,34 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Your Stats</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
+              <Ionicons name="restaurant" size={18} color="#FF6B35" style={styles.statIcon} />
               <Text style={styles.statNumber}>{userStats.totalRecipes}</Text>
-              <Text style={styles.statLabel}>Total Recipes</Text>
+              <Text style={styles.statLabel}>My Recipes</Text>
             </View>
             <View style={styles.statCard}>
+              <Ionicons name="globe" size={18} color="#FF6B35" style={styles.statIcon} />
               <Text style={styles.statNumber}>{userStats.publicRecipes}</Text>
               <Text style={styles.statLabel}>Published</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{userStats.draftRecipes}</Text>
-              <Text style={styles.statLabel}>Drafts</Text>
+              <Ionicons name="eye" size={18} color="#FF6B35" style={styles.statIcon} />
+              <Text style={styles.statNumber}>{userStats.totalViews}</Text>
+              <Text style={styles.statLabel}>Views</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{userStats.totalDishes}</Text>
-              <Text style={styles.statLabel}>Total Dishes</Text>
+              <Ionicons name="heart" size={18} color="#FF6B35" style={styles.statIcon} />
+              <Text style={styles.statNumber}>{userStats.totalLikes}</Text>
+              <Text style={styles.statLabel}>Likes</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="bookmark" size={18} color="#FF6B35" style={styles.statIcon} />
+              <Text style={styles.statNumber}>{userStats.totalFavorites}</Text>
+              <Text style={styles.statLabel}>Favorites</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="checkmark-circle" size={18} color="#FF6B35" style={styles.statIcon} />
+              <Text style={styles.statNumber}>{userStats.totalTried}</Text>
+              <Text style={styles.statLabel}>Tried</Text>
             </View>
           </View>
         </View>
@@ -186,21 +228,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statCard: {
-    width: '48%',
+    width: '31%',
     backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    padding: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
+  statIcon: {
+    marginBottom: 6,
+  },
   statNumber: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#FF6B35',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
     textAlign: 'center',
   },
