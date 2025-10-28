@@ -17,6 +17,7 @@ import FavoriteRecipeScreen from '../screens/FavoriteRecipeScreen';
 import ExploreScreen from '../screens/ExploreScreen';
 import GroceriesScreen from '../screens/GroceriesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SupabaseTestScreen from '../screens/SupabaseTestScreen';
 import BottomTabNavigator from '../components/BottomTabNavigator';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -106,6 +107,14 @@ const AppNavigator: React.FC = () => {
           component={CookStepScreen}
           options={{
             headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="SupabaseTest"
+          component={SupabaseTestScreen}
+          options={{
+            title: 'Supabase Test',
+            headerBackTitle: 'Back',
           }}
         />
         <Stack.Screen

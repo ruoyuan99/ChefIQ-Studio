@@ -66,6 +66,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       onPress: () => navigation.navigate('FavoriteRecipe'),
     },
     {
+      title: 'Supabase Test',
+      icon: 'server-outline',
+      onPress: () => navigation.navigate('SupabaseTest'),
+    },
+    {
       title: 'Settings',
       icon: 'settings-outline',
       onPress: () => {

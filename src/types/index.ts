@@ -59,6 +59,7 @@ export type RootStackParamList = {
   EditRecipe: { recipeId: string };
   RecipeDetail: { recipeId: string; returnTo?: string };
   CookStep: { recipeId: string };
+  SupabaseTest: undefined;
   ShareRecipe: { recipeId: string };
   FavoriteRecipe: undefined;
   Explore: undefined;
