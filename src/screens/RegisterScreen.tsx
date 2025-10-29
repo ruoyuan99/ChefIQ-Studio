@@ -85,8 +85,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     const result = await signUp(email.trim(), password, fullName);
     
     if (result.success) {
-      // Direct navigation without success alert
-      navigation.navigate('Home', { initialTab: 'home' });
+      // Direct navigation to Favorite page without success alert
+      navigation.navigate('Home', { initialTab: 'favorite' });
     } else {
       Alert.alert('Registration Failed', result.message);
     }

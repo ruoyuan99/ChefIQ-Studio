@@ -32,8 +32,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     const result = await signIn(email.trim(), password);
     
     if (result.success) {
-      // Direct navigation without success alert
-      navigation.navigate('Home', { initialTab: 'home' });
+      // Direct navigation to Favorite page without success alert
+      navigation.navigate('Home', { initialTab: 'favorite' });
     } else {
       Alert.alert('Login Failed', result.message);
     }
