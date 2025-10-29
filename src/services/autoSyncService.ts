@@ -14,11 +14,11 @@ export class AutoSyncService {
   // 自动同步所有数据到Supabase
   static async syncAllDataToSupabase(): Promise<SyncResult> {
     if (this.isSyncing) {
-      return { success: false, message: '同步正在进行中...' };
+      return { success: false, message: 'Sync is in progress...' };
     }
 
     this.isSyncing = true;
-    console.log('🔄 开始自动同步数据到Supabase...');
+    console.log('🔄 Starting automatic data sync to Supabase...');
 
     try {
       // 检查用户认证（支持管理员用户）
@@ -34,24 +34,24 @@ export class AutoSyncService {
           const parsedUser = JSON.parse(storedUser);
           if (parsedUser.id === '00000000-0000-0000-0000-000000000001') {
             userId = parsedUser.id;
-            console.log('👤 使用管理员账户进行同步');
+            console.log('👤 Using admin account for sync');
           } else {
-            console.log('👤 用户未认证，跳过自动同步');
-            return { success: false, message: '用户未认证' };
+            console.log('👤 User not authenticated, skipping sync');
+            return { success: false, message: 'User not authenticated' };
           }
         } else {
-          console.log('👤 用户未认证，跳过自动同步');
-          return { success: false, message: '用户未认证' };
+          console.log('👤 User not authenticated, skipping sync');
+          return { success: false, message: 'User not authenticated' };
         }
       }
 
       let syncedCount = 0;
 
-      // 1. 同步用户数据（确保用户存在）
+      // 1. Sync user data (ensure user exists)
       const userCreated = await this.syncUserData(userId);
       if (!userCreated) {
-        console.log('❌ 用户创建失败，跳过后续同步');
-        return { success: false, message: '用户创建失败，无法同步数据' };
+        console.log('❌ User creation failed, skipping subsequent sync');
+        return { success: false, message: 'User creation failed, cannot sync data' };
       }
       syncedCount++;
 
@@ -74,18 +74,18 @@ export class AutoSyncService {
       // 标记同步完成
       await this.markSyncComplete();
 
-      console.log('✅ 自动同步完成！');
+      console.log('✅ Automatic sync completed!');
       return { 
         success: true, 
-        message: '数据已自动同步到云端',
+        message: 'Data automatically synced to cloud',
         syncedCount 
       };
 
     } catch (error) {
-      console.error('❌ 自动同步失败:', error);
+      console.error('❌ Automatic sync failed:', error);
       return { 
         success: false, 
-        message: `同步失败: ${error.message}` 
+        message: `Sync failed: ${error.message}` 
       };
     } finally {
       this.isSyncing = false;
@@ -103,7 +103,7 @@ export class AutoSyncService {
         .single();
 
       if (existingUser) {
-        console.log('✅ 用户已存在，跳过用户数据同步');
+        console.log('✅ User already exists, skipping user data sync');
         return true;
       }
 
@@ -134,14 +134,14 @@ export class AutoSyncService {
         });
 
       if (error) {
-        console.error('❌ 用户数据同步失败:', error);
+        console.error('❌ User data sync failed:', error);
         return false;
       }
 
-      console.log('✅ 用户数据同步完成');
+      console.log('✅ User data sync completed');
       return true;
     } catch (error) {
-      console.error('❌ 用户数据同步失败:', error);
+      console.error('❌ User data sync failed:', error);
       return false;
     }
   }

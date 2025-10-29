@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(userData);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {
-      console.error('加载用户资料失败:', error);
+      console.error('Failed to load user profile:', error);
     }
   };
 
@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('创建用户资料失败:', error);
+        console.error('Failed to create user profile:', error);
         return;
       }
 
@@ -153,15 +153,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
 
         if (error) {
-          console.error('创建管理员用户失败:', error);
+          console.error('Failed to create admin user:', error);
         } else {
-          console.log('✅ 管理员用户已创建');
+          console.log('✅ Admin user created successfully');
         }
       } else {
-        console.log('✅ 管理员用户已存在');
+        console.log('✅ Admin user already exists');
       }
     } catch (error) {
-      console.error('确保管理员用户存在失败:', error);
+      console.error('Failed to ensure admin user exists:', error);
     }
   };
 
@@ -188,13 +188,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await createUserProfile(data.user);
         return { 
           success: true, 
-          message: '注册成功！请检查您的邮箱以验证账户。' 
+          message: 'Registration successful! Please check your email to verify your account.' 
         };
       }
 
-      return { success: false, message: '注册失败' };
+      return { success: false, message: 'Registration failed' };
     } catch (error) {
-      return { success: false, message: `注册失败: ${error}` };
+      return { success: false, message: `Registration failed: ${error}` };
     } finally {
       setLoading(false);
     }
@@ -206,7 +206,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // 特殊处理admin@admin.com账户
       if (email === 'admin@admin.com' && password === 'password') {
-        console.log('🔑 使用管理员账户登录');
+        console.log('🔑 Logging in with admin account');
         
         const adminUser: User = {
           id: '00000000-0000-0000-0000-000000000001',
@@ -221,7 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 确保管理员用户在Supabase中存在
         await ensureAdminUserExists(adminUser);
         
-        return { success: true, message: '管理员登录成功！' };
+        return { success: true, message: 'Admin login successful!' };
       }
       
       // 正常Supabase登录
@@ -236,12 +236,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (data.user) {
         await loadUserProfile(data.user);
-        return { success: true, message: '登录成功！' };
+        return { success: true, message: 'Login successful!' };
       }
 
-      return { success: false, message: '登录失败' };
+      return { success: false, message: 'Login failed' };
     } catch (error) {
-      return { success: false, message: `登录失败: ${error}` };
+      return { success: false, message: `Login failed: ${error}` };
     } finally {
       setLoading(false);
     }
@@ -254,7 +254,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       await AsyncStorage.removeItem('user');
     } catch (error) {
-      console.error('登出失败:', error);
+      console.error('Sign out failed:', error);
     } finally {
       setLoading(false);
     }
