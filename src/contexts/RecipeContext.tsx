@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Recipe, MenuItem } from '../types';
+import { AutoSyncService } from '../services/autoSyncService';
+import { RealTimeSyncService } from '../services/realTimeSyncService';
+import { useAuth } from './AuthContext';
 
 interface RecipeState {
   recipes: Recipe[];
@@ -62,6 +65,36 @@ const RecipeContext = createContext<RecipeContextType | undefined>(undefined);
 
 export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(recipeReducer, initialState);
+  const { user } = useAuth();
+
+  // 自动同步数据到Supabase
+  useEffect(() => {
+    const autoSync = async () => {
+      if (user) {
+        try {
+          console.log('🔄 用户已登录，开始自动同步数据...');
+          const needsSync = await AutoSyncService.needsSync();
+          
+          if (needsSync) {
+            console.log('📤 检测到本地数据，开始同步到Supabase...');
+            const result = await AutoSyncService.syncAllDataToSupabase();
+            
+            if (result.success) {
+              console.log('✅ 自动同步完成:', result.message);
+            } else {
+              console.log('⚠️ 自动同步失败:', result.message);
+            }
+          } else {
+            console.log('✅ 数据已同步，无需重复同步');
+          }
+        } catch (error) {
+          console.error('❌ 自动同步出错:', error);
+        }
+      }
+    };
+
+    autoSync();
+  }, [user]);
 
   // 加载保存的recipes
   useEffect(() => {
@@ -128,12 +161,23 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     console.log('RecipeContext - Instructions details:', newRecipe.instructions);
     
     dispatch({ type: 'ADD_RECIPE', payload: newRecipe });
+    
+    // 实时同步到Supabase
+    if (user) {
+      RealTimeSyncService.syncRecipe(newRecipe, user.id);
+    }
+    
     return newRecipe; // 返回创建的recipe对象
   };
 
   const updateRecipe = (recipe: Recipe) => {
     const updatedRecipe = { ...recipe, updatedAt: new Date() };
     dispatch({ type: 'UPDATE_RECIPE', payload: updatedRecipe });
+    
+    // 实时同步到Supabase
+    if (user) {
+      RealTimeSyncService.syncRecipe(updatedRecipe, user.id);
+    }
   };
 
   const deleteRecipe = (recipeId: string) => {

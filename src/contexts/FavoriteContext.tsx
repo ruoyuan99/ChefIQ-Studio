@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { Recipe } from '../types';
 import { sampleRecipes } from '../data/sampleRecipes';
+import { RealTimeSyncService } from '../services/realTimeSyncService';
+import { useAuth } from './AuthContext';
 
 interface FavoriteState {
   favoriteRecipes: Recipe[];
@@ -61,17 +63,34 @@ const FavoriteContext = createContext<FavoriteContextType | undefined>(undefined
 
 export const FavoriteProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(favoriteReducer, initialState);
+  const { user } = useAuth();
 
   const addToFavorites = (recipe: Recipe) => {
     dispatch({ type: 'ADD_FAVORITE', payload: recipe });
+    
+    // 实时同步到Supabase
+    if (user) {
+      RealTimeSyncService.syncFavorite(recipe.id, user.id, true);
+    }
   };
 
   const removeFromFavorites = (recipeId: string) => {
     dispatch({ type: 'REMOVE_FAVORITE', payload: recipeId });
+    
+    // 实时同步到Supabase
+    if (user) {
+      RealTimeSyncService.syncFavorite(recipeId, user.id, false);
+    }
   };
 
   const toggleFavorite = (recipe: Recipe) => {
+    const isCurrentlyFavorite = state.favoriteRecipes.some(fav => fav.id === recipe.id);
     dispatch({ type: 'TOGGLE_FAVORITE', payload: recipe });
+    
+    // 实时同步到Supabase
+    if (user) {
+      RealTimeSyncService.syncFavorite(recipe.id, user.id, !isCurrentlyFavorite);
+    }
   };
 
   const isFavorite = (recipeId: string) => {
