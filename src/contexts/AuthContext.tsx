@@ -132,6 +132,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const ensureAdminUserExists = async (adminUser: User) => {
+    try {
+      // 检查管理员用户是否已存在
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', adminUser.id)
+        .single();
+
+      if (!existingUser) {
+        // 创建管理员用户
+        const { error } = await supabase
+          .from('users')
+          .insert({
+            id: adminUser.id,
+            email: adminUser.email,
+            name: adminUser.name,
+            avatar_url: adminUser.avatar_url
+          });
+
+        if (error) {
+          console.error('创建管理员用户失败:', error);
+        } else {
+          console.log('✅ 管理员用户已创建');
+        }
+      } else {
+        console.log('✅ 管理员用户已存在');
+      }
+    } catch (error) {
+      console.error('确保管理员用户存在失败:', error);
+    }
+  };
+
   const signUp = async (email: string, password: string, name?: string): Promise<{ success: boolean; message: string }> => {
     try {
       setLoading(true);
@@ -171,6 +204,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
+      // 特殊处理admin@admin.com账户
+      if (email === 'admin@admin.com' && password === 'password') {
+        console.log('🔑 使用管理员账户登录');
+        
+        const adminUser: User = {
+          id: 'admin-user-id-12345',
+          email: 'admin@admin.com',
+          name: 'Admin User',
+          avatar_url: null
+        };
+        
+        setUser(adminUser);
+        await AsyncStorage.setItem('user', JSON.stringify(adminUser));
+        
+        // 确保管理员用户在Supabase中存在
+        await ensureAdminUserExists(adminUser);
+        
+        return { success: true, message: '管理员登录成功！' };
+      }
+      
+      // 正常Supabase登录
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password

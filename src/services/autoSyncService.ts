@@ -21,33 +21,50 @@ export class AutoSyncService {
     console.log('🔄 开始自动同步数据到Supabase...');
 
     try {
-      // 检查用户认证
+      // 检查用户认证（支持管理员用户）
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('👤 用户未认证，跳过自动同步');
-        return { success: false, message: '用户未认证' };
+      let userId: string;
+      
+      if (user) {
+        userId = user.id;
+      } else {
+        // 检查是否是管理员用户（从AsyncStorage获取）
+        const storedUser = await AsyncStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          if (parsedUser.id === 'admin-user-id-12345') {
+            userId = parsedUser.id;
+            console.log('👤 使用管理员账户进行同步');
+          } else {
+            console.log('👤 用户未认证，跳过自动同步');
+            return { success: false, message: '用户未认证' };
+          }
+        } else {
+          console.log('👤 用户未认证，跳过自动同步');
+          return { success: false, message: '用户未认证' };
+        }
       }
 
       let syncedCount = 0;
 
       // 1. 同步用户数据
-      await this.syncUserData(user.id);
+      await this.syncUserData(userId);
       syncedCount++;
 
       // 2. 同步菜谱数据
-      const recipes = await this.syncRecipes(user.id);
+      const recipes = await this.syncRecipes(userId);
       syncedCount += recipes.length;
 
       // 3. 同步收藏数据
-      await this.syncFavorites(user.id);
+      await this.syncFavorites(userId);
       syncedCount++;
 
       // 4. 同步评论数据
-      await this.syncComments(user.id);
+      await this.syncComments(userId);
       syncedCount++;
 
       // 5. 同步社交统计数据
-      await this.syncSocialStats(user.id);
+      await this.syncSocialStats(userId);
       syncedCount++;
 
       // 标记同步完成
@@ -74,11 +91,6 @@ export class AutoSyncService {
   // 同步用户数据
   private static async syncUserData(userId: string): Promise<void> {
     try {
-      const userData = await AsyncStorage.getItem('userData');
-      if (!userData) return;
-
-      const user = JSON.parse(userData);
-      
       // 检查用户是否已存在
       const { data: existingUser } = await supabase
         .from('users')
@@ -87,27 +99,35 @@ export class AutoSyncService {
         .single();
 
       if (existingUser) {
-        // 更新现有用户
-        await supabase
-          .from('users')
-          .update({
-            name: user.name || 'User',
-            email: user.email || `user-${Date.now()}@app.com`,
-            avatar_url: user.avatar_url || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId);
-      } else {
-        // 创建新用户
-        await supabase
-          .from('users')
-          .insert({
-            id: userId,
-            name: user.name || 'User',
-            email: user.email || `user-${Date.now()}@app.com`,
-            avatar_url: user.avatar_url || null
-          });
+        console.log('✅ 用户已存在，跳过用户数据同步');
+        return;
       }
+
+      // 获取用户数据
+      let userData: any = {};
+      const storedUserData = await AsyncStorage.getItem('userData');
+      if (storedUserData) {
+        userData = JSON.parse(storedUserData);
+      }
+
+      // 如果是管理员用户，使用默认值
+      if (userId === 'admin-user-id-12345') {
+        userData = {
+          name: 'Admin User',
+          email: 'admin@admin.com',
+          avatar_url: null
+        };
+      }
+
+      // 创建用户
+      await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          name: userData.name || 'User',
+          email: userData.email || `user-${Date.now()}@app.com`,
+          avatar_url: userData.avatar_url || null
+        });
 
       console.log('✅ 用户数据同步完成');
     } catch (error) {
