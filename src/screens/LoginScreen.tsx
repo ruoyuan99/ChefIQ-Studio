@@ -25,21 +25,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('错误', '请输入邮箱和密码');
+      Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
     const result = await signIn(email.trim(), password);
     
     if (result.success) {
-      Alert.alert('成功', result.message, [
-        {
-          text: '确定',
-          onPress: () => navigation.navigate('Home', { initialTab: 'home' })
-        }
-      ]);
+      // Direct navigation without success alert
+      navigation.navigate('Home', { initialTab: 'home' });
     } else {
-      Alert.alert('登录失败', result.message);
+      Alert.alert('Login Failed', result.message);
     }
   };
 
@@ -103,7 +99,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               disabled={loading}
             >
               <Text style={styles.loginButtonText}>
-                {loading ? '登录中...' : '登录'}
+                {loading ? 'Logging in...' : 'Login'}
               </Text>
             </TouchableOpacity>
 

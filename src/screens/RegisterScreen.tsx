@@ -85,14 +85,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     const result = await signUp(email.trim(), password, fullName);
     
     if (result.success) {
-      Alert.alert('注册成功', result.message, [
-        {
-          text: '确定',
-          onPress: () => navigation.navigate('Home', { initialTab: 'home' })
-        }
-      ]);
+      // Direct navigation without success alert
+      navigation.navigate('Home', { initialTab: 'home' });
     } else {
-      Alert.alert('注册失败', result.message);
+      Alert.alert('Registration Failed', result.message);
     }
   };
 
@@ -220,7 +216,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 disabled={loading}
               >
                 <Text style={styles.registerButtonText}>
-                  {loading ? '创建账户中...' : '创建账户'}
+                  {loading ? 'Creating Account...' : 'Create Account'}
                 </Text>
               </TouchableOpacity>
             </View>

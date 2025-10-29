@@ -1,6 +1,13 @@
 -- Fix RLS Policy for Admin User
 -- Execute this script in Supabase SQL Editor
 
+-- First, drop all existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Users can view own profile" ON users;
+DROP POLICY IF EXISTS "Users can create own profile" ON users;
+DROP POLICY IF EXISTS "Users can update own profile" ON users;
+DROP POLICY IF EXISTS "Allow admin user creation" ON users;
+DROP POLICY IF EXISTS "Admin can manage own profile" ON users;
+
 -- Allow admin user (00000000-0000-0000-0000-000000000001) to be created without auth
 CREATE POLICY "Allow admin user creation" ON users
   FOR INSERT 
