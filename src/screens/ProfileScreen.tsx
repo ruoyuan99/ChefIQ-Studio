@@ -94,7 +94,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     {
       title: 'Data Migration',
       icon: 'cloud-upload-outline',
-      onPress: () => navigation.navigate('DataMigration'),
+      onPress: () => {
+        navigation.navigate('DataMigration');
+      },
     },
     {
       title: 'Settings',
