@@ -18,6 +18,7 @@ import ExploreScreen from '../screens/ExploreScreen';
 import GroceriesScreen from '../screens/GroceriesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
+import DataMigrationScreen from '../screens/DataMigrationScreen';
 import BottomTabNavigator from '../components/BottomTabNavigator';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -114,6 +115,14 @@ const AppNavigator: React.FC = () => {
           component={SupabaseTestScreen}
           options={{
             title: 'Supabase Test',
+            headerBackTitle: 'Back',
+          }}
+        />
+        <Stack.Screen
+          name="DataMigration"
+          component={DataMigrationScreen}
+          options={{
+            title: 'Data Migration',
             headerBackTitle: 'Back',
           }}
         />
