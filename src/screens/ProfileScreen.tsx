@@ -7,8 +7,10 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
 import PointsDisplay from '../components/PointsDisplay';
@@ -18,6 +20,7 @@ interface ProfileScreenProps {
 }
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
+  const { user, signOut } = useAuth();
   const { state } = useRecipe();
   const { getStats } = useSocialStats();
 
@@ -52,6 +55,24 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     draftRecipes: state.recipes.filter(recipe => !recipe.isPublic).length,
     totalDishes: state.recipes.reduce((acc, recipe) => acc + recipe.items.length, 0),
     ...socialStats,
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      '确认登出',
+      '您确定要登出吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        { 
+          text: '登出', 
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            navigation.navigate('Login');
+          }
+        }
+      ]
+    );
   };
 
   const menuItems = [
@@ -96,6 +117,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         // TODO: Navigate to about
       },
     },
+    {
+      title: 'Sign Out',
+      icon: 'log-out-outline',
+      onPress: handleSignOut,
+      style: 'destructive'
+    },
   ];
 
   return (
@@ -108,11 +135,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#FF6B35" />
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={40} color="#FF6B35" />
+              )}
             </View>
           </View>
-          <Text style={styles.userName}>Recipe Chef</Text>
-          <Text style={styles.userEmail}>chef@recipeapp.com</Text>
+          <Text style={styles.userName}>{user?.name || 'Recipe Chef'}</Text>
+          <Text style={styles.userEmail}>{user?.email || 'chef@recipeapp.com'}</Text>
         </View>
 
         {/* Stats Section */}
@@ -210,6 +241,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: '#FF6B35',
+  },
+  avatarImage: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
   },
   userName: {
     fontSize: 24,

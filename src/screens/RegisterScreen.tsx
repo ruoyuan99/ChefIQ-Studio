@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RegisterScreenProps {
   navigation: any;
@@ -27,7 +28,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { signUp, loading } = useAuth();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -78,23 +79,21 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       return;
     }
 
-    setIsLoading(true);
+    const { firstName, lastName, email, password } = formData;
+    const fullName = `${firstName} ${lastName}`.trim();
     
-    // Simulate registration process
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      Alert.alert(
-        'Success', 
-        'Account created successfully! Welcome to Recipe App!', 
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Home', { initialTab: 'favorite' })
-          }
-        ]
-      );
-    }, 1500);
+    const result = await signUp(email.trim(), password, fullName);
+    
+    if (result.success) {
+      Alert.alert('注册成功', result.message, [
+        {
+          text: '确定',
+          onPress: () => navigation.navigate('Home', { initialTab: 'home' })
+        }
+      ]);
+    } else {
+      Alert.alert('注册失败', result.message);
+    }
   };
 
   return (
@@ -216,12 +215,12 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
               </View>
 
               <TouchableOpacity
-                style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
+                style={[styles.registerButton, loading && styles.registerButtonDisabled]}
                 onPress={handleRegister}
-                disabled={isLoading}
+                disabled={loading}
               >
                 <Text style={styles.registerButtonText}>
-                  {isLoading ? 'Creating Account...' : 'Create Account'}
+                  {loading ? '创建账户中...' : '创建账户'}
                 </Text>
               </TouchableOpacity>
             </View>

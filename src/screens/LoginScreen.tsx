@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LoginScreenProps {
   navigation: any;
@@ -20,32 +21,26 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, loading } = useAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
+      Alert.alert('错误', '请输入邮箱和密码');
       return;
     }
 
-    setIsLoading(true);
+    const result = await signIn(email.trim(), password);
     
-    // Simulate login process with admin validation
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Check for admin credentials
-      if (email.toLowerCase() === 'admin@admin.com' && password === 'password') {
-        Alert.alert('Success', 'Welcome Admin!', [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Home', { initialTab: 'favorite' })
-          }
-        ]);
-      } else {
-        Alert.alert('Error', 'Invalid email or password. Please try again.');
-      }
-    }, 1000);
+    if (result.success) {
+      Alert.alert('成功', result.message, [
+        {
+          text: '确定',
+          onPress: () => navigation.navigate('Home', { initialTab: 'home' })
+        }
+      ]);
+    } else {
+      Alert.alert('登录失败', result.message);
+    }
   };
 
   return (
@@ -103,12 +98,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             </View>
 
             <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
               onPress={handleLogin}
-              disabled={isLoading}
+              disabled={loading}
             >
               <Text style={styles.loginButtonText}>
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {loading ? '登录中...' : '登录'}
               </Text>
             </TouchableOpacity>
 
