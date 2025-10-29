@@ -32,7 +32,7 @@ export class AutoSyncService {
         const storedUser = await AsyncStorage.getItem('user');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
-          if (parsedUser.id === 'admin-user-id-12345') {
+          if (parsedUser.id === '00000000-0000-0000-0000-000000000001') {
             userId = parsedUser.id;
             console.log('👤 使用管理员账户进行同步');
           } else {
@@ -47,8 +47,12 @@ export class AutoSyncService {
 
       let syncedCount = 0;
 
-      // 1. 同步用户数据
-      await this.syncUserData(userId);
+      // 1. 同步用户数据（确保用户存在）
+      const userCreated = await this.syncUserData(userId);
+      if (!userCreated) {
+        console.log('❌ 用户创建失败，跳过后续同步');
+        return { success: false, message: '用户创建失败，无法同步数据' };
+      }
       syncedCount++;
 
       // 2. 同步菜谱数据
@@ -89,7 +93,7 @@ export class AutoSyncService {
   }
 
   // 同步用户数据
-  private static async syncUserData(userId: string): Promise<void> {
+  private static async syncUserData(userId: string): Promise<boolean> {
     try {
       // 检查用户是否已存在
       const { data: existingUser } = await supabase
@@ -100,7 +104,7 @@ export class AutoSyncService {
 
       if (existingUser) {
         console.log('✅ 用户已存在，跳过用户数据同步');
-        return;
+        return true;
       }
 
       // 获取用户数据
@@ -111,7 +115,7 @@ export class AutoSyncService {
       }
 
       // 如果是管理员用户，使用默认值
-      if (userId === 'admin-user-id-12345') {
+      if (userId === '00000000-0000-0000-0000-000000000001') {
         userData = {
           name: 'Admin User',
           email: 'admin@admin.com',
@@ -120,7 +124,7 @@ export class AutoSyncService {
       }
 
       // 创建用户
-      await supabase
+      const { error } = await supabase
         .from('users')
         .insert({
           id: userId,
@@ -129,9 +133,16 @@ export class AutoSyncService {
           avatar_url: userData.avatar_url || null
         });
 
+      if (error) {
+        console.error('❌ 用户数据同步失败:', error);
+        return false;
+      }
+
       console.log('✅ 用户数据同步完成');
+      return true;
     } catch (error) {
       console.error('❌ 用户数据同步失败:', error);
+      return false;
     }
   }
 

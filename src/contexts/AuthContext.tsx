@@ -209,7 +209,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🔑 使用管理员账户登录');
         
         const adminUser: User = {
-          id: 'admin-user-id-12345',
+          id: '00000000-0000-0000-0000-000000000001',
           email: 'admin@admin.com',
           name: 'Admin User',
           avatar_url: null
