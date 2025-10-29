@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DataMigrationService } from '../services/dataMigrationService';
+import { useAuth } from '../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface MigrationStatus {
@@ -25,10 +26,12 @@ interface MigrationResult {
 }
 
 const DataMigrationScreen: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>({ migrated: false });
   const [isLoading, setIsLoading] = useState(false);
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
   const [asyncStorageData, setAsyncStorageData] = useState<any>({});
+  const [migrationProgress, setMigrationProgress] = useState<string>('');
 
   useEffect(() => {
     checkMigrationStatus();
@@ -63,9 +66,28 @@ const DataMigrationScreen: React.FC = () => {
   };
 
   const handleMigration = async () => {
+    if (!user) {
+      Alert.alert(
+        '需要登录',
+        '您需要先登录才能进行数据迁移。请先登录后再试。',
+        [{ text: '确定' }]
+      );
+      return;
+    }
+
+    const dataCount = Object.keys(asyncStorageData).length;
+    if (dataCount === 0) {
+      Alert.alert(
+        '没有数据',
+        'AsyncStorage中没有找到需要迁移的数据。',
+        [{ text: '确定' }]
+      );
+      return;
+    }
+
     Alert.alert(
       '确认数据迁移',
-      '这将把AsyncStorage中的数据迁移到Supabase。此操作不可逆，请确认继续。',
+      `这将把AsyncStorage中的${dataCount}种类型的数据迁移到Supabase。此操作将在您登录的账户下创建数据，请确认继续。`,
       [
         { text: '取消', style: 'cancel' },
         { text: '确认迁移', onPress: startMigration }
@@ -76,24 +98,41 @@ const DataMigrationScreen: React.FC = () => {
   const startMigration = async () => {
     setIsLoading(true);
     setMigrationResult(null);
+    setMigrationProgress('正在检查用户认证...');
 
     try {
       console.log('🚀 开始数据迁移...');
       
+      setMigrationProgress('正在迁移用户数据...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setMigrationProgress('正在迁移菜谱数据...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setMigrationProgress('正在迁移食材和步骤...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setMigrationProgress('正在迁移收藏和评论...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setMigrationProgress('正在完成迁移...');
       const result = await DataMigrationService.migrateAllData();
       
       if (result.success) {
         await DataMigrationService.markMigrationComplete();
         setMigrationStatus({ migrated: true, migratedAt: new Date().toISOString() });
         setMigrationResult(result);
+        setMigrationProgress('');
         
+        const message = result.message || '数据已成功迁移到Supabase！';
         Alert.alert(
           '迁移成功',
-          '数据已成功迁移到Supabase！',
+          message,
           [{ text: '确定' }]
         );
       } else {
         setMigrationResult(result);
+        setMigrationProgress('');
         Alert.alert(
           '迁移失败',
           result.message,
@@ -107,6 +146,7 @@ const DataMigrationScreen: React.FC = () => {
         details: error
       };
       setMigrationResult(errorResult);
+      setMigrationProgress('');
       
       Alert.alert(
         '迁移失败',
@@ -115,6 +155,7 @@ const DataMigrationScreen: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+      setMigrationProgress('');
     }
   };
 
@@ -213,6 +254,44 @@ const DataMigrationScreen: React.FC = () => {
     );
   };
 
+  const renderUserStatus = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>用户状态</Text>
+      <View style={styles.statusContainer}>
+        <Ionicons
+          name={user ? "checkmark-circle" : "close-circle"}
+          size={24}
+          color={user ? "#4CAF50" : "#F44336"}
+        />
+        <Text style={[
+          styles.statusText,
+          { color: user ? "#4CAF50" : "#F44336" }
+        ]}>
+          {user ? `已登录: ${user.email}` : "未登录"}
+        </Text>
+      </View>
+      {!user && (
+        <Text style={styles.warningText}>
+          请先登录才能进行数据迁移
+        </Text>
+      )}
+    </View>
+  );
+
+  const renderMigrationProgress = () => {
+    if (!isLoading || !migrationProgress) return null;
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>迁移进度</Text>
+        <View style={styles.progressContainer}>
+          <ActivityIndicator size="small" color="#FF6B35" />
+          <Text style={styles.progressText}>{migrationProgress}</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
@@ -221,8 +300,10 @@ const DataMigrationScreen: React.FC = () => {
           <Text style={styles.subtitle}>将AsyncStorage数据迁移到Supabase</Text>
         </View>
 
+        {renderUserStatus()}
         {renderDataSummary()}
         {renderMigrationStatus()}
+        {renderMigrationProgress()}
         {renderMigrationResult()}
 
         <View style={styles.actions}>
@@ -230,10 +311,10 @@ const DataMigrationScreen: React.FC = () => {
             style={[
               styles.button,
               styles.primaryButton,
-              (isLoading || migrationStatus.migrated) && styles.buttonDisabled
+              (isLoading || migrationStatus.migrated || !user) && styles.buttonDisabled
             ]}
             onPress={handleMigration}
-            disabled={isLoading || migrationStatus.migrated}
+            disabled={isLoading || migrationStatus.migrated || !user}
           >
             {isLoading ? (
               <ActivityIndicator color="white" size="small" />
@@ -342,6 +423,22 @@ const styles = StyleSheet.create({
   migrationDate: {
     fontSize: 14,
     color: '#666',
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#F44336',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 12,
   },
   resultContainer: {
     flexDirection: 'row',
