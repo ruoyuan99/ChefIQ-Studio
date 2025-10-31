@@ -180,6 +180,25 @@ const DataMigrationScreen: React.FC = () => {
     }
   };
 
+  const handleImageUpload = async () => {
+    if (!user) {
+      Alert.alert('Login Required', 'Please log in before uploading images.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      setMigrationProgress('Uploading local recipe images...');
+      const result = await DataMigrationService.migrateRecipeImages();
+      setMigrationProgress('');
+      Alert.alert(result.success ? 'Upload Complete' : 'Upload Failed', result.message);
+    } catch (e: any) {
+      setMigrationProgress('');
+      Alert.alert('Upload Failed', e?.message || 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getDataCount = (data: any) => {
     if (Array.isArray(data)) return data.length;
     if (typeof data === 'object' && data !== null) return Object.keys(data).length;
@@ -307,6 +326,14 @@ const DataMigrationScreen: React.FC = () => {
         {renderMigrationResult()}
 
         <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={handleImageUpload}
+            disabled={isLoading}
+          >
+            <Ionicons name="cloud-upload" size={20} color="#FF6B35" />
+            <Text style={[styles.buttonText, styles.secondaryButtonText]}>Upload Recipe Images</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.button,

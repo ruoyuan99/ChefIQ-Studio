@@ -187,14 +187,29 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     setRecipeData({ ...recipeData, imageUri: null });
   };
 
-  const addTag = () => {
-    if (newTag.trim() && !recipeData.tags.includes(newTag.trim())) {
-      setRecipeData({
-        ...recipeData,
-        tags: [...recipeData.tags, newTag.trim()]
-      });
-      setNewTag('');
+  const addTagsFromString = (input: string) => {
+    if (!input) return;
+    // 支持逗号/空格分隔，一次添加多个；去重、去空
+    const pieces = input
+      .split(/[\s,]+/)
+      .map(t => t.trim())
+      .filter(Boolean);
+    if (pieces.length === 0) return;
+    const existing = new Set((recipeData.tags || []).map(t => t.toLowerCase()));
+    const merged: string[] = [...(recipeData.tags || [])];
+    for (const p of pieces) {
+      const key = p.toLowerCase();
+      if (!existing.has(key)) {
+        existing.add(key);
+        merged.push(p);
+      }
     }
+    setRecipeData({ ...recipeData, tags: merged });
+  };
+
+  const addTag = () => {
+    addTagsFromString(newTag);
+    setNewTag('');
   };
 
   const removeTag = (index: number) => {
@@ -496,24 +511,8 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   };
 
   const handleSaveAsDraft = () => {
-    const recipeDataToSave = {
-      ...recipeData,
-      isPublic: false, // 草稿不公开
-      items,
-      // 使用recipeData中的ingredients和instructions，确保数据一致性
-      ingredients: recipeData.ingredients,
-      instructions: recipeData.instructions,
-    };
-
-    if (isEditing && existingRecipe) {
-      updateRecipe({
-        ...existingRecipe,
-        ...recipeDataToSave,
-      });
-    } else {
-      addRecipe(recipeDataToSave);
-    }
-
+    // 草稿不做严格校验，直接以 isPublic=false 保存并同步
+    saveRecipeDataWithVisibility(false);
     Alert.alert('Success', 'Recipe saved as draft', [
       { text: 'OK', onPress: () => navigation.navigate('RecipeList') },
     ]);
@@ -579,17 +578,17 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       }
       
       // 验证通过，继续保存流程
-      saveRecipeData();
+      saveRecipeDataWithVisibility(true);
     }, 200); // 增加延迟时间确保状态更新
   };
 
-  const saveRecipeData = () => {
+  const saveRecipeDataWithVisibility = (isPublic: boolean) => {
     // 使用ref中的最新值
     const currentRecipeData = recipeDataRef.current;
 
     const recipeDataToSave = {
       ...currentRecipeData,
-      isPublic: true, // 发布为公开
+      isPublic, // 由调用方决定是否公开（发布=true；草稿=false）
       items,
       // 使用currentRecipeData中的ingredients和instructions，确保数据一致性
       ingredients: currentRecipeData.ingredients,
@@ -697,7 +696,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
             <Ionicons
               name={item.isAvailable ? 'checkmark-circle' : 'close-circle'}
               size={20}
-              color={item.isAvailable ? '#FF6B35' : '#F44336'}
+              color={item.isAvailable ? '#d96709' : '#F44336'}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -806,7 +805,15 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               style={styles.tagInput}
               placeholder="Enter a tag and press Enter"
               value={newTag}
-              onChangeText={setNewTag}
+              onChangeText={(text) => {
+                // 如果用户输入了分隔符（逗号/空格/回车前捕获），自动提交当前片段
+                if (/[\s,]$/.test(text)) {
+                  addTagsFromString(text);
+                  setNewTag('');
+                } else {
+                  setNewTag(text);
+                }
+              }}
               onSubmitEditing={addTag}
               onFocus={() => {
                 setShowTagSuggestions(true);
@@ -933,7 +940,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
                       >
                         <Text style={styles.dropdownItemText}>{option}</Text>
                         {recipeData.cookingTime === option && (
-                          <Ionicons name="checkmark" size={20} color="#FF6B35" />
+                          <Ionicons name="checkmark" size={20} color="#d96709" />
                         )}
                       </TouchableOpacity>
                     ))}
@@ -969,7 +976,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
                       >
                         <Text style={styles.dropdownItemText}>{option}</Text>
                         {recipeData.servings === option && (
-                          <Ionicons name="checkmark" size={20} color="#FF6B35" />
+                          <Ionicons name="checkmark" size={20} color="#d96709" />
                         )}
                       </TouchableOpacity>
                     ))}
@@ -1657,7 +1664,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 100,
+    zIndex: 7000,
+    position: 'relative',
   },
   tagSuggestionsScroll: {
     maxHeight: 150,

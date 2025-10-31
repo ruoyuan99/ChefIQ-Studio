@@ -5,8 +5,8 @@ import { RootStackParamList } from '../types';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
+import SplashScreen from '../screens/SplashScreen';
 import RecipeListScreen from '../screens/RecipeListScreen';
 import RecipeNameScreen from '../screens/RecipeNameScreen';
 import CreateRecipeScreen from '../screens/CreateRecipeScreen';
@@ -27,7 +27,7 @@ const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Login"
+        initialRouteName="Splash"
         screenOptions={{
           headerStyle: {
             backgroundColor: 'white',
@@ -43,19 +43,20 @@ const AppNavigator: React.FC = () => {
         }}
       >
         <Stack.Screen
+          name="Splash"
+          component={SplashScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="Login"
           component={LoginScreen}
           options={{
             headerShown: false,
           }}
         />
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
+        {/** Register screen removed for competition build */}
         <Stack.Screen
           name="Home"
           component={HomeScreen}

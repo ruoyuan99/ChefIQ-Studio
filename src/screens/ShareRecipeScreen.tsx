@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,16 @@ import {
   Alert,
   Share,
   Clipboard,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
+import { supabase } from '../config/supabase';
+import { sampleRecipes } from '../data/sampleRecipes';
+import ShareRecipeCard from '../components/ShareRecipeCard';
+import ShareRecipeContent from '../components/ShareRecipeContent';
+import { captureCardToPng, saveToPhotos, shareImage } from '../utils/shareCard';
 
 interface ShareRecipeScreenProps {
   navigation: any;
@@ -23,8 +30,84 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
   route,
 }) => {
   const { getRecipeById, updateRecipe } = useRecipe();
-  const recipe = getRecipeById(route.params.recipeId);
-  const [shareCode, setShareCode] = useState(recipe?.shareCode || '');
+  const recipeId = route.params.recipeId;
+  const initialRecipe = getRecipeById(recipeId);
+  const [recipe, setRecipe] = useState<any>(initialRecipe || null);
+  const [shareCode, setShareCode] = useState(initialRecipe?.shareCode || '');
+  const [loading, setLoading] = useState(!initialRecipe);
+  const cardRef = useRef<View>(null);
+  const screenWidth = Dimensions.get('window').width;
+
+  // Fallback: If recipe not in context (e.g., opened from cloud), fetch minimal data from Supabase
+  useEffect(() => {
+    const load = async () => {
+      if (recipe) { setLoading(false); return; }
+      // Support sample recipes (id starts with sample_)
+      if (typeof recipeId === 'string' && recipeId.startsWith('sample_')) {
+        const s = sampleRecipes.find(r => r.id === recipeId);
+        if (s) {
+          setRecipe({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            imageUri: (s as any).image_url || (s as any).imageUri || (s as any).image || null,
+            cookingTime: s.cookingTime,
+            servings: s.servings,
+            authorName: (s as any).authorName,
+            authorAvatar: (s as any).authorAvatar,
+            tags: (s as any).tags || [],
+            ingredients: (s as any).ingredients || [],
+            instructions: (s as any).instructions || [],
+            cookware: (s as any).cookware || '',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      setLoading(true);
+      const { data } = await supabase
+        .from('recipes')
+        .select(`
+          id,title,description,image_url,cooking_time,servings,cookware,
+          ingredients:ingredients(name,amount,unit,order_index),
+          instructions:instructions(step_number,description,order_index),
+          tags:tags(name)
+        `)
+        .eq('id', recipeId)
+        .maybeSingle();
+      if (data) {
+        setRecipe({
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          image_url: (data as any).image_url,
+          cookingTime: (data as any).cooking_time,
+          servings: String((data as any).servings ?? ''),
+          cookware: (data as any).cookware || '',
+          tags: ((data as any).tags || []).map((t: any) => t.name),
+          ingredients: ((data as any).ingredients || [])
+            .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+            .map((ing: any) => ({ name: ing.name, amount: ing.amount, unit: ing.unit })),
+          instructions: ((data as any).instructions || [])
+            .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+            .map((ins: any, i: number) => ({ step: ins.step_number || i + 1, description: ins.description })),
+        });
+      }
+      setLoading(false);
+    };
+    load();
+  }, [recipeId]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="small" color="#FF6B35" />
+          <Text style={{ marginTop: 8, color: '#666' }}>Loading recipe…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!recipe) {
     return (
@@ -49,16 +132,11 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
 
   const shareMenu = async () => {
     try {
-      const shareContent = {
-        title: recipe.title,
-        message: `查看我的菜单: ${recipe.title}\n\n${recipe.description}\n\n分享码: ${shareCode}\n\n菜品列表:\n${recipe.items
-          .filter(item => item.isAvailable)
-          .map(item => `• ${item.name} - ¥${item.price}`)
-          .join('\n')}`,
-      };
-      await Share.share(shareContent);
+      if (!cardRef.current) return;
+      const uri = await captureCardToPng(cardRef.current, { width: Math.round(Dimensions.get('window').width * 2) });
+      await shareImage(uri);
     } catch (error) {
-      Alert.alert('分享失败', '无法分享菜单');
+      Alert.alert('Share Failed', 'Unable to share the image');
     }
   };
 
@@ -76,136 +154,52 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
     Alert.alert('二维码分享', '二维码功能需要额外配置，当前版本暂不支持');
   };
 
+  const saveCardImage = async () => {
+    try {
+      if (!cardRef.current) return;
+      const uri = await captureCardToPng(cardRef.current, { width: Math.round(Dimensions.get('window').width * 2) });
+      await saveToPhotos(uri);
+      Alert.alert('Saved', 'Image saved to Photos');
+    } catch (e) {
+      Alert.alert('Save Failed', 'Unable to save image to Photos');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Share Menu</Text>
-        <View style={styles.placeholder} />
-      </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.menuPreview}>
-          <Text style={styles.menuTitle}>{recipe.title}</Text>
-          {recipe.description && (
-            <Text style={styles.menuDescription}>{recipe.description}</Text>
-          )}
-          <View style={styles.menuStats}>
-            <View style={styles.statItem}>
-              <Ionicons name="restaurant" size={16} color="#666" />
-              <Text style={styles.statText}>{recipe.items.length} items</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="eye" size={16} color="#666" />
-              <Text style={styles.statText}>
-                {recipe.isPublic ? 'Public' : 'Private'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.shareCodeSection}>
-          <Text style={styles.sectionTitle}>分享码</Text>
-          <View style={styles.shareCodeContainer}>
-            <View style={styles.shareCodeDisplay}>
-              <Text style={styles.shareCodeText}>
-                {shareCode || '点击生成分享码'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.generateButton}
-              onPress={generateShareCode}
-            >
-              <Ionicons name="refresh" size={20} color="white" />
-              <Text style={styles.generateButtonText}>生成</Text>
-            </TouchableOpacity>
-          </View>
-          {shareCode && (
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={copyShareCode}
-            >
-              <Ionicons name="copy-outline" size={20} color="#2196F3" />
-              <Text style={styles.copyButtonText}>复制分享码</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.shareOptions}>
-          <Text style={styles.sectionTitle}>分享方式</Text>
-          
-          <TouchableOpacity style={styles.shareOption} onPress={shareMenu}>
-            <View style={styles.shareOptionContent}>
-              <View style={[styles.shareIcon, { backgroundColor: '#FF6B35' }]}>
-                <Ionicons name="share-outline" size={24} color="white" />
-              </View>
-              <View style={styles.shareOptionInfo}>
-                <Text style={styles.shareOptionTitle}>系统分享</Text>
-                <Text style={styles.shareOptionDescription}>
-                  通过系统分享功能发送到其他应用
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
+        {/* Action bar above the card */}
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: '#d96709' }]} onPress={shareMenu}>
+            <Ionicons name="share-outline" size={18} color="#fff" />
+            <Text style={styles.primaryBtnText}>Share</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.shareOption} onPress={shareAsText}>
-            <View style={styles.shareOptionContent}>
-              <View style={[styles.shareIcon, { backgroundColor: '#FF6B35' }]}>
-                <Ionicons name="document-text-outline" size={24} color="white" />
-              </View>
-              <View style={styles.shareOptionInfo}>
-                <Text style={styles.shareOptionTitle}>复制文本</Text>
-                <Text style={styles.shareOptionDescription}>
-                  复制菜单内容到剪贴板
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.shareOption} onPress={shareAsQR}>
-            <View style={styles.shareOptionContent}>
-              <View style={[styles.shareIcon, { backgroundColor: '#FF6B35' }]}>
-                <Ionicons name="qr-code-outline" size={24} color="white" />
-              </View>
-              <View style={styles.shareOptionInfo}>
-                <Text style={styles.shareOptionTitle}>二维码</Text>
-                <Text style={styles.shareOptionDescription}>
-                  生成二维码供他人扫描
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: '#4CAF50' }]} onPress={saveCardImage}>
+            <Ionicons name="download-outline" size={18} color="#fff" />
+            <Text style={styles.primaryBtnText}>Save</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.tipsSection}>
-          <Text style={styles.sectionTitle}>分享提示</Text>
-          <View style={styles.tipItem}>
-            <Ionicons name="information-circle" size={16} color="#2196F3" />
-            <Text style={styles.tipText}>
-              分享码可以让其他人快速找到你的菜单
-            </Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Ionicons name="eye-off" size={16} color="#FF9800" />
-            <Text style={styles.tipText}>
-              只有公开的菜单才能被其他人查看
-            </Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-            <Text style={styles.tipText}>
-              只有标记为可用的菜品才会显示在分享内容中
-            </Text>
+        <View style={styles.cardPreview}>
+          <View ref={cardRef} collapsable={false}>
+            <ShareRecipeContent
+              width={Math.round(screenWidth * 0.95)}
+              title={recipe.title}
+              imageUri={recipe.image_url || recipe.imageUri}
+              cookingTime={recipe.cookingTime}
+              servings={recipe.servings}
+              authorName={recipe.authorName}
+              description={recipe.description}
+              tags={recipe.tags || []}
+              ingredients={recipe.ingredients || []}
+              instructions={recipe.instructions || []}
+              cookware={recipe.cookware}
+              logoSource={require('../../assets/ChefiQStudioLogo.png')}
+            />
           </View>
         </View>
+        {/* Removed duplicate info card below the share content */}
+
+        {/* Removed: share code and other option blocks */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -238,6 +232,26 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    alignItems: 'center',
+  },
+  actionBar: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 6,
   },
   menuPreview: {
     backgroundColor: 'white',
@@ -414,6 +428,11 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 18,
     color: '#666',
+  },
+  loadingBox: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

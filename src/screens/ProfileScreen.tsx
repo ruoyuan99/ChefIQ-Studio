@@ -59,12 +59,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const handleSignOut = () => {
     Alert.alert(
-      '确认登出',
-      '您确定要登出吗？',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
-        { text: '取消', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         { 
-          text: '登出', 
+          text: 'Sign Out', 
           style: 'destructive',
           onPress: async () => {
             await signOut();

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, ReactNode, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Recipe, MenuItem } from '../types';
 import { AutoSyncService } from '../services/autoSyncService';
+import { CloudRecipeService } from '../services/cloudRecipeService';
 import { RealTimeSyncService } from '../services/realTimeSyncService';
 import { useAuth } from './AuthContext';
 
@@ -87,6 +88,15 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           } else {
             console.log('✅ 数据已同步，无需重复同步');
           }
+
+          // 从云端拉取并覆盖为权威数据
+          try {
+            const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
+            console.log('☁️ 从云端加载菜谱:', cloudRecipes.length);
+            dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
+          } catch (e) {
+            console.error('❌ 加载云端菜谱失败:', e);
+          }
         } catch (error) {
           console.error('❌ 自动同步出错:', error);
         }
@@ -96,27 +106,28 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     autoSync();
   }, [user]);
 
-  // 加载保存的recipes
+  // 未登录时，从本地缓存加载（离线/首次）
   useEffect(() => {
-    const loadRecipes = async () => {
-      try {
-        const storedRecipes = await AsyncStorage.getItem('recipes');
-        if (storedRecipes) {
-          const recipes = JSON.parse(storedRecipes);
-          // 转换日期字符串为Date对象
-          const parsedRecipes = recipes.map((recipe: any) => ({
-            ...recipe,
-            createdAt: new Date(recipe.createdAt),
-            updatedAt: new Date(recipe.updatedAt),
-          }));
-          dispatch({ type: 'SET_RECIPES', payload: parsedRecipes });
+    if (!user) {
+      const loadRecipes = async () => {
+        try {
+          const storedRecipes = await AsyncStorage.getItem('recipes');
+          if (storedRecipes) {
+            const recipes = JSON.parse(storedRecipes);
+            const parsedRecipes = recipes.map((recipe: any) => ({
+              ...recipe,
+              createdAt: new Date(recipe.createdAt),
+              updatedAt: new Date(recipe.updatedAt),
+            }));
+            dispatch({ type: 'SET_RECIPES', payload: parsedRecipes });
+          }
+        } catch (error) {
+          console.error('Failed to load recipes from storage', error);
         }
-      } catch (error) {
-        console.error('Failed to load recipes from storage', error);
-      }
-    };
-    loadRecipes();
-  }, []);
+      };
+      loadRecipes();
+    }
+  }, [user]);
 
   // 保存recipes到AsyncStorage
   useEffect(() => {
@@ -145,6 +156,8 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       id: Date.now().toString(),
       createdAt: new Date(),
       updatedAt: new Date(),
+      authorName: user?.name || (user?.email ? user.email.split('@')[0] : 'Chef'),
+      authorAvatar: user?.avatar_url || null,
     };
     
     console.log('RecipeContext - Adding recipe:', {
@@ -181,7 +194,13 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const deleteRecipe = (recipeId: string) => {
+    const recipe = state.recipes.find(r => r.id === recipeId);
     dispatch({ type: 'DELETE_RECIPE', payload: recipeId });
+
+    // 同步删除到 Supabase（通过标题+用户ID匹配）
+    if (user && recipe?.title) {
+      RealTimeSyncService.deleteRecipeByTitleForUser(recipe.title, user.id);
+    }
   };
 
   const setCurrentRecipe = (recipe: Recipe | null) => {

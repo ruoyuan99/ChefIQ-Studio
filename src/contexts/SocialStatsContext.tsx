@@ -1,4 +1,6 @@
 import React, { createContext, useReducer, useContext, ReactNode, useEffect } from 'react';
+ 
+import { supabase } from '../config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SocialStats {
@@ -91,10 +93,11 @@ const socialStatsReducer = (state: SocialStatsState, action: SocialStatsAction):
 interface SocialStatsContextType {
   state: SocialStatsState;
   getStats: (recipeId: string) => SocialStats;
-  incrementLikes: (recipeId: string) => void;
-  incrementFavorites: (recipeId: string) => void;
+  fetchStats: (recipeId: string) => Promise<void>;
   incrementViews: (recipeId: string) => void;
-  incrementTried: (recipeId: string) => void;
+  adjustLikes: (recipeId: string, delta: 1 | -1) => void;
+  adjustFavorites: (recipeId: string, delta: 1 | -1) => void;
+  adjustTried: (recipeId: string, delta: 1 | -1) => void;
 }
 
 const SocialStatsContext = createContext<SocialStatsContextType | undefined>(undefined);
@@ -129,39 +132,166 @@ export const SocialStatsProvider: React.FC<{ children: ReactNode }> = ({ childre
     saveStats();
   }, [state.stats]);
 
+  // 从 Supabase 加载某个菜谱的社交统计
+  const fetchStats = async (recipeId: string) => {
+    // Skip non-UUID ids (e.g., sample_* recipes)
+    if (!/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(recipeId)) {
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('social_stats')
+        .select('likes_count, favorites_count, views_count, tries_count')
+        .eq('recipe_id', recipeId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Failed to fetch social stats from Supabase:', error);
+        return;
+      }
+
+      // Count distinct viewers from view table
+      const { count, error: viewErr } = await supabase
+        .from('social_stat_views')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('recipe_id', recipeId);
+      if (viewErr) {
+        console.error('Failed to count views:', viewErr);
+      }
+
+      const statsFromDb: SocialStats = {
+        likes: data?.likes_count ?? 0,
+        favorites: data?.favorites_count ?? 0,
+        // views reflects distinct viewers
+        views: count ?? data?.views_count ?? 0,
+        tried: data?.tries_count ?? 0,
+      };
+
+      dispatch({ type: 'SET_STATS', payload: { recipeId, stats: statsFromDb } });
+    } catch (err) {
+      console.error('Failed to fetch social stats:', err);
+    }
+  };
+
   const getStats = (recipeId: string): SocialStats => {
-    return state.stats[recipeId] || {
-      likes: Math.floor(Math.random() * 1000) + 100, // 模拟数据
-      favorites: Math.floor(Math.random() * 500) + 50,
-      views: Math.floor(Math.random() * 2000) + 500,
-      tried: Math.floor(Math.random() * 200) + 10,
+    const s = state.stats[recipeId];
+    if (!s) {
+      return { likes: 0, favorites: 0, views: 2, tried: 0 };
+    }
+    return {
+      likes: s.likes || 0,
+      favorites: s.favorites || 0,
+      // Ensure UI never shows < 2 for initial display
+      views: Math.max(2, s.views || 0),
+      tried: s.tried || 0,
     };
   };
 
-  const incrementLikes = (recipeId: string) => {
-    dispatch({ type: 'INCREMENT_LIKES', payload: recipeId });
+  const upsertAll = (recipeId: string, stats: SocialStats, errorLabel: string) => {
+    if (!/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(recipeId)) {
+      return;
+    }
+    supabase
+      .from('social_stats')
+      .upsert({
+        recipe_id: recipeId,
+        likes_count: stats.likes,
+        favorites_count: stats.favorites,
+        tries_count: stats.tried,
+        views_count: stats.views,
+        updated_at: new Date().toISOString(),
+      })
+      .then(({ error }) => {
+        if (error) console.error(`Failed to upsert ${errorLabel}:`, error);
+      });
   };
 
-  const incrementFavorites = (recipeId: string) => {
-    dispatch({ type: 'INCREMENT_FAVORITES', payload: recipeId });
+  const adjustLikes = (recipeId: string, delta: 1 | -1) => {
+    const current = getStats(recipeId);
+    const next: SocialStats = {
+      ...current,
+      likes: Math.max(0, current.likes + delta),
+    };
+    dispatch({ type: 'SET_STATS', payload: { recipeId, stats: next } });
+    upsertAll(recipeId, next, 'likes');
+  };
+
+  const adjustFavorites = (recipeId: string, delta: 1 | -1) => {
+    const current = getStats(recipeId);
+    const next: SocialStats = {
+      ...current,
+      favorites: Math.max(0, current.favorites + delta),
+    };
+    dispatch({ type: 'SET_STATS', payload: { recipeId, stats: next } });
+    upsertAll(recipeId, next, 'favorites');
   };
 
   const incrementViews = (recipeId: string) => {
-    dispatch({ type: 'INCREMENT_VIEWS', payload: recipeId });
+    const current = getStats(recipeId);
+    const next = { ...current, views: current.views + 1 };
+    dispatch({ type: 'SET_STATS', payload: { recipeId, stats: next } });
+    // Distinct views per user: insert into view table once per (recipe,user)
+    const isUuid = /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(recipeId);
+    if (!isUuid) return;
+    (async () => {
+      try {
+        let userId: string | null = null;
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user?.id) {
+          userId = authData.user.id;
+        } else {
+          const stored = await AsyncStorage.getItem('user');
+          if (stored) {
+            const u = JSON.parse(stored);
+            if (u?.id) userId = u.id;
+          }
+        }
+        if (!userId) return;
+
+        // Insert view row (ignore duplicates on unique constraint)
+        const { error } = await supabase
+          .from('social_stat_views')
+          .upsert(
+            [{ recipe_id: recipeId, user_id: userId, viewed_at: new Date().toISOString() }],
+            { onConflict: 'recipe_id,user_id', ignoreDuplicates: true }
+          );
+        if (error) {
+          console.error('Failed to upsert distinct view:', error);
+          return;
+        }
+        // Recount and sync totals
+        const { count } = await supabase
+          .from('social_stat_views')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('recipe_id', recipeId);
+        const updated: SocialStats = { ...next, views: count ?? next.views };
+        dispatch({ type: 'SET_STATS', payload: { recipeId, stats: updated } });
+        upsertAll(recipeId, updated, 'views');
+      } catch (e) {
+        console.error('Failed distinct view flow:', e);
+      }
+    })();
   };
 
-  const incrementTried = (recipeId: string) => {
-    dispatch({ type: 'INCREMENT_TRIED', payload: recipeId });
+  const adjustTried = (recipeId: string, delta: 1 | -1) => {
+    const current = getStats(recipeId);
+    const next: SocialStats = {
+      ...current,
+      tried: Math.max(0, current.tried + delta),
+    };
+    dispatch({ type: 'SET_STATS', payload: { recipeId, stats: next } });
+    upsertAll(recipeId, next, 'tried');
   };
 
   return (
     <SocialStatsContext.Provider value={{ 
       state, 
-      getStats, 
-      incrementLikes, 
-      incrementFavorites, 
+      getStats,
+      fetchStats,
       incrementViews, 
-      incrementTried 
+      adjustLikes,
+      adjustFavorites,
+      adjustTried,
     }}>
       {children}
     </SocialStatsContext.Provider>

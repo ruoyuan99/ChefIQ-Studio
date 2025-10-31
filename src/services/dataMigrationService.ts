@@ -345,6 +345,79 @@ export class DataMigrationService {
     }
   }
 
+  // 上传本地菜谱图片到 Supabase Storage 并回填 recipes.image_url
+  static async migrateRecipeImages(): Promise<{ success: boolean; uploaded: number; skipped: number; message: string }> {
+    try {
+      // 获取当前用户
+      const { data: authData } = await supabase.auth.getUser();
+      let userId: string | null = authData?.user?.id || null;
+      if (!userId) {
+        // 支持管理员账号离线登录
+        const stored = await AsyncStorage.getItem('user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u?.id) userId = u.id;
+        }
+      }
+      if (!userId) {
+        return { success: false, uploaded: 0, skipped: 0, message: 'User not authenticated' };
+      }
+
+      // 读取本地菜谱
+      const recipesData = await AsyncStorage.getItem('recipes');
+      if (!recipesData) {
+        return { success: true, uploaded: 0, skipped: 0, message: 'No local recipes' };
+      }
+      const localRecipes = JSON.parse(recipesData);
+      let uploaded = 0;
+      let skipped = 0;
+
+      for (const r of localRecipes) {
+        const candidate = r?.image_url || r?.imageUri || r?.image;
+        if (!candidate || (typeof candidate === 'string' && (candidate.startsWith('http://') || candidate.startsWith('https://')))) {
+          skipped += 1;
+          continue;
+        }
+
+        // 找到 Supabase 中对应的菜谱（按 title + user_id 匹配）
+        const { data: found, error: findErr } = await supabase
+          .from('recipes')
+          .select('id, image_url')
+          .eq('title', r.title || r.name)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (findErr || !found) {
+          skipped += 1;
+          continue;
+        }
+        if (found.image_url) {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          // 上传并更新 image_url
+          const publicUrl = await uploadRecipeImage(candidate as string, userId);
+          const { error: updateErr } = await supabase
+            .from('recipes')
+            .update({ image_url: publicUrl, updated_at: new Date().toISOString() })
+            .eq('id', found.id);
+          if (!updateErr) {
+            uploaded += 1;
+          } else {
+            skipped += 1;
+          }
+        } catch (_) {
+          skipped += 1;
+        }
+      }
+
+      return { success: true, uploaded, skipped, message: `Uploaded ${uploaded}, skipped ${skipped}` };
+    } catch (e: any) {
+      return { success: false, uploaded: 0, skipped: 0, message: e?.message || 'Image migration failed' };
+    }
+  }
+
   // 检查迁移状态
   static async checkMigrationStatus() {
     try {

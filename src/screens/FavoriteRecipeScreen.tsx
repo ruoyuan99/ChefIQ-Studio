@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useLike } from '../contexts/LikeContext';
+ 
 import { useFavorite } from '../contexts/FavoriteContext';
 import { useTried } from '../contexts/TriedContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
@@ -46,19 +48,23 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
   
   // 使用FavoriteContext中的recipes（已包含示例recipes）
   const allFavoriteRecipes = state.favoriteRecipes;
+  const { isLiked } = useLike();
+  const { isTried } = useTried();
+
   const renderFavoriteCard = (recipe: any) => (
     <TouchableOpacity
       key={recipe.id}
       style={styles.favoriteCard}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
     >
-      {recipe.imageUri && (
+      {(recipe.image_url || recipe.imageUri || recipe.image) && (
         <Image 
           source={
-            typeof recipe.imageUri === 'string' 
-              ? { uri: recipe.imageUri } 
-              : recipe.imageUri
-          } 
+            (() => {
+              const src = (recipe.image_url || recipe.imageUri || recipe.image);
+              return typeof src === 'string' ? { uri: src } : src;
+            })()
+          }
           style={styles.favoriteImage} 
         />
       )}
@@ -90,11 +96,11 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
           <View style={styles.favoriteSocialStats}>
             <View style={styles.socialStatItem}>
               <Ionicons name="heart" size={12} color="#FF6B35" />
-              <Text style={styles.socialStatText}>{getStats(recipe.id).likes}</Text>
+              <Text style={styles.socialStatText}>{isLiked(recipe.id) ? Math.max(2, getStats(recipe.id).likes) : getStats(recipe.id).likes}</Text>
             </View>
             <View style={styles.socialStatItem}>
               <Ionicons name="bookmark" size={12} color="#FF6B35" />
-              <Text style={styles.socialStatText}>{getStats(recipe.id).favorites}</Text>
+              <Text style={styles.socialStatText}>{Math.max(2, getStats(recipe.id).favorites)}</Text>
             </View>
             <View style={styles.socialStatItem}>
               <Ionicons name="eye" size={12} color="#FF6B35" />
@@ -102,7 +108,7 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
             </View>
             <View style={styles.socialStatItem}>
               <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
-              <Text style={styles.socialStatText}>{getStats(recipe.id).tried}</Text>
+              <Text style={styles.socialStatText}>{isTried(recipe.id) ? Math.max(2, getStats(recipe.id).tried) : getStats(recipe.id).tried}</Text>
             </View>
           </View>
         </View>
@@ -186,15 +192,33 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
       </Modal>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.introSection}>
-          <View style={styles.introIcon}>
-            <Ionicons name="heart" size={48} color="#FF9800" />
+        {/* Chef iQ Challenge Card */}
+        <TouchableOpacity style={styles.challengeCard}>
+          <View style={styles.challengeHeader}>
+            <View style={styles.challengeIconContainer}>
+              <Ionicons name="trophy" size={28} color="#d96709" />
+            </View>
+            <View style={styles.challengeTitleContainer}>
+              <Text style={styles.challengeBadge}>CHALLENGE</Text>
+              <Text style={styles.challengeTitle}>Chef iQ Challenge</Text>
+            </View>
           </View>
-          <Text style={styles.introDescription}>
-            Explore our curated collection of delicious recipes from our community. 
-            Find inspiration for your next meal!
-          </Text>
-        </View>
+          
+          <View style={styles.challengeContentNoPadding}>
+            <Image
+              source={require('../../assets/challenge.png')}
+              style={styles.productImageFull}
+              resizeMode="cover"
+            />
+
+            <View style={styles.challengeRewardsWrapper}>
+              <TouchableOpacity style={styles.challengeButton}>
+                <Text style={styles.challengeButtonText}>Join Challenge</Text>
+                <Ionicons name="arrow-forward" size={18} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
 
         <View style={styles.recipesSection}>
           <Text style={styles.sectionSubtitle}>
@@ -244,6 +268,157 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+  },
+  // Challenge Card Styles
+  challengeCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#d96709',
+  },
+  challengeHeader: {
+    backgroundColor: '#FFF5F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#d96709',
+  },
+  challengeIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  challengeTitleContainer: {
+    flex: 1,
+  },
+  challengeBadge: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#d96709',
+    letterSpacing: 1.5,
+    marginBottom: 4,
+  },
+  challengeTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  challengeContent: {
+    padding: 16,
+    paddingTop: 12,
+  },
+  challengeContentNoPadding: {
+    width: '100%',
+  },
+  challengeProductInfo: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  productImageContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: 180,
+  },
+  productImageFull: {
+    width: '100%',
+    height: 180,
+  },
+  productDetails: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 6,
+  },
+  challengeDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  challengeRewardsWrapper: {
+    padding: 16,
+  },
+  challengeRewards: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  rewardItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  rewardText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 4,
+  },
+  challengeButton: {
+    backgroundColor: '#d96709',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#d96709',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  challengeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  challengeImagePlaceholder: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#d96709',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  placeholderSubtext: {
+    color: 'white',
+    fontSize: 12,
+    opacity: 0.9,
   },
   introSection: {
     alignItems: 'center',

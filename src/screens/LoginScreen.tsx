@@ -9,6 +9,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,9 +50,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="restaurant" size={64} color="#FF6B35" />
+              <Image
+                source={require('../../assets/ChefiQStudioLogo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.title}>Welcome to Recipe App</Text>
+            <Text style={styles.title}>Welcome to{'\n'}Chef iQ Studio</Text>
             <Text style={styles.subtitle}>Sign in to continue</Text>
           </View>
 
@@ -114,12 +120,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             <Text style={styles.adminInfoText}>Password: password</Text>
           </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account?</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.signUpText}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Registration entry hidden for competition build */}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -144,27 +145,22 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'white',
+    width: Math.round(Dimensions.get('window').width * 0.8),
+    height: Math.round(Dimensions.get('window').width * 0.8 * (64 / 260)),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
@@ -202,13 +198,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   loginButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#d96709',
     borderRadius: 12,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
-    shadowColor: '#FF6B35',
+    shadowColor: '#d96709',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -232,7 +228,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   forgotPasswordText: {
-    color: '#FF6B35',
+    color: '#d96709',
     fontSize: 14,
   },
   footer: {
@@ -245,7 +241,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   signUpText: {
-    color: '#FF6B35',
+    color: '#d96709',
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 4,
@@ -256,7 +252,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 24,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF6B35',
+    borderLeftColor: '#d96709',
   },
   adminInfoTitle: {
     fontSize: 14,

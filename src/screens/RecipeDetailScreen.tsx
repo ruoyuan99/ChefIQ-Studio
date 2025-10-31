@@ -23,6 +23,7 @@ import { useTried } from '../contexts/TriedContext';
 import { usePoints } from '../contexts/PointsContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
 import { useComment } from '../contexts/CommentContext';
+import { useAuth } from '../contexts/AuthContext';
 import { sampleRecipes } from '../data/sampleRecipes';
 import { MenuItem, Ingredient, Instruction } from '../types';
 
@@ -41,7 +42,21 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const { toggleLike, isLiked } = useLike();
   const { toggleTried, isTried, getTriedCount } = useTried();
   const { addPoints } = usePoints();
-  const { getStats } = useSocialStats();
+  const { getStats, fetchStats, incrementViews, adjustLikes, adjustFavorites, adjustTried } = useSocialStats();
+
+  // Derived display helpers for social numbers with sensible minimums
+  const getDisplayLikes = (id: string) => {
+    const n = getStats(id).likes;
+    return isLiked(id) ? Math.max(2, n) : n;
+  };
+  const getDisplayFavorites = (id: string) => {
+    const n = getStats(id).favorites;
+    return isFavorite(id) ? Math.max(2, n) : n;
+  };
+  const getDisplayTried = (id: string) => {
+    const n = getStats(id).tried;
+    return isTried(id) ? Math.max(2, n) : n;
+  };
   const { getComments, addComment, toggleCommentLike } = useComment();
   
   // 添加份数调整状态
@@ -50,6 +65,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   // 留言相关状态
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const { user: authUser } = useAuth();
   
   // 根据ID判断数据来源
   const recipeId = route.params.recipeId;
@@ -95,6 +111,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     imageUri: recipe?.imageUri ? 'Has image' : 'No image'
   });
 
+  // Custom in-app share button (non-native header)
+
   if (!recipe) {
     return (
       <View style={styles.container}>
@@ -105,6 +123,14 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
       </View>
     );
   }
+
+  // Load social stats from Supabase and bump views once when opening
+  useEffect(() => {
+    if (recipeId && !recipeId.startsWith('sample_')) {
+      fetchStats(recipeId);
+      incrementViews(recipeId);
+    }
+  }, [recipeId]);
 
 
   const handleShare = async () => {
@@ -129,6 +155,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     if (!wasLiked) {
       addPoints('like_recipe', `Liked ${recipe.title}`, recipe.id);
     }
+    // update social stats
+    adjustLikes(recipe.id, wasLiked ? -1 : 1);
     
     Alert.alert(
       wasLiked ? 'Unliked' : 'Liked',
@@ -145,6 +173,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     if (!wasFavorite) {
       addPoints('favorite_recipe', `Favorited ${recipe.title}`, recipe.id);
     }
+    // update social stats
+    adjustFavorites(recipe.id, wasFavorite ? -1 : 1);
     
     Alert.alert(
       wasFavorite ? 'Removed from Favorites' : 'Added to Favorites',
@@ -157,6 +187,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const handleTried = () => {
     const wasTried = isTried(recipe.id);
     toggleTried(recipe.id);
+    // update social stats
+    adjustTried(recipe.id, wasTried ? -1 : 1);
     
     if (!wasTried) {
       addPoints('try_recipe', `Tried ${recipe.title}`, recipe.id);
@@ -233,9 +265,9 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         
         <TouchableOpacity 
           style={styles.shareButton}
-          onPress={handleShare}
+          onPress={() => navigation.navigate('ShareRecipe', { recipeId })}
         >
-          <Ionicons name="share-outline" size={24} color="#FF6B35" />
+          <Ionicons name="share-outline" size={24} color="#d96709" />
         </TouchableOpacity>
       </View>
 
@@ -244,16 +276,13 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         style={styles.scrollView}
       >
         {/* Recipe Main Image */}
-        {recipe.imageUri && (
+        {(recipe.image_url || recipe.imageUri || recipe.image) && (
           <View style={styles.recipeImageSection}>
             <Image 
               source={
                 (() => {
-                  console.log('RecipeDetailScreen - Image URI:', recipe.imageUri);
-                  console.log('RecipeDetailScreen - Image URI type:', typeof recipe.imageUri);
-                  return typeof recipe.imageUri === 'string' 
-                    ? { uri: recipe.imageUri } 
-                    : recipe.imageUri;
+                  const src = (recipe.image_url || recipe.imageUri || recipe.image);
+                  return typeof src === 'string' ? { uri: src } : src;
                 })()
               } 
               style={styles.recipeImage} 
@@ -294,13 +323,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           
           <View style={styles.authorInfo}>
             <View style={styles.authorAvatar}>
-              {isUserCreated ? (
-                <Ionicons 
-                  name="person" 
-                  size={24} 
-                  color="white" 
-                />
-              ) : recipe.authorAvatar ? (
+              {recipe.authorAvatar ? (
                 <Image 
                   source={
                     typeof recipe.authorAvatar === 'string' 
@@ -311,7 +334,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
                 />
               ) : (
                 <Ionicons 
-                  name="people" 
+                  name="person" 
                   size={24} 
                   color="white" 
                 />
@@ -319,7 +342,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             </View>
             <View style={styles.authorDetails}>
               <Text style={styles.authorName}>
-                {isUserCreated ? 'Your Recipe' : (recipe.authorName || 'Chef iQ Community')}
+                {recipe.authorName || (isUserCreated ? (authUser?.name || (authUser?.email ? authUser.email.split('@')[0] : 'You')) : 'Chef iQ Community')}
               </Text>
               {!isUserCreated && recipe.authorBio && (
                 <Text style={styles.authorBio}>{recipe.authorBio}</Text>
@@ -535,7 +558,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             styles.socialStatNumber,
             { color: isLiked(recipe.id) ? "#FF6B35" : "#999" }
           ]}>
-            {getStats(recipe.id).likes}
+            {getDisplayLikes(recipe.id)}
           </Text>
         </TouchableOpacity>
 
@@ -552,7 +575,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             styles.socialStatNumber,
             { color: isFavorite(recipe.id) ? "#FF6B35" : "#999" }
           ]}>
-            {getStats(recipe.id).favorites}
+            {getDisplayFavorites(recipe.id)}
           </Text>
         </TouchableOpacity>
 
@@ -574,7 +597,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             styles.socialStatNumber,
             { color: isTried(recipe.id) ? "#4CAF50" : "#999" }
           ]}>
-            {getStats(recipe.id).tried}
+            {getDisplayTried(recipe.id)}
           </Text>
         </TouchableOpacity>
         </View>

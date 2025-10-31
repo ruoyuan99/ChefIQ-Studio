@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useTried } from '../contexts/TriedContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
+import { useLike } from '../contexts/LikeContext';
+import { useFavorite } from '../contexts/FavoriteContext';
 import { sampleRecipes } from '../data/sampleRecipes';
 
 interface ExploreScreenProps {
@@ -24,6 +26,8 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const { state } = useRecipe();
   const { getTriedCount } = useTried();
   const { getStats } = useSocialStats();
+  const { isLiked } = useLike();
+  const { isFavorite } = useFavorite();
   const [searchQuery, setSearchQuery] = useState('');
 
   // 合并用户创建的公开菜谱和示例菜谱
@@ -44,13 +48,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       style={styles.recipeCard}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
     >
-      {recipe.imageUri && (
+      {(recipe.image_url || recipe.imageUri || recipe.image) && (
         <Image 
           source={
-            typeof recipe.imageUri === 'string' 
-              ? { uri: recipe.imageUri } 
-              : recipe.imageUri
-          } 
+            (() => {
+              const src = (recipe.image_url || recipe.imageUri || recipe.image);
+              return typeof src === 'string' ? { uri: src } : src;
+            })()
+          }
           style={styles.recipeImage} 
         />
       )}
@@ -81,14 +86,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         </View>
         
         {/* Social Stats */}
-        <View style={styles.recipeSocialStats}>
+          <View style={styles.recipeSocialStats}>
           <View style={styles.socialStatItem}>
             <Ionicons name="heart" size={12} color="#FF6B35" />
-            <Text style={styles.socialStatText}>{getStats(recipe.id).likes}</Text>
+              <Text style={styles.socialStatText}>{isLiked(recipe.id) ? Math.max(2, getStats(recipe.id).likes) : getStats(recipe.id).likes}</Text>
           </View>
           <View style={styles.socialStatItem}>
             <Ionicons name="bookmark" size={12} color="#FF6B35" />
-            <Text style={styles.socialStatText}>{getStats(recipe.id).favorites}</Text>
+              <Text style={styles.socialStatText}>{isFavorite(recipe.id) ? Math.max(2, getStats(recipe.id).favorites) : getStats(recipe.id).favorites}</Text>
           </View>
           <View style={styles.socialStatItem}>
             <Ionicons name="eye" size={12} color="#FF6B35" />

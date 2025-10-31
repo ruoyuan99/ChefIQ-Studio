@@ -32,6 +32,7 @@ export interface Recipe {
   isPublic: boolean;
   shareCode?: string;
   imageUri?: string | number | null;
+  image_url?: string | null; // 云端图片地址
   authorAvatar?: string | number | null; // 作者头像
   authorName?: string; // 作者姓名
   authorBio?: string; // 作者简介
@@ -50,6 +51,7 @@ export interface Category {
 }
 
 export type RootStackParamList = {
+  Splash: undefined;
   Login: undefined;
   Register: undefined;
   Home: { initialTab?: string };

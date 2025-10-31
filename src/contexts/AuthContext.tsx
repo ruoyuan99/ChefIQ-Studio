@@ -81,8 +81,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) {
         console.error('获取用户资料失败:', error);
-        // 如果用户不存在，创建一个
-        await createUserProfile(authUser);
+        // 如果按 id 未找到，尝试按 email 合并已有资料
+        await createOrMergeUserProfile(authUser);
         return;
       }
 
@@ -100,7 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const createUserProfile = async (authUser: any) => {
+  const createOrMergeUserProfile = async (authUser: any) => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -114,19 +114,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('Failed to create user profile:', error);
-        return;
+        // 如果是邮箱唯一键冲突（已存在同邮箱但不同 id），执行合并：把该邮箱的记录 id 改为当前 authUser.id
+        const isDuplicateEmail = (error as any)?.code === '23505' || ((error as any)?.message || '').includes('duplicate key value')
+        if (isDuplicateEmail && authUser.email) {
+          // 找到当前邮箱的旧记录
+          const { data: existingByEmail } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', authUser.email)
+            .maybeSingle();
+
+          if (existingByEmail && existingByEmail.id !== authUser.id) {
+            // 将该记录更新为新 id 与最新资料
+            const { error: updateErr } = await supabase
+              .from('users')
+              .update({
+                id: authUser.id,
+                name: authUser.user_metadata?.name || existingByEmail.name || authUser.email?.split('@')[0],
+                avatar_url: authUser.user_metadata?.avatar_url || existingByEmail.avatar_url || null,
+              })
+              .eq('email', authUser.email);
+            if (updateErr) {
+              console.error('合并用户资料失败:', updateErr);
+              return;
+            }
+          } else {
+            console.error('邮箱已存在但无法获取旧记录，跳过合并');
+            return;
+          }
+        } else {
+          console.error('Failed to create user profile:', error);
+          return;
+        }
       }
 
-      const userData: User = {
-        id: data.id,
-        email: data.email,
-        name: data.name,
-        avatar_url: data.avatar_url
-      };
-
-      setUser(userData);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      // 如果是 insert 成功，或已完成合并，则以最新 id/email 载入
+      if (!error) {
+        const userData: User = {
+          id: (data as any).id,
+          email: (data as any).email,
+          name: (data as any).name,
+          avatar_url: (data as any).avatar_url
+        };
+        setUser(userData);
+        await AsyncStorage.setItem('user', JSON.stringify(userData));
+        return;
+      }
+      // 合并完成的情况，按 id 重新读取并设置
+      const { data: merged, error: mergedErr } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      if (!mergedErr && merged) {
+        const mergedUser: User = {
+          id: merged.id,
+          email: merged.email,
+          name: merged.name,
+          avatar_url: merged.avatar_url,
+        };
+        setUser(mergedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(mergedUser));
+      }
     } catch (error) {
       console.error('创建用户资料失败:', error);
     }
@@ -203,26 +252,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signIn = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
       setLoading(true);
-      
-      // 特殊处理admin@admin.com账户
-      if (email === 'admin@admin.com' && password === 'password') {
-        console.log('🔑 Logging in with admin account');
-        
-        const adminUser: User = {
-          id: '00000000-0000-0000-0000-000000000001',
-          email: 'admin@admin.com',
-          name: 'Admin User',
-          avatar_url: null
-        };
-        
-        setUser(adminUser);
-        await AsyncStorage.setItem('user', JSON.stringify(adminUser));
-        
-        // 确保管理员用户在Supabase中存在
-        await ensureAdminUserExists(adminUser);
-        
-        return { success: true, message: 'Admin login successful!' };
-      }
       
       // 正常Supabase登录
       const { data, error } = await supabase.auth.signInWithPassword({

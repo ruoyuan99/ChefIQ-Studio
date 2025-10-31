@@ -1,9 +1,34 @@
 import { supabase } from '../config/supabase';
+import { uploadRecipeImage } from './storageService';
 
 export class RealTimeSyncService {
   // 实时同步菜谱到Supabase
   static async syncRecipe(recipe: any, userId: string): Promise<void> {
     try {
+      // Require a valid Supabase session (mock admin has no session)
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        console.log('⚠️ Skipping Supabase sync: no authenticated session');
+        console.log('ℹ️ Provided userId:', userId, 'title:', recipe?.title);
+        return;
+      }
+      console.log('✅ Supabase session present. auth.user.id =', sessionData.session.user.id, 'app userId =', userId);
+
+      // Prepare image URL (upload if local path)
+      let imageUrl: string | null = null;
+      const candidate = recipe.image_url || recipe.image || recipe.imageUri;
+      if (candidate) {
+        const isRemote = typeof candidate === 'string' && (candidate.startsWith('http://') || candidate.startsWith('https://'));
+        if (isRemote) {
+          imageUrl = candidate as string;
+        } else {
+          try {
+            imageUrl = await uploadRecipeImage(candidate as string, userId);
+          } catch (_) {
+            imageUrl = null;
+          }
+        }
+      }
       // 检查菜谱是否已存在
       const { data: existingRecipe } = await supabase
         .from('recipes')
@@ -14,11 +39,11 @@ export class RealTimeSyncService {
 
       if (existingRecipe) {
         // 更新现有菜谱
-        await supabase
+        const { error: updateError } = await supabase
           .from('recipes')
           .update({
             description: recipe.description || '',
-            image_url: recipe.image || recipe.imageUri || null,
+            image_url: imageUrl,
             cooking_time: recipe.cookingTime || recipe.cooking_time || '30分钟',
             servings: parseInt(recipe.servings) || 4,
             cookware: recipe.cookware || '',
@@ -26,14 +51,15 @@ export class RealTimeSyncService {
             updated_at: new Date().toISOString()
           })
           .eq('id', existingRecipe.id);
+        if (updateError) throw updateError;
       } else {
         // 创建新菜谱
-        const { data: newRecipe } = await supabase
+        const { data: newRecipe, error: insertError } = await supabase
           .from('recipes')
           .insert({
             title: recipe.title || recipe.name || 'Untitled Recipe',
             description: recipe.description || '',
-            image_url: recipe.image || recipe.imageUri || null,
+            image_url: imageUrl,
             cooking_time: recipe.cookingTime || recipe.cooking_time || '30分钟',
             servings: parseInt(recipe.servings) || 4,
             cookware: recipe.cookware || '',
@@ -42,6 +68,8 @@ export class RealTimeSyncService {
           })
           .select()
           .single();
+        if (insertError) throw insertError;
+        console.log('🆕 Recipe inserted with id:', newRecipe?.id);
 
         // 同步食材
         if (recipe.ingredients && recipe.ingredients.length > 0) {
@@ -59,9 +87,34 @@ export class RealTimeSyncService {
         }
       }
 
-      console.log('✅ 菜谱实时同步完成:', recipe.title);
+      console.log('✅ 菜谱实时同步完成:', recipe.title, 'is_public:', recipe?.isPublic === true);
     } catch (error) {
       console.error('❌ 菜谱实时同步失败:', error);
+    }
+  }
+
+  // 删除菜谱（及其子表）
+  static async deleteRecipeByTitleForUser(title: string, userId: string): Promise<void> {
+    try {
+      const { data: recipe, error } = await supabase
+        .from('recipes')
+        .select('id')
+        .eq('title', title)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!recipe?.id) return; // nothing to delete
+
+      // Cascade deletes should handle children if FK is ON DELETE CASCADE.
+      await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', recipe.id);
+
+      console.log('✅ 菜谱删除已同步:', title);
+    } catch (err) {
+      console.error('❌ 菜谱删除同步失败:', err);
     }
   }
 
