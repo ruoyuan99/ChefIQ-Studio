@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe Data Schema",
+  "description": "JSON Schema for Recipe data structure used in the Recipe App",
+  "type": "object",
+  "definitions": {
+    "MenuItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the menu item"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the menu item"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the menu item"
+        },
+        "price": {
+          "type": "number",
+          "description": "Price of the menu item"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the menu item (e.g., 'Main Course', 'Appetizer', 'Dessert')"
+        },
+        "image": {
+          "type": "string",
+          "description": "Optional image URL for the menu item"
+        },
+        "isAvailable": {
+          "type": "boolean",
+          "description": "Whether the menu item is currently available"
+        }
+      },
+      "required": ["id", "name", "description", "price", "category", "isAvailable"],
+      "additionalProperties": false
+    },
+    "Ingredient": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ingredient"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the ingredient"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (e.g., 'cup', 'tablespoon', 'pound')"
+        }
+      },
+      "required": ["id", "name", "amount", "unit"],
+      "additionalProperties": false
+    },
+    "Instruction": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the instruction"
+        },
+        "step": {
+          "type": "number",
+          "description": "Step number in the cooking process"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the cooking step"
+        },
+        "imageUri": {
+          "type": ["string", "null"],
+          "description": "Optional image URI for the instruction step"
+        }
+      },
+      "required": ["id", "step", "description"],
+      "additionalProperties": false
+    },
+    "Category": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the category"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the category"
+        },
+        "color": {
+          "type": "string",
+          "description": "Color code for the category"
+        }
+      },
+      "required": ["id", "name", "color"],
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the recipe"
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the recipe",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the recipe",
+      "maxLength": 500
+    },
+    "items": {
+      "type": "array",
+      "description": "List of menu items in the recipe",
+      "items": {
+        "$ref": "#/definitions/MenuItem"
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time when the recipe was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time when the recipe was last updated"
+    },
+    "isPublic": {
+      "type": "boolean",
+      "description": "Whether the recipe is public or private"
+    },
+    "shareCode": {
+      "type": "string",
+      "description": "Optional share code for the recipe"
+    },
+    "imageUri": {
+      "type": ["string", "null"],
+      "description": "Optional main image URI for the recipe"
+    },
+    "tags": {
+      "type": "array",
+      "description": "List of tags for the recipe",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cookingTime": {
+      "type": "string",
+      "description": "Cooking time for the recipe",
+      "enum": [
+        "Under 15 minutes",
+        "15-30 minutes",
+        "30-45 minutes",
+        "45-60 minutes",
+        "1-2 hours",
+        "2-4 hours",
+        "4+ hours",
+        "Overnight"
+      ]
+    },
+    "servings": {
+      "type": "string",
+      "description": "Number of servings",
+      "enum": [
+        "1 serving",
+        "2 servings",
+        "3-4 servings",
+        "4-6 servings",
+        "6-8 servings",
+        "8-10 servings",
+        "10+ servings"
+      ]
+    },
+    "ingredients": {
+      "type": "array",
+      "description": "List of ingredients for the recipe",
+      "items": {
+        "$ref": "#/definitions/Ingredient"
+      }
+    },
+    "instructions": {
+      "type": "array",
+      "description": "List of cooking instructions",
+      "items": {
+        "$ref": "#/definitions/Instruction"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "description",
+    "items",
+    "createdAt",
+    "updatedAt",
+    "isPublic",
+    "tags",
+    "cookingTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "recipe_1234567890",
+      "title": "Chicken Pasta Salad",
+      "description": "A delicious and healthy chicken pasta salad perfect for summer",
+      "items": [
+        {
+          "id": "item_1",
+          "name": "Chicken Breast",
+          "description": "Grilled chicken breast",
+          "price": 12.99,
+          "category": "Main Course",
+          "isAvailable": true
+        }
+      ],
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "isPublic": true,
+      "shareCode": "ABC123",
+      "imageUri": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...",
+      "tags": ["Healthy", "Quick & Easy", "Mediterranean"],
+      "cookingTime": "30-45 minutes",
+      "servings": "4-6 servings",
+      "ingredients": [
+        {
+          "id": "ing_1",
+          "name": "Chicken Breast",
+          "amount": 2,
+          "unit": "pounds"
+        },
+        {
+          "id": "ing_2",
+          "name": "Pasta",
+          "amount": 1,
+          "unit": "pound"
+        }
+      ],
+      "instructions": [
+        {
+          "id": "inst_1",
+          "step": 1,
+          "description": "Boil water in a large pot and cook pasta according to package directions.",
+          "imageUri": null
+        },
+        {
+          "id": "inst_2",
+          "step": 2,
+          "description": "Season chicken breast with salt and pepper, then grill for 6-7 minutes per side.",
+          "imageUri": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ..."
+        }
+      ]
+    }
+  ]
+}
