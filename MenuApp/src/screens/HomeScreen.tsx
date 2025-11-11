@@ -37,9 +37,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
     console.log('showRecipeOptions changed:', showRecipeOptions);
   }, [showRecipeOptions]);
 
-  // 自动显示创建食谱弹窗
+  // Automatically show create recipe modal
   useEffect(() => {
-    // 延迟显示弹窗，确保页面完全加载
+    // Delay showing modal to ensure page is fully loaded
     const timer = setTimeout(() => {
       console.log('Auto-showing create recipe modal');
       setShowRecipeOptions(true);
@@ -123,6 +123,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
       importedRecipe: recipe,
     });
   };
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -288,6 +289,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
         onClose={() => setShowTextImportModal(false)}
         onImport={handleTextImport}
       />
+
     </SafeAreaView>
   );
 };
@@ -296,7 +298,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    paddingBottom: 100, // 增加底部流白空间
+    paddingBottom: 100, // Add bottom padding for spacing
   },
   scrollContent: {
     padding: 20,

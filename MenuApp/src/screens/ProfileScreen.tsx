@@ -87,23 +87,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       onPress: () => navigation.navigate('FavoriteRecipe'),
     },
     {
-      title: 'Supabase Test',
-      icon: 'server-outline',
-      onPress: () => navigation.navigate('SupabaseTest'),
-    },
-    {
-      title: 'Data Migration',
-      icon: 'cloud-upload-outline',
-      onPress: () => {
-        navigation.navigate('DataMigration');
-      },
-    },
-    {
-      title: 'Edit Profile',
-      icon: 'create-outline',
-      onPress: () => navigation.navigate('EditProfile'),
-    },
-    {
       title: 'Settings',
       icon: 'settings-outline',
       onPress: () => {
@@ -115,13 +98,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       icon: 'help-circle-outline',
       onPress: () => {
         // TODO: Navigate to help
-      },
-    },
-    {
-      title: 'About',
-      icon: 'information-circle-outline',
-      onPress: () => {
-        // TODO: Navigate to about
       },
     },
     {
@@ -137,6 +113,24 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Points Display */}
         <PointsDisplay />
+        
+        {/* Chef iQ Challenge Card - Prominent placement at top */}
+        <TouchableOpacity
+          style={styles.challengeCard}
+          onPress={() => navigation.navigate('ChefIQChallenge')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.challengeCardContent}>
+            <View style={styles.challengeIconContainer}>
+              <Ionicons name="trophy" size={32} color="#FFD700" />
+            </View>
+            <View style={styles.challengeTextContainer}>
+              <Text style={styles.challengeTitle}>Chef iQ Challenge</Text>
+              <Text style={styles.challengeDescription}>Test your cooking skills and compete with others!</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#FF6B35" />
+          </View>
+        </TouchableOpacity>
         
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -288,6 +282,50 @@ const styles = StyleSheet.create({
     color: '#d96709',
     fontWeight: '600',
     marginLeft: 6,
+  },
+  challengeCard: {
+    backgroundColor: 'white',
+    marginTop: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 2,
+    borderColor: '#FF6B35',
+  },
+  challengeCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  challengeIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  challengeTextContainer: {
+    flex: 1,
+  },
+  challengeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  challengeDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
   statsContainer: {
     backgroundColor: 'white',

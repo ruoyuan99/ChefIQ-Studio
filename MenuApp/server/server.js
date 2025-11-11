@@ -10,7 +10,7 @@ const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const OpenAI = require('openai');
-const { logCompletionUsage } = require('./aiTokenLogger');
+const { logCompletionUsage, calculateCost } = require('./aiTokenLogger');
 require('dotenv').config();
 
 // Initialize OpenAI client (optional - only if API key is provided)
@@ -35,6 +35,89 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Request timeout configuration
 const AXIOS_TIMEOUT = 30000; // 30 seconds
+
+// ============================================
+// YouTube Search Cache
+// ============================================
+// Cache configuration
+const YOUTUBE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const youtubeCache = new Map(); // In-memory cache for YouTube search results
+
+/**
+ * Generate cache key for YouTube search
+ * @param {string} recipeTitle - Recipe title
+ * @param {string} cookware - Cookware used
+ * @returns {string} Cache key
+ */
+function generateCacheKey(recipeTitle, cookware) {
+  // Normalize the key by converting to lowercase and trimming
+  const normalizedTitle = (recipeTitle || '').toLowerCase().trim();
+  const normalizedCookware = (cookware || '').toLowerCase().trim();
+  return `youtube:${normalizedTitle}:${normalizedCookware}`;
+}
+
+/**
+ * Get cached YouTube search results
+ * @param {string} cacheKey - Cache key
+ * @returns {object|null} Cached result or null if not found/expired
+ */
+function getCachedYouTubeResult(cacheKey) {
+  const cached = youtubeCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+  
+  // Check if cache is expired
+  const now = Date.now();
+  if (now - cached.timestamp > YOUTUBE_CACHE_TTL) {
+    youtubeCache.delete(cacheKey);
+    console.log(`🗑️  Cache expired for key: ${cacheKey}`);
+    return null;
+  }
+  
+  console.log(`✅ Cache hit for key: ${cacheKey} (age: ${Math.round((now - cached.timestamp) / 1000 / 60)} minutes)`);
+  return cached.data;
+}
+
+/**
+ * Set cached YouTube search results
+ * @param {string} cacheKey - Cache key
+ * @param {object} data - Data to cache
+ */
+function setCachedYouTubeResult(cacheKey, data) {
+  youtubeCache.set(cacheKey, {
+    data: data,
+    timestamp: Date.now(),
+  });
+  console.log(`💾 Cached YouTube result for key: ${cacheKey}`);
+  
+  // Optional: Log cache size (for monitoring)
+  if (youtubeCache.size % 10 === 0) {
+    console.log(`📊 YouTube cache size: ${youtubeCache.size} entries`);
+  }
+}
+
+/**
+ * Clear expired cache entries (should be called periodically)
+ */
+function clearExpiredCache() {
+  const now = Date.now();
+  let cleared = 0;
+  
+  for (const [key, value] of youtubeCache.entries()) {
+    if (now - value.timestamp > YOUTUBE_CACHE_TTL) {
+      youtubeCache.delete(key);
+      cleared++;
+    }
+  }
+  
+  if (cleared > 0) {
+    console.log(`🧹 Cleared ${cleared} expired cache entries. Remaining: ${youtubeCache.size}`);
+  }
+}
+
+// Clear expired cache every hour
+setInterval(clearExpiredCache, 60 * 60 * 1000); // 1 hour
 
 /**
  * Generate complete Recipe schema with all required fields
@@ -399,6 +482,858 @@ function extractRecipeFromHTML(html, url) {
   }
 
   return null;
+}
+
+/**
+ * Categorize cooking time into three categories: Quick, Medium, Long
+ * Quick: < 30 minutes
+ * Medium: 30-60 minutes
+ * Long: > 60 minutes
+ */
+function categorizeCookingTime(cookingTime) {
+  if (!cookingTime || typeof cookingTime !== 'string') {
+    return 'Medium'; // Default to Medium if not specified
+  }
+  
+  const timeStr = cookingTime.toLowerCase().trim();
+  
+  // Quick: Under 15 minutes, 15-30 minutes
+  if (timeStr.includes('under 15') || 
+      timeStr.includes('15-30') || 
+      timeStr.includes('15 to 30') ||
+      timeStr.includes('< 30') ||
+      timeStr.includes('less than 30')) {
+    return 'Quick';
+  }
+  
+  // Long: 1-2 hours, 2-4 hours, 4+ hours, Overnight
+  if (timeStr.includes('1-2 hours') || 
+      timeStr.includes('2-4 hours') || 
+      timeStr.includes('4+ hours') || 
+      timeStr.includes('4 hours') ||
+      timeStr.includes('overnight') ||
+      timeStr.includes('> 60') ||
+      timeStr.includes('more than 60') ||
+      timeStr.includes('1 hour') ||
+      timeStr.includes('2 hour')) {
+    return 'Long';
+  }
+  
+  // Medium: 30-45 minutes, 45-60 minutes (default)
+  return 'Medium';
+}
+
+/**
+ * Get YouTube video search queries and descriptions from OpenAI
+ * OpenAI will return 3 optimized search queries and descriptions for finding the most relevant videos
+ * based on the recipe ingredients and requirements
+ * The three videos will be categorized by cooking time: Quick, Medium, Long
+ */
+async function getYouTubeVideoRecommendationsFromAI(recipeData) {
+  if (!openai) {
+    console.warn('⚠️  OpenAI not available, cannot get AI video recommendations');
+    return null;
+  }
+
+  try {
+    const ingredientsList = recipeData.ingredients 
+      ? recipeData.ingredients.map(ing => typeof ing === 'string' ? ing : ing.name || ing).join(', ')
+      : 'Unknown';
+    
+    const cookingTime = recipeData.cookingTime || 'Not specified';
+    
+    const prompt = `You are an expert YouTube video recommendation system for cooking tutorials. Your task is to find the BEST cooking tutorial videos for a given recipe.
+
+RECIPE INFORMATION:
+- Title: ${recipeData.title || 'Unknown'}
+- Description: ${recipeData.description || 'No description'}
+- Main Ingredients: ${ingredientsList}
+- Primary Cookware: ${recipeData.cookware || 'Unknown'}
+- Cuisine Style: ${recipeData.cuisine || 'Not specified'}
+- Cooking Time: ${cookingTime}
+
+YOUR TASK - HYBRID STRATEGY (OPTIMIZED FOR QUOTA SAVINGS):
+Generate exactly 2 video recommendations. For EACH video, you have TWO options:
+
+OPTION 1 (PREFERRED - Saves 99% quota): Provide a specific YouTube video ID
+- If you know a specific, highly relevant YouTube video ID that matches this recipe, provide it
+- Only provide video IDs if you are CONFIDENT they are correct and relevant
+- Video IDs should be from well-known cooking channels or popular tutorial videos
+- Format: 11-character YouTube video ID (e.g., "dQw4w9WgXcQ")
+
+OPTION 2 (FALLBACK): Provide a search query
+- If you don't know a specific video ID, provide an optimized search query
+- Search queries should be highly specific and optimized for YouTube's search algorithm
+- Use 5-12 words, include key ingredients, cookware, and cooking methods
+
+PRIORITY STRATEGY:
+1. FIRST PRIORITY: Provide video ID if you know a specific, highly relevant video (saves 99% API quota)
+2. SECOND PRIORITY: Provide search query if you don't know a specific video ID
+3. ALWAYS provide a searchQuery as fallback, even if you provide a videoId
+
+VIDEO SELECTION CRITERIA:
+- Videos should be highly relevant to the recipe (ingredients, cookware, technique)
+- Videos should be from reputable cooking channels
+- Videos should be educational and tutorial-focused
+- Videos should match the cuisine style and cooking method
+- Videos should be in English (for English-speaking audiences)
+
+SEARCH QUERY GUIDELINES (if providing searchQuery):
+- Use 5-12 words (optimal for YouTube search)
+- Include primary ingredients and cookware when relevant
+- Use action words: "how to", "easy", "best", "recipe", "tutorial"
+- Include cooking methods: "air fry", "pan sear", "roast", "braise", etc.
+- Be specific but not overly restrictive
+- Use natural language (how people actually search)
+- Avoid generic terms like "food" or "cooking" alone
+
+DESCRIPTION REQUIREMENTS - CRITICAL:
+For each video, you MUST write a description in ENGLISH ONLY. The description should:
+- Be written in natural, conversational American English
+- Be 2-3 sentences, 50-100 words
+- Explain why this video is helpful for this recipe
+- Describe what the viewer will learn from this video
+- Highlight the specific value this video provides
+- Use proper English grammar and spelling
+- NOT contain any Chinese characters, Chinese text, or any language other than English
+
+Return a JSON object with this exact structure:
+{
+  "videos": [
+    {
+      "videoId": "dQw4w9WgXcQ",  // OPTIONAL: YouTube video ID (11 characters) if you know a specific relevant video
+      "searchQuery": "air fryer chicken recipe tutorial",  // REQUIRED: Search query as fallback or primary method
+      "description": "English description in American English (2-3 sentences, 50-100 words, ENGLISH ONLY - no Chinese). Explain what makes this video helpful and what the viewer will learn.",
+      "confidence": "high"  // OPTIONAL: "high", "medium", or "low" - confidence level for videoId
+    },
+    {
+      "videoId": null,  // OPTIONAL: Set to null if you don't know a specific video ID
+      "searchQuery": "how to cook chicken in air fryer",  // REQUIRED: Always provide a search query
+      "description": "English description in American English (2-3 sentences, 50-100 words, ENGLISH ONLY - no Chinese). Explain what makes this video helpful and what the viewer will learn.",
+      "confidence": "medium"  // OPTIONAL: Confidence level
+    }
+  ]
+}
+
+CRITICAL REQUIREMENTS - READ CAREFULLY:
+1. Return exactly 2 video recommendations (no more, no less)
+2. ALWAYS provide a searchQuery for each video (required as fallback)
+3. OPTIONALLY provide a videoId if you know a specific, relevant video (saves 99% quota)
+4. videoId should be a valid 11-character YouTube video ID format
+5. If you're not sure about a video ID, set it to null and provide only searchQuery
+6. ALL descriptions MUST be written in ENGLISH ONLY
+7. DO NOT use Chinese characters, Chinese text, or any language other than English in descriptions
+8. Write descriptions in natural, conversational American English
+9. Each video should target different aspects, techniques, or approaches
+10. Focus on finding high-quality, educational cooking tutorial videos
+11. Prioritize videos that match ingredients, cookware, and cooking methods
+
+QUOTA OPTIMIZATION:
+- Providing videoId saves 99% API quota (1 unit vs 100 units per video)
+- Only provide videoId if you are confident it's correct and relevant
+- Always provide searchQuery as fallback in case videoId is invalid
+
+REMINDER: All descriptions must be in English. If you write descriptions in Chinese, the system will reject them and generate fallback descriptions.`;
+
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert YouTube video recommendation system specializing in cooking tutorials. Your task is to find the most relevant and helpful cooking videos for recipes. You can provide either specific YouTube video IDs (if you know them) or optimized search queries (as fallback). Always return valid JSON with exactly 2 video recommendations. Each recommendation should include: videoId (optional, if you know a specific video), searchQuery (required, as fallback), description (required, in English only), and confidence (optional). CRITICAL: All descriptions must be written in English only - do not use Chinese or any other language. Write in natural, conversational American English. If you provide videoId, make sure it is a valid 11-character YouTube video ID from a relevant, reputable cooking tutorial video. Always provide searchQuery as fallback, even if you provide videoId.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.8, // Slightly higher for more creative and natural search queries
+      max_tokens: 1200, // Increased to allow for longer, more detailed English descriptions
+      response_format: { type: 'json_object' },
+    });
+
+    // Log token usage
+    logCompletionUsage('youtube-video-recommendations', completion, {
+      recipeTitle: recipeData.title,
+      cookware: recipeData.cookware || 'none',
+    });
+
+    const responseText = completion.choices[0]?.message?.content?.trim() || '';
+    
+    try {
+      // Remove markdown code blocks if present
+      const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const result = JSON.parse(cleanedText);
+      
+      if (result && result.videos && Array.isArray(result.videos) && result.videos.length > 0) {
+        console.log(`✅ AI recommended ${result.videos.length} YouTube video recommendations`);
+        
+        // Validate and normalize the recommendations
+        const chineseCharRegex = /[\u4e00-\u9fff]/;
+        const validatedVideos = result.videos.map((video, index) => {
+          // Validate video ID format (should be 11 characters if provided)
+          if (video.videoId && typeof video.videoId === 'string') {
+            video.videoId = video.videoId.trim();
+            // YouTube video IDs are 11 characters
+            if (video.videoId.length !== 11) {
+              console.warn(`⚠️  Video ${index + 1} videoId has invalid length (${video.videoId.length} chars, expected 11), ignoring videoId`);
+              video.videoId = null;
+            }
+          } else if (video.videoId === '' || video.videoId === null || video.videoId === undefined) {
+            video.videoId = null;
+          }
+          
+          // Ensure searchQuery is always provided
+          if (!video.searchQuery || typeof video.searchQuery !== 'string' || video.searchQuery.trim().length === 0) {
+            console.warn(`⚠️  Video ${index + 1} missing searchQuery, generating fallback`);
+            video.searchQuery = `${recipeData.title || 'recipe'} ${recipeData.cookware || ''} tutorial`.trim();
+          }
+          
+          // Validate description (check for Chinese characters)
+          if (video.description && chineseCharRegex.test(video.description)) {
+            console.warn(`⚠️  Video ${index + 1} description contains Chinese characters, will use YouTube API description instead`);
+            video.description = null; // Set to null, will use YouTube description
+          }
+          
+          // Log what AI provided
+          if (video.videoId) {
+            console.log(`📺 Video ${index + 1}: AI provided videoId "${video.videoId}" (confidence: ${video.confidence || 'unknown'})`);
+          } else {
+            console.log(`🔍 Video ${index + 1}: AI provided searchQuery "${video.searchQuery}"`);
+          }
+          
+          return video;
+        });
+        
+        const videosWithIds = validatedVideos.filter(v => v.videoId).length;
+        const videosWithQueries = validatedVideos.filter(v => v.searchQuery).length;
+        console.log(`✅ Validated ${validatedVideos.length} recommendations: ${videosWithIds} with videoId, ${videosWithQueries} with searchQuery`);
+        
+        return validatedVideos;
+      } else {
+        console.warn('⚠️  AI response does not contain valid video recommendations');
+        console.warn('⚠️  Response:', responseText);
+    return null;
+      }
+    } catch (parseError) {
+      console.error('❌ Failed to parse AI video recommendations:', parseError.message);
+      console.error('❌ Response text:', responseText);
+    return null;
+    }
+  } catch (error) {
+    console.error('❌ Error getting YouTube video recommendations from AI:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Search YouTube videos by query and return the first result (for backward compatibility)
+ */
+async function searchYouTubeVideoByQuery(searchQuery) {
+  const videos = await searchYouTubeVideosByQuery(searchQuery, 1);
+  return videos && videos.length > 0 ? videos[0] : null;
+}
+
+/**
+ * Search YouTube videos by query and return multiple results
+ * @param {string} searchQuery - Search query string
+ * @param {number} maxResults - Maximum number of videos to return (default: 2)
+ * @returns {Promise<Array>} Array of video objects
+ */
+async function searchYouTubeVideosByQuery(searchQuery, maxResults = 2) {
+  if (!process.env.YOUTUBE_API_KEY) {
+    return [];
+  }
+
+      try {
+        const axios = require('axios');
+    console.log(`🔍 Searching YouTube for: "${searchQuery}" (maxResults: ${maxResults})`);
+    
+        const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+          params: {
+            part: 'snippet',
+            q: searchQuery,
+            type: 'video',
+        maxResults: maxResults, // Get top N results
+            key: process.env.YOUTUBE_API_KEY,
+            videoEmbeddable: true,
+        order: 'relevance', // Order by relevance (best match for the search query)
+        safeSearch: 'moderate', // Moderate safe search for family-friendly content
+          },
+      timeout: 10000,
+        });
+
+    if (!response.data || !response.data.items || response.data.items.length === 0) {
+      console.warn(`⚠️  No YouTube videos found for query: "${searchQuery}"`);
+      return [];
+    }
+        
+        const videos = response.data.items.map((item) => ({
+          videoId: item.id.videoId,
+          title: item.snippet.title,
+          description: item.snippet.description,
+      thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+          channelTitle: item.snippet.channelTitle,
+          publishedAt: item.snippet.publishedAt,
+          url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+          embedUrl: `https://www.youtube.com/embed/${item.id.videoId}`,
+        }));
+        
+    console.log(`✅ Found ${videos.length} video(s) for query: "${searchQuery}"`);
+    return videos;
+  } catch (apiError) {
+    const errorData = apiError.response?.data;
+    const errorMessage = errorData?.error?.message || apiError.message;
+    const errorCode = errorData?.error?.code || apiError.response?.status;
+    
+    console.error(`❌ YouTube API error for query "${searchQuery}":`, errorMessage);
+    console.error(`❌ Error code: ${errorCode}`);
+    
+    // Check for quota exceeded error
+    if (errorCode === 403 && errorMessage && errorMessage.includes('quota')) {
+      console.error('❌ YouTube API quota exceeded! The daily quota limit has been reached.');
+      console.error('💡 Solutions:');
+      console.error('   1. Wait for the quota to reset (usually at midnight Pacific Time)');
+      console.error('   2. Request a quota increase in Google Cloud Console');
+      console.error('   3. Implement caching to reduce API calls');
+      console.error('   4. Optimize search queries to reduce redundant calls');
+      // Re-throw to let caller handle quota errors
+      throw new Error('QUOTA_EXCEEDED');
+    }
+    
+    if (errorData?.error) {
+      console.error(`❌ Error details:`, JSON.stringify(errorData.error, null, 2));
+    }
+    
+    return [];
+  }
+}
+
+/**
+ * Get YouTube video details by video IDs using YouTube API
+ * Returns video information including thumbnails, titles, channels, etc.
+ */
+async function getYouTubeVideoDetails(videoIds) {
+  if (!process.env.YOUTUBE_API_KEY) {
+    console.warn('⚠️  YouTube API key not configured');
+    return [];
+  }
+
+  if (!videoIds || videoIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const axios = require('axios');
+    console.log(`🔍 Fetching YouTube video details for ${videoIds.length} video(s) using videos.list (1 unit per video)`);
+    
+    const response = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+      params: {
+        part: 'snippet', // Only need snippet for video details (not contentDetails to save quota)
+        id: videoIds.join(','),
+        key: process.env.YOUTUBE_API_KEY,
+      },
+      timeout: 10000,
+    });
+
+    if (!response.data || !response.data.items || response.data.items.length === 0) {
+      console.warn(`⚠️  YouTube API returned no video details for videoIds: ${videoIds.join(', ')}`);
+      return [];
+    }
+
+    const videos = response.data.items.map((item) => ({
+      videoId: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+      channelTitle: item.snippet.channelTitle,
+      publishedAt: item.snippet.publishedAt,
+      url: `https://www.youtube.com/watch?v=${item.id}`,
+      embedUrl: `https://www.youtube.com/embed/${item.id}`,
+    }));
+
+    console.log(`✅ Retrieved details for ${videos.length} YouTube video(s) using videos.list (${videoIds.length} units)`);
+    return videos;
+  } catch (apiError) {
+    const errorData = apiError.response?.data;
+    const errorMessage = errorData?.error?.message || apiError.message;
+    const errorCode = errorData?.error?.code || apiError.response?.status;
+    
+    console.error(`❌ YouTube API error fetching video details for IDs "${videoIds.join(', ')}":`, errorMessage);
+    console.error(`❌ Error code: ${errorCode}`);
+    
+    // Check for quota exceeded error
+    if (errorCode === 403 && errorMessage && errorMessage.includes('quota')) {
+      console.error('❌ YouTube API quota exceeded! The daily quota limit has been reached.');
+      console.error('💡 This affects videos.list operation (1 unit per video)');
+      // Re-throw to let caller handle quota errors
+      throw new Error('QUOTA_EXCEEDED');
+    }
+    
+    // For other errors (invalid video ID, etc.), return empty array (not an error)
+    if (errorCode === 404 || (errorData?.error?.errors && errorData.error.errors.some(e => e.reason === 'videoNotFound'))) {
+      console.warn(`⚠️  Video IDs not found: ${videoIds.join(', ')}`);
+      return [];
+    }
+    
+    if (errorData?.error) {
+      console.error(`❌ Error details:`, JSON.stringify(errorData.error, null, 2));
+    }
+    
+    // For other errors, return empty array (fallback will be used)
+    return [];
+  }
+}
+
+/**
+ * Search for related YouTube videos based on recipe ingredients and requirements
+ * New workflow:
+ * 1. Use OpenAI to get 3 most relevant YouTube video IDs and descriptions
+ * 2. Use YouTube API to get video details (thumbnails, titles, channels, etc.)
+ * 3. Merge AI descriptions with YouTube API data
+ * 4. Return complete video information
+ * 
+ * @param {string} recipeTitle - The recipe title to search for
+ * @param {string} cookware - The cookware used (e.g., "air fryer", "oven")
+ * @param {object} recipeData - Recipe data including ingredients, description, etc.
+ * @param {boolean} skipAI - Optional flag to skip AI recommendations (default: false)
+ *                           Note: This is independent of DISABLE_AI_RECIPE_GENERATION
+ */
+// Global flag to track YouTube quota status (shared across requests)
+// This helps skip unnecessary API calls when quota is exhausted
+let globalYouTubeQuotaExceeded = false;
+let globalYouTubeQuotaExceededTime = 0;
+const QUOTA_EXCEEDED_RESET_TIME = 60 * 60 * 1000; // Reset after 1 hour
+
+async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, skipAI = false) {
+  try {
+    // PERFORMANCE OPTIMIZATION: Check global quota status first
+    // If quota was exhausted recently, skip all YouTube operations immediately
+    const now = Date.now();
+    if (globalYouTubeQuotaExceeded && (now - globalYouTubeQuotaExceededTime) < QUOTA_EXCEEDED_RESET_TIME) {
+      const searchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : recipeTitle;
+      const encodedQuery = encodeURIComponent(searchQuery);
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodedQuery}`;
+      console.log(`⏩ Skipping YouTube search (global quota exceeded) - using fallback URL`);
+        return {
+          searchUrl,
+        videos: [],
+      };
+    }
+    
+    // Generate cache key
+    const cacheKey = generateCacheKey(recipeTitle, cookware);
+    
+    // Check cache first (unless skipAI is true, which might indicate we want fresh data)
+    if (!skipAI) {
+      const cachedResult = getCachedYouTubeResult(cacheKey);
+      if (cachedResult) {
+        console.log(`🎯 Using cached YouTube results for: "${recipeTitle}" with cookware: "${cookware}"`);
+        return cachedResult;
+      }
+    }
+    
+    // Generate fallback search URL
+    const searchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : recipeTitle;
+    const encodedQuery = encodeURIComponent(searchQuery);
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodedQuery}`;
+    
+    // Check if we should use AI recommendations
+    const shouldUseAI = !skipAI && openai && recipeData;
+    
+    // Debug logging
+    console.log(`🔍 YouTube search debug:`, {
+      skipAI,
+      hasOpenAI: !!openai,
+      hasRecipeData: !!recipeData,
+      shouldUseAI,
+      youtubeApiKey: process.env.YOUTUBE_API_KEY ? 'configured' : 'not configured',
+      cacheKey,
+      cacheHit: false, // Will be true if we found in cache above
+    });
+    
+    if (shouldUseAI) {
+      // PERFORMANCE OPTIMIZATION: Check global quota status BEFORE calling AI
+      // If quota is already exceeded, skip AI call entirely to save time
+      const now = Date.now();
+      if (globalYouTubeQuotaExceeded && (now - globalYouTubeQuotaExceededTime) < QUOTA_EXCEEDED_RESET_TIME) {
+        console.log(`⏩ Skipping AI YouTube recommendations (global quota exceeded) - using fallback URL`);
+    return {
+      searchUrl,
+      videos: [],
+    };
+      }
+      
+      console.log(`🤖 Getting AI YouTube video recommendations for: "${recipeTitle}"`);
+      console.log(`📝 Recipe data for AI:`, JSON.stringify({
+        title: recipeData.title,
+        cookware: recipeData.cookware,
+        ingredientsCount: recipeData.ingredients?.length || 0,
+      }, null, 2));
+      
+      // Step 1: Get optimized search queries and descriptions from OpenAI
+      // Add timeout to prevent AI call from blocking too long (2 seconds max)
+      const AI_YOUTUBE_TIMEOUT = 2000; // 2 seconds timeout for AI call
+      let aiRecommendations = null;
+      try {
+        const aiPromise = getYouTubeVideoRecommendationsFromAI(recipeData);
+        const aiTimeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('AI YouTube recommendations timeout')), AI_YOUTUBE_TIMEOUT);
+        });
+        aiRecommendations = await Promise.race([aiPromise, aiTimeoutPromise]);
+      } catch (aiError) {
+        if (aiError.message === 'AI YouTube recommendations timeout') {
+          console.warn(`⏱️  AI YouTube recommendations timeout after ${AI_YOUTUBE_TIMEOUT}ms, skipping AI optimization`);
+          aiRecommendations = null;
+        } else {
+          console.error(`❌ Error getting AI YouTube recommendations:`, aiError.message);
+          aiRecommendations = null;
+        }
+      }
+      
+      if (aiRecommendations && aiRecommendations.length > 0) {
+        console.log(`✅ AI recommended ${aiRecommendations.length} video recommendations`);
+        
+        if (process.env.YOUTUBE_API_KEY) {
+          // HYBRID STRATEGY: Try video IDs first (1 unit), fallback to search (100 units)
+          const videosToProcess = aiRecommendations.slice(0, 2); // Process up to 2 recommendations
+          console.log(`📊 Processing ${videosToProcess.length} video recommendations using hybrid strategy`);
+          
+          // Separate recommendations with videoIds and those with only searchQueries
+          const videosWithIds = videosToProcess.filter(rec => rec.videoId);
+          const videosWithQueriesOnly = videosToProcess.filter(rec => !rec.videoId && rec.searchQuery);
+          
+          console.log(`🎯 Hybrid strategy: ${videosWithIds.length} with videoId (low cost), ${videosWithQueriesOnly.length} with searchQuery only (fallback)`);
+          
+          const videoPromises = videosToProcess.map(async (aiRec, index) => {
+            try {
+              let videoDetail = null;
+              let quotaCost = 0;
+              
+              // PRIORITY 1: Try to use videoId if available (1 unit)
+              if (aiRec.videoId) {
+                console.log(`🎯 Attempting to use videoId "${aiRec.videoId}" for recommendation ${index + 1} (1 unit)`);
+                try {
+                  const videoDetails = await getYouTubeVideoDetails([aiRec.videoId]);
+                  if (videoDetails && videoDetails.length > 0) {
+                    videoDetail = videoDetails[0];
+                    quotaCost = 1; // videos.list costs 1 unit
+                    console.log(`✅ Successfully retrieved video using videoId "${aiRec.videoId}" (1 unit cost) - SAVED 99 units!`);
+                  } else {
+                    console.warn(`⚠️  VideoId "${aiRec.videoId}" not found or invalid, falling back to search`);
+                    videoDetail = null; // Ensure videoDetail is null to trigger fallback
+                  }
+                } catch (videoIdError) {
+                  // Check if it's a quota error
+                  if (videoIdError.message === 'QUOTA_EXCEEDED') {
+                    console.error(`❌ Quota exceeded while fetching videoId "${aiRec.videoId}"`);
+                    return { quotaExceeded: true, videoId: aiRec.videoId, quotaCost: 0 };
+                  }
+                  console.warn(`⚠️  Error fetching video by ID "${aiRec.videoId}":`, videoIdError.message);
+                  videoDetail = null; // Ensure videoDetail is null to trigger fallback
+                }
+              }
+              
+              // PRIORITY 2: Fallback to searchQuery if videoId failed or not available (100 units per search)
+              // For search queries, get top 2 videos per query
+              if (!videoDetail && aiRec.searchQuery) {
+                console.log(`🔍 Searching for videos using searchQuery "${aiRec.searchQuery}" (getting top 2 videos, 100 units)`);
+                try {
+                  const searchVideos = await searchYouTubeVideosByQuery(aiRec.searchQuery, 2);
+                  if (searchVideos && searchVideos.length > 0) {
+                    quotaCost = 100; // search.list costs 100 units per query (regardless of maxResults)
+                    console.log(`✅ Successfully retrieved ${searchVideos.length} video(s) using searchQuery "${aiRec.searchQuery}" (100 units cost)`);
+                    // Return array of videos with AI description applied
+                    return searchVideos.map((video) => {
+                      // Check if AI description is in English (not Chinese)
+                      const chineseCharRegex = /[\u4e00-\u9fff]/;
+                      let finalDescription = '';
+                      
+                      if (aiRec.description && !chineseCharRegex.test(aiRec.description)) {
+                        // AI description is in English, use it for all videos from this search
+                        finalDescription = aiRec.description;
+                      } else {
+                        // AI description is Chinese or missing, generate English description from video and recipe info
+                        const recipeTitle = recipeData.title || 'this recipe';
+                        const cookware = recipeData.cookware || 'your cookware';
+                        const ingredientsList = recipeData.ingredients 
+                          ? recipeData.ingredients.map(ing => typeof ing === 'string' ? ing : ing.name || ing).slice(0, 3).join(', ')
+                          : '';
+                        
+                        // Create a natural English description
+                        if (ingredientsList) {
+                          finalDescription = `Learn how to make ${recipeTitle.toLowerCase()} with ${ingredientsList.toLowerCase()} using ${cookware.toLowerCase()}. This video provides clear step-by-step instructions and helpful cooking tips to help you create a delicious and perfectly cooked dish.`;
+                        } else {
+                          finalDescription = `This tutorial demonstrates how to prepare ${recipeTitle.toLowerCase()} using ${cookware.toLowerCase()}. Watch to learn essential cooking techniques, timing tips, and flavor-enhancing methods that will help you achieve excellent results every time.`;
+                        }
+                      }
+                      
+    return {
+                        ...video,
+                        description: finalDescription, // Always use English description
+                        aiDescription: aiRec.description, // Keep AI description for reference
+                        quotaCost: 0, // Quota cost tracked at search level, not per video
+                        method: 'search', // Track which method was used
+                        searchQuery: aiRec.searchQuery, // Track which search query this came from
+                      };
+                    });
+                  } else {
+                    console.warn(`⚠️  No videos found for searchQuery "${aiRec.searchQuery}"`);
+                    return [];
+                  }
+                } catch (searchError) {
+                  console.error(`❌ Error searching for query "${aiRec.searchQuery}":`, searchError.message);
+                  // Check if it's a quota error
+                  if (searchError.message === 'QUOTA_EXCEEDED' || 
+                      (searchError.response?.status === 403 || (searchError.response?.data?.error?.code === 403))) {
+                    const errorMessage = searchError.response?.data?.error?.message || searchError.message;
+                    if (errorMessage.includes('quota') || searchError.message === 'QUOTA_EXCEEDED') {
+                      console.error('❌ YouTube API quota exceeded detected in search!');
+                      return [{ quotaExceeded: true, query: aiRec.searchQuery, quotaCost: 0 }];
+                    }
+                  }
+                  return [];
+                }
+              }
+              
+              // If we have a video from videoId, process it
+              if (videoDetail) {
+                // Check if AI description is in English (not Chinese)
+                const chineseCharRegex = /[\u4e00-\u9fff]/;
+                let finalDescription = '';
+                
+                if (aiRec.description && !chineseCharRegex.test(aiRec.description)) {
+                  // AI description is in English, use it
+                  finalDescription = aiRec.description;
+                  console.log(`✅ Using AI English description for video: ${videoDetail.title}`);
+                } else {
+                  // AI description is Chinese or missing, generate English description from video and recipe info
+                  console.warn(`⚠️  AI description is Chinese or missing for: ${videoDetail.title}, generating English description`);
+                  
+                  // Generate a contextual English description based on video and recipe information
+                  const recipeTitle = recipeData.title || 'this recipe';
+                  const cookware = recipeData.cookware || 'your cookware';
+                  const ingredientsList = recipeData.ingredients 
+                    ? recipeData.ingredients.map(ing => typeof ing === 'string' ? ing : ing.name || ing).slice(0, 3).join(', ')
+                    : '';
+                  
+                  // Create a natural English description
+                  if (ingredientsList) {
+                    finalDescription = `Learn how to make ${recipeTitle.toLowerCase()} with ${ingredientsList.toLowerCase()} using ${cookware.toLowerCase()}. This video provides clear step-by-step instructions and helpful cooking tips to help you create a delicious and perfectly cooked dish.`;
+                  } else {
+                    finalDescription = `This tutorial demonstrates how to prepare ${recipeTitle.toLowerCase()} using ${cookware.toLowerCase()}. Watch to learn essential cooking techniques, timing tips, and flavor-enhancing methods that will help you achieve excellent results every time.`;
+                  }
+                  
+                  console.log(`✅ Generated English description for video: ${videoDetail.title}`);
+                }
+                
+                // Merge AI description with YouTube video data
+                // Return as array for consistency with search results
+                return [{
+                  ...videoDetail,
+                  description: finalDescription, // Always use English description
+                  aiDescription: aiRec.description, // Keep AI description for reference
+                  quotaCost: quotaCost, // Track quota cost for monitoring
+                  method: 'videoId', // Track which method was used
+                }];
+              } else {
+                console.warn(`⚠️  No video found for recommendation ${index + 1} (videoId: ${aiRec.videoId || 'none'}, searchQuery: ${aiRec.searchQuery || 'none'})`);
+                return [];
+              }
+            } catch (error) {
+              console.error(`❌ Error processing recommendation ${index + 1}:`, error.message);
+              // Return empty array for consistency (other branches return arrays)
+              return [];
+            }
+          });
+          
+          // Wait for all video processing to complete
+          const videoResultsArrays = await Promise.all(videoPromises);
+          
+          // Flatten arrays (each search query can return multiple videos)
+          const videoResults = videoResultsArrays.flat();
+          
+          // Calculate total quota cost and statistics
+          let totalQuotaCost = 0;
+          let videosByVideoId = 0;
+          let videosBySearch = 0;
+          let searchQueriesUsed = 0;
+          const hasQuotaError = videoResults.some(result => result && result.quotaExceeded);
+          
+          // Filter out error markers and calculate statistics
+          const validVideos = [];
+          const processedVideoIds = new Set();
+          const processedSearchQueries = new Set();
+          
+          for (const result of videoResults) {
+            // Skip error markers and invalid results
+            if (!result || result.quotaExceeded || result.error) {
+              continue;
+            }
+            // Valid video result must have videoId (required for frontend)
+            if (result.videoId && result.title) {
+              // Track quota cost
+              if (result.method === 'videoId') {
+                totalQuotaCost += result.quotaCost || 0;
+                videosByVideoId++;
+                if (!processedVideoIds.has(result.videoId)) {
+                  processedVideoIds.add(result.videoId);
+                  validVideos.push(result);
+                }
+              } else if (result.method === 'search') {
+                // Track search query usage (100 units per query, not per video)
+                if (result.searchQuery && !processedSearchQueries.has(result.searchQuery)) {
+                  processedSearchQueries.add(result.searchQuery);
+                  searchQueriesUsed++;
+                  totalQuotaCost += 100; // Each search query costs 100 units
+                }
+                videosBySearch++;
+                if (!processedVideoIds.has(result.videoId)) {
+                  processedVideoIds.add(result.videoId);
+                  validVideos.push(result);
+                }
+              }
+            }
+          }
+          
+          // Log quota usage statistics
+          console.log(`📊 Quota usage summary:`);
+          console.log(`   - Total cost: ${totalQuotaCost} units`);
+          console.log(`   - Videos retrieved by videoId: ${videosByVideoId} (${videosByVideoId} units)`);
+          console.log(`   - Search queries used: ${searchQueriesUsed} (${searchQueriesUsed * 100} units)`);
+          console.log(`   - Videos retrieved by search: ${videosBySearch} (from ${searchQueriesUsed} queries)`);
+          console.log(`   - Total unique videos: ${validVideos.length}`);
+          if (videosByVideoId > 0) {
+            console.log(`   - Quota saved: ${(videosByVideoId * 99)} units (compared to search for those videos)`);
+          }
+          
+          // Check for quota exceeded
+          if (hasQuotaError) {
+            // Set global flag to skip future YouTube searches
+            globalYouTubeQuotaExceeded = true;
+            globalYouTubeQuotaExceededTime = Date.now();
+            console.error('❌ YouTube API quota exceeded detected. Stopping video search.');
+            console.error('🚫 Global quota flag set - future requests will skip YouTube searches for 1 hour');
+            console.error('💡 Solutions:');
+            console.error('   1. Wait for quota reset (usually at midnight Pacific Time)');
+            console.error('   2. Request quota increase in Google Cloud Console');
+            console.error('   3. Implement caching to reduce API calls');
+          }
+          
+          // Check if all processing failed
+          if (validVideos.length === 0 && videoResults.length > 0) {
+            if (hasQuotaError) {
+              console.warn('⚠️  YouTube API quota exceeded. No videos can be retrieved.');
+            } else {
+              console.warn('⚠️  All video processing failed (0 videos found)');
+              console.warn('⚠️  This might indicate:');
+              console.warn('   1. YouTube API quota exceeded');
+              console.warn('   2. Invalid video IDs provided by AI');
+              console.warn('   3. YouTube API service issue');
+              console.warn('   4. Network connectivity problem');
+            }
+            console.warn('⚠️  Falling back to search URL only. Videos will not be displayed.');
+          }
+          
+          // Remove internal fields before returning (frontend doesn't need them)
+          // validVideos already has duplicates removed
+          const uniqueVideos = validVideos.map(video => {
+            const { quotaCost, method, aiDescription, searchQuery, ...videoForFrontend } = video;
+            return videoForFrontend;
+          });
+          
+          if (uniqueVideos.length > 0) {
+            console.log(`✅ Successfully found ${uniqueVideos.length} unique videos`);
+            console.log(`📺 Video titles:`, uniqueVideos.map(v => v.title).join(', '));
+            console.log(`📺 Video IDs:`, uniqueVideos.map(v => v.videoId).join(', '));
+            console.log(`💡 Strategy result: ${videosByVideoId} videos via videoId (${videosByVideoId} units), ${videosBySearch} videos from ${searchQueriesUsed} search queries (${searchQueriesUsed * 100} units)`);
+            
+            const result = {
+              searchUrl,
+              videos: uniqueVideos, // Return all unique videos (up to 4 from 2 queries * 2 videos each)
+            };
+            
+            // Cache the result for future requests
+            setCachedYouTubeResult(cacheKey, result);
+            
+            return result;
+          } else {
+            console.warn('⚠️  No unique videos found for any of the AI-recommended video recommendations');
+            console.warn('⚠️  Possible reasons:');
+            console.warn('   - YouTube API quota exceeded (check server logs for 403 errors)');
+            console.warn('   - Invalid video IDs provided by AI');
+            console.warn('   - No videos match the search queries');
+            console.warn('   - YouTube API errors');
+            console.warn('⚠️  Falling back to search URL only. User can still search manually on YouTube.');
+            
+            // Cache the fallback result (empty videos) to avoid repeated API calls
+            const fallbackResult = {
+              searchUrl,
+      videos: [],
+    };
+            
+            // Only cache if it's not a quota error (don't cache quota errors)
+            if (!hasQuotaError) {
+              setCachedYouTubeResult(cacheKey, fallbackResult);
+            }
+          }
+        } else {
+          console.warn('⚠️  YouTube API key not configured, cannot search for videos');
+        }
+      } else {
+        console.warn('⚠️  AI did not return video recommendations, falling back to search URL');
+      }
+    } else {
+      if (skipAI) {
+        console.log('⚠️  AI recommendations skipped by parameter (skipAI=true)');
+      } else if (!openai) {
+        console.log('⚠️  OpenAI not available, cannot get AI recommendations (openai is null/undefined)');
+      } else if (!recipeData) {
+        console.log('⚠️  Recipe data not provided, cannot get AI recommendations (recipeData is null/undefined)');
+      } else {
+        console.log('⚠️  Unknown reason for skipping AI recommendations');
+      }
+    }
+    
+    // Fallback: return search URL only
+    console.log(`📺 Returning search URL for YouTube: ${searchUrl}`);
+    const fallbackResult = {
+      searchUrl,
+      videos: [],
+    };
+    
+    // Cache the fallback result to avoid repeated API calls
+    setCachedYouTubeResult(cacheKey, fallbackResult);
+    
+    return fallbackResult;
+  } catch (error) {
+    console.error('❌ Error searching YouTube videos:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Generate cache key for error handling
+    const cacheKey = generateCacheKey(recipeTitle, cookware);
+    
+    // Return fallback search URL
+    const fallbackQuery = cookware ? `${recipeTitle} ${cookware} recipe` : recipeTitle;
+    const fallbackResult = {
+      searchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(fallbackQuery)}`,
+      videos: [],
+    };
+    
+    // Don't cache quota errors (they should be retried after quota reset)
+    // But cache other errors to avoid repeated failures
+    const isQuotaError = error.response?.status === 403 && 
+                         (error.response?.data?.error?.message?.includes('quota') || 
+                          error.message?.includes('quota'));
+    if (!isQuotaError) {
+      setCachedYouTubeResult(cacheKey, fallbackResult);
+      console.log(`💾 Cached error result for: ${cacheKey}`);
+    } else {
+      console.log('⚠️  Not caching quota error - will retry after quota reset');
+    }
+    
+    return fallbackResult;
+  }
 }
 
 /**
@@ -1166,6 +2101,831 @@ app.post('/api/import-recipe-text', async (req, res) => {
 });
 
 /**
+ * Generate recipe from ingredients using AI
+ * Takes user's available ingredients and generates a recipe
+ */
+app.post('/api/generate-recipe-from-ingredients', async (req, res) => {
+  const requestStartTime = Date.now();
+  console.log(`⏱️  [PERFORMANCE] Recipe generation request started at ${new Date(requestStartTime).toISOString()}`);
+  
+  try {
+    const { ingredients, dietaryRestrictions, cuisine, servings, cookingTime, cookware, skipAI } = req.body;
+
+    if (!ingredients || ingredients.length === 0) {
+      return res.status(400).json({
+        error: 'At least one ingredient is required',
+        success: false,
+      });
+    }
+
+    if (!cookware) {
+      return res.status(400).json({
+        error: 'Cookware is required',
+        success: false,
+      });
+    }
+
+    // Check if AI recipe generation should be skipped (via environment variable)
+    // Note: This only affects recipe generation, not YouTube search AI optimization
+    const shouldSkipRecipeAI = process.env.DISABLE_AI_RECIPE_GENERATION === 'true';
+
+    // Track YouTube quota status to avoid unnecessary API calls
+    let youtubeQuotaExceeded = false;
+    
+    const getYoutubeDataForRecipe = async (recipeData, optionLabel = '') => {
+      // PERFORMANCE OPTIMIZATION: Check global quota status first (fastest path)
+      const now = Date.now();
+      if (globalYouTubeQuotaExceeded && (now - globalYouTubeQuotaExceededTime) < QUOTA_EXCEEDED_RESET_TIME) {
+        const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+          recipeData.title + (cookware ? ` ${cookware} recipe` : '')
+        )}`;
+        console.log(`⏩ Skipping YouTube search${optionLabel ? ` (${optionLabel})` : ''} - global quota exceeded, using fallback URL`);
+        return {
+          searchUrl: fallbackUrl,
+          videos: [],
+        };
+      }
+      
+      // PERFORMANCE OPTIMIZATION: If YouTube quota is already exceeded in this request, skip API calls and return fallback immediately
+      if (youtubeQuotaExceeded) {
+        const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+          recipeData.title + (cookware ? ` ${cookware} recipe` : '')
+        )}`;
+        console.log(`⏩ Skipping YouTube search${optionLabel ? ` (${optionLabel})` : ''} - quota exceeded in this request, using fallback URL`);
+        return {
+          searchUrl: fallbackUrl,
+          videos: [],
+        };
+      }
+
+      let youtubeVideos = null;
+      const startTime = Date.now();
+      try {
+        const logLabel = optionLabel ? ` (${optionLabel})` : '';
+        console.log(`🔍 Searching YouTube videos${logLabel} for: "${recipeData.title}" with cookware: "${cookware}"`);
+        console.log(`📺 YouTube API Key configured: ${process.env.YOUTUBE_API_KEY ? 'YES' : 'NO'}`);
+
+        const recipeDataForSearch = {
+          title: recipeData.title,
+          description: recipeData.description,
+          ingredients: recipeData.ingredients || [],
+          cookware: cookware,
+          cuisine: cuisine || null,
+          cookingTime: recipeData.cookingTime || null,
+        };
+
+        // Reduce timeout to 2 seconds for faster fallback when quota is exceeded
+        const YOUTUBE_SEARCH_TIMEOUT = 2000; // 2 seconds timeout (reduced from 3s for faster response)
+        const youtubeSearchPromise = searchYouTubeVideos(recipeData.title, cookware, recipeDataForSearch);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('YouTube search timeout')), YOUTUBE_SEARCH_TIMEOUT);
+        });
+
+        youtubeVideos = await Promise.race([youtubeSearchPromise, timeoutPromise]);
+        
+        const searchTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`📺 YouTube search result${logLabel}: ${youtubeVideos?.videos?.length || 0} videos (${searchTime}s)`);
+        console.log(`📺 YouTube search URL${logLabel}: ${youtubeVideos?.searchUrl ? 'YES' : 'NO'}`);
+
+        if (!youtubeVideos || !youtubeVideos.searchUrl) {
+          console.warn(`⚠️  No search URL in YouTube result${logLabel}, creating fallback`);
+          youtubeVideos = {
+            searchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(
+              recipeData.title + (cookware ? ` ${cookware} recipe` : '')
+            )}`,
+            videos: youtubeVideos?.videos || [],
+          };
+        }
+      } catch (youtubeError) {
+        const searchTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        
+        // Check if quota is exceeded and mark it globally to skip future calls
+        if (youtubeError.message && (youtubeError.message.includes('QUOTA_EXCEEDED') || youtubeError.message.includes('quota'))) {
+          youtubeQuotaExceeded = true;
+          console.warn(`🚫 YouTube quota exceeded detected. Skipping future YouTube searches for this request.`);
+        }
+        
+        if (youtubeError.message === 'YouTube search timeout') {
+          console.warn(`⏱️  YouTube search timeout${optionLabel ? ` (${optionLabel})` : ''} after ${searchTime}s, using fallback`);
+        } else if (youtubeError.message && youtubeError.message.includes('QUOTA_EXCEEDED')) {
+          console.warn(`🚫 YouTube quota exceeded${optionLabel ? ` (${optionLabel})` : ''}, using fallback`);
+        } else {
+          console.error(`❌ Error searching YouTube videos${optionLabel ? ` (${optionLabel})` : ''}:`, youtubeError.message);
+        }
+        
+        youtubeVideos = {
+          searchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(
+            recipeData.title + (cookware ? ` ${cookware} recipe` : '')
+          )}`,
+          videos: [],
+        };
+      }
+
+      const finalYoutubeVideos = youtubeVideos || {
+        searchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(
+          recipeData.title + (cookware ? ` ${cookware} recipe` : '')
+        )}`,
+        videos: [],
+      };
+
+      if (!Array.isArray(finalYoutubeVideos.videos)) {
+        finalYoutubeVideos.videos = [];
+      }
+
+      if (!finalYoutubeVideos.searchUrl) {
+        finalYoutubeVideos.searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+          recipeData.title + (cookware ? ` ${cookware} recipe` : '')
+        )}`;
+        console.log(`⚠️  Created fallback search URL${optionLabel ? ` (${optionLabel})` : ''}:`, finalYoutubeVideos.searchUrl);
+      }
+
+      return finalYoutubeVideos;
+    };
+    
+    if (shouldSkipRecipeAI) {
+      console.log(`⚠️  AI recipe generation is disabled. Creating mock recipe options for YouTube testing.`);
+      console.log(`📝 Ingredients: ${ingredients.join(', ')}`);
+      console.log(`🍳 Cookware: ${cookware}`);
+      console.log(`📺 YouTube search will still use AI optimization if available.`);
+      
+      const ingredientObjects = ingredients.map((ing, index) => ({
+        name: ing,
+        amount: index + 1,
+        unit: 'cup'
+      }));
+
+      // Determine cooking times - if user specified, all three use same category with slight variation
+      // If not specified, use different times to reflect different styles
+      let cookingTimes;
+      if (cookingTime) {
+        // All three recipes same category, but slight variation for style
+        if (cookingTime === 'Quick') {
+          cookingTimes = ['25 minutes', '28 minutes', '30 minutes']; // All under 30 minutes
+        } else if (cookingTime === 'Medium') {
+          cookingTimes = ['40 minutes', '45 minutes', '50 minutes']; // All 30-60 minutes
+        } else if (cookingTime === 'Long') {
+          cookingTimes = ['70 minutes', '80 minutes', '90 minutes']; // All over 60 minutes
+        }
+      } else {
+        // Different cooking times to reflect different styles
+        cookingTimes = ['30 minutes', '45 minutes', '60 minutes'];
+      }
+
+      // Determine servings - use user selection or default
+      const targetServings = servings || '4 servings';
+      
+      // Determine tags based on user selections
+      const baseTags = [cookware];
+      if (cuisine && cuisine !== 'None') {
+        baseTags.push(cuisine);
+      }
+      if (cookingTime) {
+        baseTags.push(cookingTime);
+      }
+      if (dietaryRestrictions && dietaryRestrictions.length > 0) {
+        baseTags.push(...dietaryRestrictions);
+      }
+
+      // Three different styles
+      const style1Tags = [...baseTags, 'Classic', 'Traditional'];
+      const style2Tags = [...baseTags, 'Modern', 'Fusion'];
+      const style3Tags = [...baseTags, 'Gourmet', 'Elevated'];
+
+      const mockRecipes = [
+        {
+          title: `Classic ${ingredients[0] || 'Chef'} ${cookware} ${cookingTime === 'Quick' ? 'Quick' : cookingTime === 'Medium' ? 'Classic' : cookingTime === 'Long' ? 'Special' : 'Dish'}`,
+          description: `A traditional, straightforward recipe that highlights ${ingredients.join(', ')} using your ${cookware}. Simple techniques with familiar flavors make this an approachable everyday meal.${cuisine && cuisine !== 'None' ? ` Inspired by classic ${cuisine} cuisine.` : ''}${dietaryRestrictions && dietaryRestrictions.length > 0 ? ` Suitable for ${dietaryRestrictions.join(', ')}.` : ''}`,
+          ingredients: ingredientObjects,
+          instructions: [
+            { step: 1, description: `Prep all ingredients simply and preheat the ${cookware}.` },
+            { step: 2, description: `Layer ${ingredients[0]} with supporting ingredients using traditional techniques.` },
+            { step: 3, description: `Cook in the ${cookware} until done and serve with classic presentation.` }
+          ],
+          cookingTime: cookingTimes[0],
+          servings: targetServings,
+          tags: style1Tags,
+          cookware,
+        },
+        {
+          title: `Modern ${ingredients[0] || 'Family'} ${cookware} ${cookingTime === 'Quick' ? 'Express' : cookingTime === 'Medium' ? 'Fusion' : cookingTime === 'Long' ? 'Feast' : 'Creation'}`,
+          description: `A contemporary recipe with creative twists that transforms ${ingredients.join(', ')} into something exciting using your ${cookware}. Bold flavors and modern techniques create a memorable dish.${cuisine && cuisine !== 'None' ? ` Featuring ${cuisine} fusion flavors.` : ''}${dietaryRestrictions && dietaryRestrictions.length > 0 ? ` Perfect for ${dietaryRestrictions.join(', ')} diets.` : ''}`,
+          ingredients: ingredientObjects.map((ing) => ({
+            ...ing,
+            amount: ing.amount + 0.5,
+          })),
+          instructions: [
+            { step: 1, description: `Season ${ingredients[0]} with modern spice blends and prep with creative techniques.` },
+            { step: 2, description: `Use innovative cooking methods in the ${cookware} to build complex flavors.` },
+            { step: 3, description: `Finish with contemporary garnishes and serve with style.` }
+          ],
+          cookingTime: cookingTimes[1],
+          servings: targetServings,
+          tags: style2Tags,
+          cookware,
+        },
+        {
+          title: `Gourmet ${ingredients[0] || 'Signature'} ${cookware} ${cookingTime === 'Quick' ? 'Delight' : cookingTime === 'Medium' ? 'Showcase' : cookingTime === 'Long' ? 'Masterpiece' : 'Experience'}`,
+          description: `An elevated, restaurant-quality recipe that showcases ${ingredients.join(', ')} in your ${cookware}. Sophisticated techniques and refined presentation make this perfect for special occasions.${cuisine && cuisine !== 'None' ? ` Using advanced ${cuisine} techniques.` : ''}${dietaryRestrictions && dietaryRestrictions.length > 0 ? ` Compliant with ${dietaryRestrictions.join(', ')} requirements.` : ''}`,
+          ingredients: ingredientObjects.map((ing, idx) => ({
+            ...ing,
+            amount: ing.amount + idx * 0.25,
+          })),
+          instructions: [
+            { step: 1, description: `Prepare ${ingredients[0]} with advanced techniques like marinating or sous-vide preparation.` },
+            { step: 2, description: `Cook in stages inside the ${cookware} using professional methods to build depth.` },
+            { step: 3, description: `Plate with artistic presentation, adding elegant garnishes and finishing touches.` }
+          ],
+          cookingTime: cookingTimes[2],
+          servings: targetServings,
+          tags: style3Tags,
+          cookware,
+        },
+      ];
+
+      const recipeOptions = [];
+
+      for (let i = 0; i < mockRecipes.length; i += 1) {
+        const mockRecipe = mockRecipes[i];
+        const finalRecipe = generateCompleteRecipeSchema(mockRecipe);
+        const youtubeData = await getYoutubeDataForRecipe(finalRecipe, `Option ${i + 1}`);
+
+        recipeOptions.push({
+          recipe: finalRecipe,
+          youtubeVideos: youtubeData,
+        });
+      }
+
+      console.log(`✅ Mock recipe options generated: ${recipeOptions.length}`);
+      
+      return res.json({
+        success: true,
+        recipeOptions,
+      });
+    }
+
+    if (!openai) {
+      return res.status(503).json({
+        error: 'AI recipe generation is not available. Please set OPENAI_API_KEY in .env file.',
+        success: false,
+      });
+    }
+
+    console.log(`🤖 Generating recipe from ingredients: ${ingredients.join(', ')}`);
+
+    // JSON schema for three recipe options
+    // The response should be an object with a "recipes" array containing exactly 3 recipes
+    const RECIPE_JSON_SCHEMA = {
+      type: 'object',
+      properties: {
+        recipes: {
+          type: 'array',
+          items: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        ingredients: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              amount: { type: 'number' },
+              unit: { type: 'string' }
+            },
+            required: ['name', 'amount', 'unit'],
+            additionalProperties: false
+          }
+        },
+        instructions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              step: { type: 'number' },
+              description: { type: 'string' }
+            },
+            required: ['step', 'description'],
+            additionalProperties: false
+          }
+        },
+        cookingTime: { type: ['string', 'null'] },
+        servings: { type: ['string', 'null'] },
+        tags: {
+          type: 'array',
+          items: { type: 'string' }
+        },
+        cookware: { type: ['string', 'null'] }
+      },
+      required: ['title', 'description', 'ingredients', 'instructions', 'cookingTime', 'servings', 'tags', 'cookware'],
+            additionalProperties: false
+          },
+          minItems: 3,
+          maxItems: 3
+        }
+      },
+      required: ['recipes'],
+      additionalProperties: false
+    };
+
+    // ============================================
+    // SINGLE-STAGE RECIPE GENERATION
+    // Generate complete recipes directly in one API call for better performance
+    // Expected improvement: 26-44% faster (30-40s vs 54s), 30-43% fewer tokens, 15-35% cost reduction
+    // ============================================
+    
+    console.log('🎯 Starting single-stage recipe generation process...');
+    const aiGenerationStartTime = Date.now();
+    console.log(`⏱️  [PERFORMANCE] AI generation started at ${new Date(aiGenerationStartTime).toISOString()}`);
+    
+    // SINGLE-STAGE: Generate complete recipes directly
+    const modelForRecipeGeneration = process.env.OPENAI_MODEL_RECIPE || 'gpt-4o';
+    console.log(`📝 Generating recipes using ${modelForRecipeGeneration} (single-stage)...`);
+    const apiStartTime = Date.now();
+    
+    // Build user requirements
+    const userRequirements = [];
+    
+    if (cookingTime) {
+      if (cookingTime === 'Quick') {
+        userRequirements.push('Cooking Time: ALL three recipes MUST be Quick (less than 30 minutes total). This is REQUIRED.');
+      } else if (cookingTime === 'Medium') {
+        userRequirements.push('Cooking Time: ALL three recipes MUST be Medium (30-60 minutes total). This is REQUIRED.');
+      } else if (cookingTime === 'Long') {
+        userRequirements.push('Cooking Time: ALL three recipes MUST be Long (more than 60 minutes total). This is REQUIRED.');
+      }
+    }
+    
+    if (servings) {
+      userRequirements.push(`Servings: ALL three recipes MUST serve ${servings}. This is REQUIRED.`);
+    }
+    
+    if (cuisine && cuisine !== 'None') {
+      userRequirements.push(`Cuisine: ALL three recipes MUST have ${cuisine} cuisine influence. This is REQUIRED.`);
+    }
+    
+    if (dietaryRestrictions && dietaryRestrictions.length > 0) {
+      userRequirements.push(`Dietary Restrictions: ALL three recipes MUST respect: ${dietaryRestrictions.join(', ')}. This is REQUIRED.`);
+    }
+    
+    // Build optimized single-stage prompt
+    const prompt = `Create THREE HIGHLY DISTINCT, REALISTIC, AUTHENTIC recipes from these available ingredients: ${ingredients.join(', ')}.
+
+CRITICAL: Generate REAL, PRACTICAL recipes that people would actually cook, not random ingredient combinations. Each recipe must be a complete, well-thought-out dish with proper techniques, timing, and cooking methods.
+
+INGREDIENT USAGE - REALISTIC COMBINATIONS:
+- You do NOT need to use ALL provided ingredients in every recipe
+- Each recipe should SELECT a DIFFERENT subset of ingredients that WORK WELL TOGETHER in real cooking
+- Recipe 1 (Classic/Traditional): Choose 2-3 ingredients for a classic dish (e.g., chicken + tomato = curry/stew, not just "chicken and tomato")
+- Recipe 2 (Modern/Fusion): Choose a DIFFERENT 2-4 ingredients for a modern/fusion dish (ensure ingredients complement each other)
+- Recipe 3 (Gourmet/Elevated): Choose yet ANOTHER DIFFERENT 2-4 ingredients for a gourmet/elevated dish (create sophisticated pairings)
+- You may add basic pantry staples (salt, pepper, oil, water, flour, sugar, spices, herbs, garlic, onion, etc.) as needed
+- IMPORTANT: Only combine ingredients that make culinary sense together. Create ACTUAL DISHES, not random combinations.
+- You must use each input ingredient **at least once** across the 3 recipes
+
+RECIPE VARIETY - MAXIMUM DIFFERENTIATION:
+The three recipes must be HIGHLY DISTINCT and offer COMPLETELY DIFFERENT culinary experiences:
+
+1. DISH TYPE VARIETY:
+   - Recipe 1: One specific dish type (e.g., "Tacos", "Curry", "Soup", "Stir-Fry", "Salad", "Roast", "Skewers", "Wraps")
+   - Recipe 2: A COMPLETELY DIFFERENT dish type (avoid repetition)
+   - Recipe 3: Yet ANOTHER DIFFERENT dish type
+   - Examples: If Recipe 1 is a curry, Recipe 2 could be a salad, and Recipe 3 could be a roast
+   - AVOID generic terms: "Dish", "Meal", "Supper", "Feast", "Showcase"
+
+2. FLAVOR PROFILE VARIETY:
+   - Recipe 1: Simple, classic, familiar flavors (basic seasoning, traditional combinations)
+   - Recipe 2: Bold, complex, exotic flavors (spices, sauces, marinades, fusion elements)
+   - Recipe 3: Sophisticated, refined, delicate flavors (premium ingredients, unique combinations, elegant preparations)
+
+3. COOKING TECHNIQUE VARIETY:
+   - Recipe 1: Straightforward technique (one-pot, minimal steps, simple roasting/baking)
+   - Recipe 2: More complex technique (layering flavors, multiple steps, marination, searing)
+   - Recipe 3: Advanced/unique technique (slow cooking, brining, special preparation, multi-stage cooking)
+
+4. PRIMARY INGREDIENTS:
+   - Each recipe should use DIFFERENT primary ingredients to maximize variety
+   - Overlap between recipes should be MINIMAL (maximum 1-2 shared ingredients, but used in completely different ways)
+
+${userRequirements.length > 0 ? `\nUSER REQUIREMENTS (ALL THREE RECIPES MUST SATISFY):\n${userRequirements.map((req, idx) => `${idx + 1}. ${req}`).join('\n')}` : ''}
+
+${cookingTime ? `\nIMPORTANT: ALL THREE recipes MUST be ${cookingTime} (same cooking time category), but EVERYTHING ELSE should be COMPLETELY DIFFERENT.` : ''}
+
+RECIPE STRUCTURE:
+1. TITLE: Specific, descriptive (e.g., "Air Fryer Crispy Chicken Tacos", NOT "Chicken Air Fryer Supper")
+   - Include dish type, cuisine style, or cooking technique when helpful
+   - AVOID generic suffixes: "Supper", "Feast", "Showcase", "Dish", "Meal"
+   - Each title must be UNIQUE and reflect the specific dish type
+   - Examples: "Air Fryer Crispy Chicken Tacos", "Slow Cooker Thai Red Curry", "Pan-Seared Salmon with Lemon Herbs"
+
+2. DESCRIPTION: "Perfect for: ..." + 2-3 sentences
+   - Describe what makes this dish special and when to serve it
+   - Mention flavor profile, texture, or cooking style
+
+3. INGREDIENTS: Specific quantities (US units), prep notes in parentheses, substitutions
+   - Include SPECIFIC quantities: "1 lb chicken breast", "2 cups coconut milk", "1 tablespoon curry powder"
+   - Mention prep state: "Extra-firm tofu (press to remove excess water)", "Onion, diced", "Garlic, minced"
+   - Provide substitutions: "Coconut milk (or cream as substitute)"
+   - Include common pantry staples (salt, pepper, oil, etc.)
+
+4. INSTRUCTIONS: Detailed steps with SPECIFIC times/temps
+   - Include SPECIFIC cooking times and temperatures: "Cook 3-4 min per side", "Bake 375°F for 25 min", "Cook on Low for 6-7 hours"
+   - Add preparation notes: "Press and cube the tofu", "Dice onion", "Marinate for 30 minutes"
+   - Include cooking tips: "Mix gently to coat", "Cook until golden brown", "Add in last 10 minutes"
+   - Specify when to add ingredients: "In the last 10 minutes", "After 30 minutes of cooking"
+   - Add serving suggestions: "Serve with rice, naan, or a light green salad"
+   - Each step should be clear, actionable, and realistic
+
+5. COOKING TIME: ${cookingTime ? `${cookingTime} category` : 'Appropriate for recipe'}
+   - Include both active and passive cooking time
+   - Be specific: "25 minutes", "1 hour", "6-7 hours on Low"
+
+6. SERVINGS: ${servings ? servings : 'Realistic serving sizes'}
+
+7. COOKWARE: "${cookware}" (REQUIRED for all recipes)
+
+8. TAGS: Cookware, cuisine type, meal type, dietary notes, cooking method
+
+CRITICAL REMINDERS:
+- REALISTIC, PRACTICAL recipes only (real cooking techniques, timing, methods)
+- Use ingredients that WORK TOGETHER in real cooking (e.g., chicken + tomato = curry, not random)
+- SPECIFIC quantities, times, temperatures with US units
+- Each recipe: COMPLETE, DISTINCT, AUTHENTIC
+- Avoid unrealistic ingredient combinations or impractical techniques
+- All cookware and tools should be commonly available in regular home kitchens
+- AVOID generic titles: "Supper", "Feast", "Showcase", "Dish", "Meal"
+
+RETURN FORMAT: JSON with "recipes" array containing exactly 3 recipe objects. Each recipe: title, description, ingredients (array), instructions (array), cookingTime, servings, tags (array), cookware.`;
+
+    // Build system message for single-stage approach
+    const systemMessage = `Create THREE HIGHLY DISTINCT, AUTHENTIC, PRACTICAL recipes from available ingredients.
+
+RULES:
+1. REALISTIC: Real cooking techniques, specific times/temps (e.g., "pan-fry 3-4 min per side", "bake 375°F for 25 min")
+2. INGREDIENTS: Use ingredients that WORK TOGETHER (e.g., chicken + tomato = curry, not random combinations)
+3. VARIETY: Recipe 1 (Classic/Traditional), Recipe 2 (Modern/Fusion), Recipe 3 (Gourmet/Elevated)
+   - DIFFERENT dish types (e.g., "Tacos", "Curry", "Soup", "Salad", "Roast")
+   - DIFFERENT primary ingredients (minimal overlap)
+   - DIFFERENT flavors (simple classic, bold complex, sophisticated refined)
+   - DIFFERENT techniques (straightforward, multi-step, advanced)
+4. TITLES: Specific, descriptive (e.g., "Air Fryer Crispy Chicken Tacos", NOT "Chicken Air Fryer Supper")
+   - Include dish type, cuisine, or technique
+   - AVOID generic terms: "Supper", "Feast", "Showcase", "Dish", "Meal"
+5. DESCRIPTIONS: "Perfect for: ..." + what makes it special (flavor, texture, occasion)
+6. RESPECT ALL USER CONSTRAINTS: cookware, time, servings, cuisine, dietary restrictions
+7. Use each input ingredient at least once across 3 recipes
+8. SPECIFIC quantities (US units), prep notes in parentheses, substitutions, serving suggestions
+9. DETAILED INSTRUCTIONS: Clear steps with specific times, temperatures, and techniques`;
+
+    console.log(`🤖 Using model for recipe generation: ${modelForRecipeGeneration}`);
+    if (modelForRecipeGeneration === 'gpt-4o-mini') {
+      console.log(`💰 Cost-saving mode: Using gpt-4o-mini (93% cheaper than gpt-4o)`);
+      console.log(`⚠️  Note: Recipe quality may be slightly lower. Monitor token usage and quality.`);
+    } else {
+      console.log(`💡 Tip: GPT-4o provides much better recipe quality than gpt-4o-mini`);
+    }
+
+    const completion = await openai.beta.chat.completions.parse({
+      model: modelForRecipeGeneration,
+      messages: [
+        {
+          role: 'system',
+          content: systemMessage
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'recipe_generation',
+          description: 'Generated recipe options from ingredients',
+          strict: true,
+          schema: RECIPE_JSON_SCHEMA
+        }
+      },
+      temperature: 0.75, // Slightly higher for more creative variety while maintaining realism
+    });
+    const apiEndTime = Date.now();
+    const apiDuration = ((apiEndTime - apiStartTime) / 1000).toFixed(2);
+    console.log(`⏱️  [PERFORMANCE] AI API call completed in ${apiDuration}s`);
+
+    const parsedResponse = completion.choices[0].message.parsed;
+    const generatedRecipes = Array.isArray(parsedResponse?.recipes) ? parsedResponse.recipes : [];
+
+    if (generatedRecipes.length === 0) {
+      console.error('❌ AI did not return any recipes. Parsed response:', JSON.stringify(parsedResponse, null, 2));
+      return res.status(500).json({
+        error: 'AI failed to generate recipes. The response format may be incorrect.',
+        success: false,
+        debug: {
+          hasRecipes: !!parsedResponse?.recipes,
+          recipesLength: parsedResponse?.recipes?.length || 0,
+          parsedResponseKeys: parsedResponse ? Object.keys(parsedResponse) : []
+        }
+      });
+    }
+
+    if (generatedRecipes.length < 3) {
+      console.warn(`⚠️  AI returned ${generatedRecipes.length} recipes instead of 3. Using available recipes.`);
+      // Continue with available recipes instead of failing completely
+    } else if (generatedRecipes.length > 3) {
+      console.warn(`⚠️  AI returned ${generatedRecipes.length} recipes instead of 3. Using first 3 recipes.`);
+      generatedRecipes.splice(3); // Keep only first 3
+    }
+
+    // Log token usage with cost
+    const aiGenerationEndTime = Date.now();
+    const aiGenerationDuration = ((aiGenerationEndTime - aiGenerationStartTime) / 1000).toFixed(2);
+    console.log(`⏱️  [PERFORMANCE] Total AI generation completed in ${aiGenerationDuration}s`);
+    
+    if (completion.usage) {
+      const totalCost = calculateCost(modelForRecipeGeneration, completion.usage.prompt_tokens, completion.usage.completion_tokens);
+      console.log(`📊 ${modelForRecipeGeneration} token usage: ${completion.usage.prompt_tokens} prompt + ${completion.usage.completion_tokens} completion = ${completion.usage.total_tokens} total`);
+      console.log(`💰 Total recipe generation cost: $${totalCost.toFixed(6)}`);
+      console.log(`📋 Generated recipes: ${generatedRecipes.map((r) => r?.title || 'Untitled').join(' | ')}`);
+    }
+
+    logCompletionUsage('generate-recipe-from-ingredients', completion, {
+      ingredients: ingredients.join(', '),
+      recipeTitles: generatedRecipes.map((r) => r?.title).join(' | '),
+      dietaryRestrictions: dietaryRestrictions?.join(', ') || 'none',
+      cuisine: cuisine || 'none',
+      cookware: cookware || 'none',
+    });
+    
+    // Prepare all recipes first (without YouTube data)
+    const preparedRecipes = [];
+    for (let i = 0; i < generatedRecipes.length; i += 1) {
+      const generatedRecipe = {
+        ...generatedRecipes[i],
+        // Force user requirements to be satisfied
+        cookware: cookware, // Always use user-specified cookware
+      };
+
+      // Force servings if user specified
+      if (servings) {
+        generatedRecipe.servings = servings;
+      }
+
+      // Validate and enforce cooking time category if user specified
+      if (cookingTime) {
+        const recipeCookingTime = generatedRecipe.cookingTime || '';
+        const cookingTimeLower = recipeCookingTime.toLowerCase();
+        
+        // Check if cooking time matches the category
+        let timeMatches = false;
+        if (cookingTime === 'Quick') {
+          // Extract minutes from cooking time (e.g., "25 minutes" -> 25)
+          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(min|minute|m)/);
+          if (minutesMatch) {
+            const minutes = parseInt(minutesMatch[1], 10);
+            timeMatches = minutes < 30;
+          }
+        } else if (cookingTime === 'Medium') {
+          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(min|minute|m)/);
+          if (minutesMatch) {
+            const minutes = parseInt(minutesMatch[1], 10);
+            timeMatches = minutes >= 30 && minutes <= 60;
+          }
+        } else if (cookingTime === 'Long') {
+          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(min|minute|m)/);
+          if (minutesMatch) {
+            const minutes = parseInt(minutesMatch[1], 10);
+            timeMatches = minutes > 60;
+          }
+          // Also check for hours
+          const hoursMatch = cookingTimeLower.match(/(\d+)\s*(hour|hr|h)/);
+          if (hoursMatch) {
+            timeMatches = true;
+          }
+        }
+        
+        if (!timeMatches && generatedRecipe.cookingTime) {
+          console.warn(`⚠️  Recipe ${i + 1} cooking time "${generatedRecipe.cookingTime}" doesn't match category "${cookingTime}". Adjusting...`);
+          // Set appropriate cooking time based on category
+          if (cookingTime === 'Quick') {
+            generatedRecipe.cookingTime = '25 minutes';
+          } else if (cookingTime === 'Medium') {
+            generatedRecipe.cookingTime = '45 minutes';
+          } else if (cookingTime === 'Long') {
+            generatedRecipe.cookingTime = '75 minutes';
+          }
+        }
+      }
+
+      // Ensure tags include user-specified requirements
+      if (!Array.isArray(generatedRecipe.tags)) {
+        generatedRecipe.tags = [];
+      }
+      
+      // Add cookware to tags if not present
+      if (!generatedRecipe.tags.includes(cookware)) {
+        generatedRecipe.tags.push(cookware);
+      }
+      
+      // Add cuisine to tags if specified and not present
+      if (cuisine && cuisine !== 'None' && !generatedRecipe.tags.includes(cuisine)) {
+        generatedRecipe.tags.push(cuisine);
+      }
+      
+      // Add cooking time category to tags if specified and not present
+      if (cookingTime && !generatedRecipe.tags.includes(cookingTime)) {
+        generatedRecipe.tags.push(cookingTime);
+      }
+      
+      // Add dietary restrictions to tags if specified and not present
+      if (dietaryRestrictions && dietaryRestrictions.length > 0) {
+        dietaryRestrictions.forEach(restriction => {
+          if (!generatedRecipe.tags.includes(restriction)) {
+            generatedRecipe.tags.push(restriction);
+          }
+        });
+      }
+
+      if (!generatedRecipe.title) {
+        console.warn(`⚠️  Skipping recipe option ${i + 1} due to missing title`, generatedRecipe);
+        continue;
+      }
+
+      console.log(`✅ AI generated recipe option ${i + 1}: ${generatedRecipe.title}`);
+      console.log(`   - Description: ${generatedRecipe.description?.substring(0, 100)}...`);
+      console.log(`   - Cookware: ${generatedRecipe.cookware}`);
+      console.log(`   - Cooking Time: ${generatedRecipe.cookingTime}`);
+      console.log(`   - Servings: ${generatedRecipe.servings}`);
+      console.log(`   - Ingredients count: ${generatedRecipe.ingredients?.length || 0}`);
+      console.log(`   - Instructions count: ${generatedRecipe.instructions?.length || 0}`);
+      console.log(`   - Tags: ${generatedRecipe.tags.join(', ')}`);
+      
+      // Validate recipe quality
+      if (generatedRecipe.instructions && generatedRecipe.instructions.length < 3) {
+        console.warn(`⚠️  Recipe ${i + 1} has fewer than 3 instructions - may be too simple`);
+      }
+      if (generatedRecipe.ingredients && generatedRecipe.ingredients.length < 3) {
+        console.warn(`⚠️  Recipe ${i + 1} has fewer than 3 ingredients - may be incomplete`);
+      }
+      
+      const finalRecipe = generateCompleteRecipeSchema(generatedRecipe);
+      preparedRecipes.push({ recipe: finalRecipe, index: i + 1 });
+    }
+
+    // AI generation time is already calculated above in the token usage section
+    // (aiGenerationEndTime and aiGenerationDuration are already set)
+    
+    // PERFORMANCE OPTIMIZATION: Return recipes immediately with fallback YouTube URLs
+    // YouTube data will be fetched asynchronously in the background (non-blocking)
+    console.log(`⚡ Returning recipes immediately with fallback YouTube URLs (YouTube data will load in background)`);
+    
+    // Create recipe options with fallback YouTube URLs (non-blocking)
+    const recipeOptions = preparedRecipes.map(({ recipe, index }) => {
+      const fallbackSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+        recipe.title + (cookware ? ` ${cookware} recipe` : '')
+      )}`;
+      
+      return {
+        recipe,
+        youtubeVideos: {
+          searchUrl: fallbackSearchUrl,
+          videos: [], // Empty initially, will be populated in background
+        },
+      };
+    });
+    
+    // Fetch YouTube data asynchronously in the background (non-blocking)
+    // This allows the response to be sent immediately while YouTube data loads
+    setImmediate(async () => {
+      console.log(`🚀 Starting background YouTube searches for ${preparedRecipes.length} recipe options...`);
+      const youtubeSearchStartTime = Date.now();
+      
+      // Check if quota is exceeded before starting
+      if (youtubeQuotaExceeded || globalYouTubeQuotaExceeded) {
+        console.log(`⏩ Skipping background YouTube searches - quota exceeded, using fallback URLs only`);
+        return;
+      }
+      
+      try {
+        const youtubeDataPromises = preparedRecipes.map(({ recipe, index }) => {
+          return getYoutubeDataForRecipe(recipe, `Option ${index}`)
+            .then(youtubeData => {
+              console.log(`✅ Background YouTube data received for Option ${index}: ${recipe.title}`);
+              // Update cache for future requests
+              const cacheKey = generateCacheKey(recipe.title, cookware);
+              setCachedYouTubeResult(cacheKey, youtubeData);
+              return youtubeData;
+            })
+            .catch(error => {
+              console.error(`❌ Error getting background YouTube data for Option ${index} (${recipe.title}):`, error.message);
+              return null; // Silently fail in background
+            });
+        });
+        
+        await Promise.all(youtubeDataPromises);
+        const youtubeSearchEndTime = Date.now();
+        const youtubeSearchTime = ((youtubeSearchEndTime - youtubeSearchStartTime) / 1000).toFixed(2);
+        console.log(`⚡ Background YouTube searches completed in ${youtubeSearchTime}s`);
+      } catch (error) {
+        console.error(`❌ Background YouTube search error:`, error.message);
+      }
+    });
+    
+    const youtubeSearchTime = '0.00'; // YouTube search is now non-blocking
+
+    if (recipeOptions.length === 0) {
+      const requestEndTime = Date.now();
+      const totalDuration = ((requestEndTime - requestStartTime) / 1000).toFixed(2);
+      console.log(`⏱️  [PERFORMANCE] Request failed after ${totalDuration}s (no recipe options)`);
+      return res.status(500).json({
+        error: 'No valid recipe options were generated',
+        success: false,
+      });
+    }
+
+    const requestEndTime = Date.now();
+    const totalDuration = ((requestEndTime - requestStartTime) / 1000).toFixed(2);
+    console.log(`✅ Generated ${recipeOptions.length} recipe options successfully`);
+    console.log(`⏱️  [PERFORMANCE] ========================================`);
+    console.log(`⏱️  [PERFORMANCE] TOTAL REQUEST TIME: ${totalDuration}s`);
+    console.log(`⏱️  [PERFORMANCE] - AI Generation: ${aiGenerationDuration}s (single-stage)`);
+    console.log(`⏱️  [PERFORMANCE] - YouTube Search: ${youtubeSearchTime}s (non-blocking, loaded in background)`);
+    console.log(`⏱️  [PERFORMANCE] ========================================`);
+    
+    res.json({
+      success: true,
+      recipeOptions,
+    });
+
+  } catch (error) {
+    console.error('Error generating recipe from ingredients:', error.message);
+    
+    res.status(500).json({
+      error: error.message || 'Failed to generate recipe from ingredients',
+      success: false,
+    });
+  }
+});
+
+/**
+ * Test YouTube video search endpoint
+ * This endpoint allows testing YouTube video search without generating a full recipe
+ */
+app.get('/api/test-youtube', async (req, res) => {
+  try {
+    const { query, cookware } = req.query;
+    
+    if (!query) {
+      return res.status(400).json({
+        error: 'Query parameter is required',
+        success: false,
+      });
+    }
+    
+    console.log(`🧪 Testing YouTube search for: "${query}"${cookware ? ` with cookware: ${cookware}` : ''}`);
+    
+    // Prepare recipe data for AI search (if available)
+    const recipeDataForSearch = {
+      title: query,
+      description: '',
+      ingredients: [],
+      cookware: cookware || '',
+      cuisine: null,
+      cookingTime: null,
+    };
+    
+    // Test YouTube video search with AI optimization
+    const youtubeVideos = await searchYouTubeVideos(query, cookware || '', recipeDataForSearch);
+    
+    console.log(`✅ YouTube search result:`, JSON.stringify(youtubeVideos, null, 2));
+    
+    // Extract the search query from the URL to show what was actually used
+    const searchQueryUsed = youtubeVideos.searchUrl 
+      ? decodeURIComponent(youtubeVideos.searchUrl.split('search_query=')[1]?.split('&')[0] || '')
+      : 'N/A';
+    
+    res.json({
+      success: true,
+      query: query,
+      cookware: cookware || 'none',
+      recipeData: recipeDataForSearch,
+      searchQueryUsed: searchQueryUsed,
+      youtubeVideos: youtubeVideos,
+      hasApiKey: !!process.env.YOUTUBE_API_KEY,
+      hasOpenAIApiKey: !!process.env.OPENAI_API_KEY,
+      videoCount: youtubeVideos.videos ? youtubeVideos.videos.length : 0,
+      hasSearchUrl: !!youtubeVideos.searchUrl,
+      aiOptimized: !!process.env.OPENAI_API_KEY,
+    });
+  } catch (error) {
+    console.error('Error testing YouTube search:', error.message);
+    res.status(500).json({
+      error: error.message || 'Failed to test YouTube search',
+      success: false,
+    });
+  }
+});
+
+/**
  * Health check endpoint
  */
 app.get('/health', (req, res) => {
@@ -1173,6 +2933,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     service: 'Recipe Import Server',
     timestamp: new Date().toISOString(),
+    youtubeApiKey: process.env.YOUTUBE_API_KEY ? 'configured' : 'not configured',
   });
 });
 
@@ -1184,5 +2945,17 @@ app.listen(PORT, () => {
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
   console.log(`📥 Import endpoint: http://localhost:${PORT}/api/import-recipe`);
   console.log(`🤖 Optimize endpoint: http://localhost:${PORT}/api/optimize-recipe`);
+  console.log(`📸 Scan endpoint: http://localhost:${PORT}/api/scan-recipe`);
+  console.log(`📝 Text import endpoint: http://localhost:${PORT}/api/import-recipe-text`);
+  console.log(`🍳 Generate from ingredients: http://localhost:${PORT}/api/generate-recipe-from-ingredients`);
+  console.log(`🧪 Test YouTube endpoint: http://localhost:${PORT}/api/test-youtube?query=chicken%20recipe&cookware=Oven`);
+  console.log(`📺 YouTube API Key: ${process.env.YOUTUBE_API_KEY ? '✅ Configured' : '❌ Not configured'}`);
+  console.log(`🤖 OpenAI API: ${openai ? '✅ Available' : '❌ Not available'}`);
+  console.log(`🛠️  AI recipe generation disabled: ${process.env.DISABLE_AI_RECIPE_GENERATION === 'true' ? '✅ Yes' : '❌ No'}`);
+  console.log(`💾 YouTube cache: Enabled (TTL: ${YOUTUBE_CACHE_TTL / 1000 / 60 / 60} hours)`);
+  console.log(`📊 YouTube search optimization: Hybrid strategy (videoId + searchQuery)`);
+  console.log(`🎯 Strategy: AI provides videoId when possible (1 unit), fallback to search (100 units per query, 2 videos per query)`);
+  console.log(`📈 Estimated quota consumption: 2-200 units per user query (depends on AI videoId success rate)`);
+  console.log(`💡 Best case: 2 units (2 videoIds), Worst case: 200 units (2 search queries), Average: ~100 units`);
+  console.log(`📺 Videos per query: 2 videos per search query (up to 4 total videos from 2 queries)`);
 });
-

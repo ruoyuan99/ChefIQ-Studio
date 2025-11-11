@@ -31,7 +31,7 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
 
   const addItem = () => {
     if (newItem.trim()) {
-      // 这里可以添加手动添加item的逻辑
+      // Here you can add logic to manually add items
       Alert.alert('Info', 'Use the "Groceries" button in recipe details to add ingredients automatically.');
       setNewItem('');
     }
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    paddingBottom: 100, // 增加底部流白空间
+    paddingBottom: 100, // Add bottom padding for spacing
   },
   header: {
     position: 'absolute',
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 70 : (StatusBar.currentHeight || 24) + 26, // 为header留出空间
+    paddingTop: Platform.OS === 'ios' ? 70 : (StatusBar.currentHeight || 24) + 26, // Leave space for header
   },
   categorySection: {
     marginBottom: 24,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
     padding: 8,
     backgroundColor: '#f8f9fa',
     borderRadius: 6,

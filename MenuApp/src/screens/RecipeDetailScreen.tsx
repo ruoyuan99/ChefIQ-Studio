@@ -14,6 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
@@ -26,7 +27,7 @@ import { useSocialStats } from '../contexts/SocialStatsContext';
 import { useComment } from '../contexts/CommentContext';
 import { useAuth } from '../contexts/AuthContext';
 import { sampleRecipes } from '../data/sampleRecipes';
-import { MenuItem, Ingredient, Instruction } from '../types';
+import { MenuItem, Ingredient, Instruction, YouTubeVideo } from '../types';
 
 interface RecipeDetailScreenProps {
   navigation: any;
@@ -60,23 +61,23 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   };
   const { getComments, addComment, toggleCommentLike } = useComment();
   
-  // 添加份数调整状态
+  // State for serving size adjustment
   const [currentServings, setCurrentServings] = useState(4);
   
-  // 留言相关状态
+  // State for comment-related UI
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [commentText, setCommentText] = useState('');
   const { user: authUser } = useAuth();
   
-  // 根据ID判断数据来源
+  // Determine data source based on recipe ID
   const recipeId = route.params.recipeId;
   const [recipe, setRecipe] = useState<any>(null);
   const [isUserCreated, setIsUserCreated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // 查找recipe的函数
+  // Function to find recipe by ID
   const findRecipe = (id: string, recipes: any[]) => {
-    // 判断是否为示例recipe（ID以'sample_'开头）
+    // Check if this is a sample recipe (ID starts with 'sample_')
     if (id.startsWith('sample_')) {
       const found = sampleRecipes.find(r => r.id === id);
       if (found) {
@@ -88,7 +89,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
       setIsLoading(false);
       return false;
     } else {
-      // 用户创建的recipe，从context获取
+      // User-created recipe, get from context
       const found = recipes.find((r: any) => r.id === id);
       if (found) {
         setRecipe(found);
@@ -100,49 +101,49 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     }
   };
   
-  // 监听state.recipes和recipeId的变化，重新查找recipe
+  // Watch for changes in state.recipes and recipeId, re-find recipe when needed
   useEffect(() => {
     if (!recipeId) {
       setIsLoading(false);
       return;
     }
     
-    // 如果recipe已经找到且ID匹配，不需要重新查找
+    // If recipe is already found and ID matches, no need to search again
     if (recipe && recipe.id === recipeId) {
       return;
     }
     
-    // 首先尝试通过ID直接查找
+    // First, try to find recipe by ID directly
     const found = findRecipe(recipeId, state.recipes);
     
     if (!found && !recipeId.startsWith('sample_')) {
-      // 如果找不到，可能是ID已经更新为UUID（刚创建recipe后）
-      // 尝试查找最近创建的recipe（5分钟内）
+      // If not found, recipe ID might have been updated to UUID (after creation)
+      // Try to find recently created recipe (within 5 minutes)
       const recentRecipes = state.recipes
         .filter((r: any) => {
           const createdAt = new Date(r.createdAt).getTime();
           const now = Date.now();
-          return (now - createdAt) < 5 * 60 * 1000; // 5分钟
+          return (now - createdAt) < 5 * 60 * 1000; // 5 minutes
         })
         .sort((a: any, b: any) => {
-          // 按创建时间降序排列
+          // Sort by creation time, newest first
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
       
       if (recentRecipes.length > 0) {
-        // 使用最近创建的recipe（可能是ID更新后的版本）
+        // Use the most recently created recipe (likely the updated version with new ID)
         const latestRecipe = recentRecipes[0];
         setRecipe(latestRecipe);
         setIsUserCreated(true);
         setIsLoading(false);
-        // 更新navigation params以使用新的ID
+        // Update navigation params to use the new ID
         navigation.setParams({ recipeId: latestRecipe.id });
       } else if (state.recipes.length === 0) {
-        // 如果recipes列表为空，等待一下再试（给同步一些时间）
+        // If recipes list is empty, wait a bit and try again (give sync some time)
         const timer = setTimeout(() => {
           const retryFound = findRecipe(recipeId, state.recipes);
           if (!retryFound && state.recipes.length > 0) {
-            // 最后一次尝试：使用最近创建的recipe
+            // Last attempt: use the most recently created recipe
             const lastTry = state.recipes
               .sort((a: any, b: any) => {
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -161,13 +162,13 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         }, 2000);
         return () => clearTimeout(timer);
       } else {
-        // 如果recipes列表不为空但找不到，说明真的不存在
+        // If recipes list is not empty but recipe not found, it truly doesn't exist
         setIsLoading(false);
       }
     }
   }, [state.recipes, recipeId, recipe]);
 
-  // 初始化份数 - 必须在所有 hooks 调用之后
+  // Initialize serving size - must be called after all hooks
   useEffect(() => {
     if (recipe) {
       const servings = parseInt(recipe.servings) || 4;
@@ -175,8 +176,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     }
   }, [recipe]);
 
-  // Load social stats from Supabase and bump views once when opening
-  // 必须在早期返回之前调用所有 hooks
+  // Load social stats from Supabase and increment view count when opening recipe
+  // Must be called before early returns
   useEffect(() => {
     if (recipeId && !recipeId.startsWith('sample_')) {
       fetchStats(recipeId);
@@ -184,7 +185,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     }
   }, [recipeId]);
 
-  // 调试信息
+  // Debug logging
   console.log('RecipeDetailScreen - Route params:', route.params);
   console.log('RecipeDetailScreen - Recipe ID:', recipeId);
   console.log('RecipeDetailScreen - Is sample recipe:', recipeId.startsWith('sample_'));
@@ -206,7 +207,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
 
   // Custom in-app share button (non-native header)
 
-  // 早期返回必须在所有 hooks 调用之后
+  // Early return must be after all hooks are called
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -245,7 +246,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
       };
       await Share.share(shareContent);
       
-      // 添加分享积分
+      // Award points for sharing recipe
       addPoints('share_recipe', `Shared ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add points:', err));
     } catch (error) {
       Alert.alert('Share Failed', 'Unable to share recipe');
@@ -344,7 +345,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     toggleCommentLike(recipe.id, commentId);
   };
 
-  // Cook step by step 处理函数
+  // Handler for starting step-by-step cooking mode
   const handleStartCooking = () => {
     navigation.navigate('CookStep', { recipeId: recipe.id });
   };
@@ -609,6 +610,59 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           </View>
         )}
 
+        {/* YouTube Videos Section */}
+        {(recipe.youtubeVideos && recipe.youtubeVideos.length > 0) || recipe.youtubeSearchUrl ? (
+          <View style={styles.youtubeSection}>
+            <Text style={styles.sectionTitle}>Related Videos</Text>
+            <Text style={styles.youtubeSubtitle}>Watch cooking tutorials on YouTube</Text>
+            
+            {recipe.youtubeVideos && recipe.youtubeVideos.length > 0 ? (
+              <View style={styles.youtubeVideosList}>
+                {recipe.youtubeVideos.map((video: YouTubeVideo, index: number) => (
+                  <TouchableOpacity
+                    key={video.videoId || index}
+                    style={styles.youtubeVideoCard}
+                    onPress={() => Linking.openURL(video.url)}
+                  >
+                    {video.thumbnail && (
+                      <Image 
+                        source={{ uri: video.thumbnail }} 
+                        style={styles.youtubeThumbnail}
+                      />
+                    )}
+                    <View style={styles.youtubeVideoInfo}>
+                      <Text style={styles.youtubeVideoTitle} numberOfLines={2}>
+                        {video.title}
+                      </Text>
+                      {video.channelTitle && (
+                        <Text style={styles.youtubeChannelName} numberOfLines={1}>
+                          {video.channelTitle}
+                        </Text>
+                      )}
+                      <View style={styles.youtubePlayButton}>
+                        <Ionicons name="play-circle" size={24} color="#d96709" />
+                        <Text style={styles.youtubePlayText}>Watch on YouTube</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+            
+            {recipe.youtubeSearchUrl && (
+              <TouchableOpacity
+                style={styles.youtubeSearchButton}
+                onPress={() => Linking.openURL(recipe.youtubeSearchUrl)}
+              >
+                <Ionicons name="logo-youtube" size={20} color="#fff" />
+                <Text style={styles.youtubeSearchButtonText}>
+                  Search More Videos on YouTube
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
+
         {/* Comments Section at the end of detail page */}
         <View style={styles.commentsSectionInline}>
           <Text style={styles.sectionTitle}>Comments</Text>
@@ -841,7 +895,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16, // 为header留出空间
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16, // Leave space for header
     paddingBottom: 24,
   },
   // Recipe Image Section
@@ -1303,7 +1357,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   favoritedButton: {
-    backgroundColor: '#FF6B35', // 使用橙色表示已收藏状态
+    backgroundColor: '#FF6B35', // Use orange color to indicate favorited state
   },
   // Comment Modal Styles
   modalOverlay: {
@@ -1463,6 +1517,80 @@ const styles = StyleSheet.create({
   },
   cookStepButtonCompleted: {
     backgroundColor: '#4CAF50',
+  },
+  // YouTube Videos Section
+  youtubeSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  youtubeSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  youtubeVideosList: {
+    gap: 12,
+  },
+  youtubeVideoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  youtubeThumbnail: {
+    width: 120,
+    height: 90,
+    backgroundColor: '#ddd',
+  },
+  youtubeVideoInfo: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  youtubeVideoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  youtubeChannelName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  youtubePlayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  youtubePlayText: {
+    fontSize: 12,
+    color: '#d96709',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  youtubeSearchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF0000',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  youtubeSearchButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

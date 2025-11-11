@@ -20,6 +20,10 @@ import ProfileScreen from '../screens/ProfileScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
 import DataMigrationScreen from '../screens/DataMigrationScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import GenerateRecipeScreen from '../screens/GenerateRecipeScreen';
+import GenerateRecipeLoadingScreen from '../screens/GenerateRecipeLoadingScreen';
+import GenerateRecipeResultsScreen from '../screens/GenerateRecipeResultsScreen';
+import ChefIQChallengeScreen from '../screens/ChefIQChallengeScreen';
 import BottomTabNavigator from '../components/BottomTabNavigator';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -174,6 +178,39 @@ const AppNavigator: React.FC = () => {
           options={{
             title: 'Edit Profile',
             headerBackTitle: 'Back',
+          }}
+        />
+        <Stack.Screen
+          name="GenerateRecipe"
+          component={GenerateRecipeScreen}
+          options={{
+            title: 'Generate Recipe',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="GenerateRecipeLoading"
+          component={GenerateRecipeLoadingScreen}
+          options={{
+            title: 'Generating Recipes',
+            headerShown: false,
+            gestureEnabled: false, // Prevent going back during loading
+          }}
+        />
+        <Stack.Screen
+          name="GenerateRecipeResults"
+          component={GenerateRecipeResultsScreen}
+          options={{
+            title: 'Recipe Results',
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="ChefIQChallenge"
+          component={ChefIQChallengeScreen}
+          options={{
+            title: 'Chef iQ Challenge',
+            headerShown: false,
           }}
         />
       </Stack.Navigator>

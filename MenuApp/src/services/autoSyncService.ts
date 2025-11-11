@@ -11,7 +11,7 @@ export class AutoSyncService {
   private static isSyncing = false;
   private static syncQueue: string[] = [];
 
-  // 自动同步所有数据到Supabase
+  // Automatically sync all data to Supabase
   static async syncAllDataToSupabase(): Promise<SyncResult> {
     if (this.isSyncing) {
       return { success: false, message: 'Sync is in progress...' };
@@ -21,14 +21,14 @@ export class AutoSyncService {
     console.log('🔄 Starting automatic data sync to Supabase...');
 
     try {
-      // 检查用户认证（支持管理员用户）
+      // Check user authentication (supports admin user)
       const { data: { user } } = await supabase.auth.getUser();
       let userId: string;
       
       if (user) {
         userId = user.id;
       } else {
-        // 检查是否是管理员用户（从AsyncStorage获取）
+        // Check if admin user (get from AsyncStorage)
         const storedUser = await AsyncStorage.getItem('user');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
@@ -55,23 +55,23 @@ export class AutoSyncService {
       }
       syncedCount++;
 
-      // 2. 同步菜谱数据
+      // 2. Sync recipe data
       const recipes = await this.syncRecipes(userId);
       syncedCount += recipes.length;
 
-      // 3. 同步收藏数据
+      // 3. Sync favorite data
       await this.syncFavorites(userId);
       syncedCount++;
 
-      // 4. 同步评论数据
+      // 4. Sync comment data
       await this.syncComments(userId);
       syncedCount++;
 
-      // 5. 同步社交统计数据
+      // 5. Sync social statistics data
       await this.syncSocialStats(userId);
       syncedCount++;
 
-      // 标记同步完成
+      // Mark sync as complete
       await this.markSyncComplete();
 
       console.log('✅ Automatic sync completed!');
@@ -92,10 +92,10 @@ export class AutoSyncService {
     }
   }
 
-  // 同步用户数据
+  // Sync user data
   private static async syncUserData(userId: string): Promise<boolean> {
     try {
-      // 检查用户是否已存在
+      // Check if user already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -107,14 +107,14 @@ export class AutoSyncService {
         return true;
       }
 
-      // 获取用户数据
+      // Get user data
       let userData: any = {};
       const storedUserData = await AsyncStorage.getItem('userData');
       if (storedUserData) {
         userData = JSON.parse(storedUserData);
       }
 
-      // 如果是管理员用户，使用默认值
+      // If admin user, use default values
       if (userId === '00000000-0000-0000-0000-000000000001') {
         userData = {
           name: 'Admin User',
@@ -123,7 +123,7 @@ export class AutoSyncService {
         };
       }
 
-      // 创建用户
+      // Create user
       const { error } = await supabase
         .from('users')
         .insert({
@@ -146,7 +146,7 @@ export class AutoSyncService {
     }
   }
 
-  // 同步菜谱数据
+  // Sync recipe data
   private static async syncRecipes(userId: string): Promise<any[]> {
     try {
       const recipesData = await AsyncStorage.getItem('recipes');

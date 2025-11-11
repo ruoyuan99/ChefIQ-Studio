@@ -3,7 +3,8 @@
  * Imports recipes from websites using Recipe Schema.org structured data
  */
 
-import { getBackendUrl, RECIPE_IMPORT_ENDPOINT, RECIPE_OPTIMIZE_ENDPOINT, RECIPE_SCAN_ENDPOINT, RECIPE_TEXT_IMPORT_ENDPOINT } from '../config/recipeImport';
+import { getBackendUrl, RECIPE_IMPORT_ENDPOINT, RECIPE_OPTIMIZE_ENDPOINT, RECIPE_SCAN_ENDPOINT, RECIPE_TEXT_IMPORT_ENDPOINT, RECIPE_GENERATE_FROM_INGREDIENTS_ENDPOINT } from '../config/recipeImport';
+import { RecipeOption, YouTubeVideo } from '../types';
 
 interface ImportedRecipe {
   title: string;
@@ -523,6 +524,147 @@ export const optimizeRecipeViaBackend = async (recipe: any): Promise<any> => {
     return transformBackendResponse(data.recipe);
   } catch (error: any) {
     console.error('❌ Recipe optimization error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate recipe from ingredients using AI via backend
+ */
+export const generateRecipeFromIngredients = async (
+  ingredients: string[],
+  options?: {
+    dietaryRestrictions?: string[];
+    cuisine?: string;
+    servings?: string;
+    cookingTime?: string;
+    cookware?: string;
+  }
+): Promise<RecipeOption[]> => {
+  try {
+    const backendUrl = `${getBackendUrl()}${RECIPE_GENERATE_FROM_INGREDIENTS_ENDPOINT}`;
+    console.log('🍳 Attempting to generate recipes from ingredients via backend:', backendUrl);
+    console.log('📝 Ingredients:', ingredients.join(', '));
+    
+    const response = await fetch(backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ingredients,
+        dietaryRestrictions: options?.dietaryRestrictions || [],
+        cuisine: options?.cuisine || '',
+        servings: options?.servings || '',
+        cookingTime: options?.cookingTime || '',
+        cookware: options?.cookware || '',
+      }),
+    });
+
+    console.log('📡 Generate recipe response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      let errorMessage = errorData.error || `Backend Error: ${response.statusText}`;
+      
+      if (response.status === 503 && errorMessage.includes('AI recipe generation is not available')) {
+        errorMessage = 'AI recipe generation requires OpenAI API key. Please set OPENAI_API_KEY in the backend .env file to enable recipe generation.';
+      } else if (response.status === 400 && errorMessage.includes('ingredient is required')) {
+        errorMessage = 'Please provide at least one ingredient to generate recipes.';
+      } else if (response.status === 400 && errorMessage.includes('Cookware is required')) {
+        errorMessage = 'Please select a cookware to generate recipes.';
+      }
+      
+      console.error('❌ Backend generate recipe error:', errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    console.log('✅ Backend generate recipe response received:', data.success ? 'Success' : 'Failed');
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to generate recipes from ingredients');
+    }
+
+    const normalizeYoutubeData = (rawYoutube: any, recipeTitle: string) => {
+      let videos: YouTubeVideo[] = [];
+      let searchUrl: string | undefined;
+
+      if (rawYoutube) {
+        if (Array.isArray(rawYoutube)) {
+          videos = rawYoutube;
+        } else if (typeof rawYoutube === 'object') {
+          if (Array.isArray(rawYoutube.videos)) {
+            videos = rawYoutube.videos;
+          }
+          searchUrl = rawYoutube.searchUrl;
+        }
+      }
+
+      if (!searchUrl && recipeTitle) {
+        searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipeTitle)}`;
+      }
+
+      return { videos, searchUrl };
+    };
+
+    if (Array.isArray(data.recipeOptions) && data.recipeOptions.length > 0) {
+      const recipeOptions: RecipeOption[] = data.recipeOptions.map((option: any, index: number) => {
+        const recipe = transformBackendResponse(option.recipe);
+        const { videos, searchUrl } = normalizeYoutubeData(option.youtubeVideos, recipe.title);
+
+        const recipeWithMedia = {
+          ...recipe,
+          youtubeVideos: videos,
+          youtubeSearchUrl: searchUrl,
+        };
+
+        return {
+          recipe: recipeWithMedia,
+          youtubeVideos: videos,
+          youtubeSearchUrl: searchUrl,
+          optionIndex: index,
+        };
+      });
+
+      console.log('🍽️ Received recipe options count:', recipeOptions.length);
+      return recipeOptions;
+    }
+
+    if (data.recipe) {
+      console.warn('⚠️ Backend returned legacy single recipe format. Converting to recipe options array.');
+      const recipe = transformBackendResponse(data.recipe);
+      const { videos, searchUrl } = normalizeYoutubeData(data.youtubeVideos, recipe.title);
+      const recipeWithMedia = {
+        ...recipe,
+        youtubeVideos: videos,
+        youtubeSearchUrl: searchUrl,
+      };
+
+      return [
+        {
+          recipe: recipeWithMedia,
+          youtubeVideos: videos,
+          youtubeSearchUrl: searchUrl,
+          optionIndex: 0,
+        },
+      ];
+    }
+
+    throw new Error('Backend did not return any recipe options');
+  } catch (error: any) {
+    console.error('❌ Recipe generation error:', error);
+    
+    if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+      throw new Error(
+        `Cannot connect to backend server. Please ensure:\n` +
+        `1. Backend server is running on port 3001\n` +
+        `2. If using real device, check network connection\n` +
+        `3. If using Android emulator, ensure using 10.0.2.2:3001\n` +
+        `Original error: ${error.message}`
+      );
+    }
+    
     throw error;
   }
 };

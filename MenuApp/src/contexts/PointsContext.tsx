@@ -31,7 +31,7 @@ const initialState: PointsState = {
   pointsToNextLevel: 100,
 };
 
-// 积分规则
+// Points rules
 export const POINTS_RULES = {
   create_recipe: 50,
   try_recipe: 20,
@@ -42,7 +42,7 @@ export const POINTS_RULES = {
   add_comment: 8,
 };
 
-// 等级系统
+// Level system
 const LEVEL_THRESHOLDS = [
   { level: 1, points: 0 },
   { level: 2, points: 100 },
@@ -101,7 +101,7 @@ const calculatePointsToNextLevel = (points: number, currentLevel: number): numbe
   const nextLevel = currentLevel + 1;
   const nextLevelThreshold = LEVEL_THRESHOLDS.find(l => l.level === nextLevel);
   if (!nextLevelThreshold) {
-    return 0; // 已达到最高等级
+    return 0; // Already at highest level
   }
   return nextLevelThreshold.points - points;
 };
@@ -119,24 +119,24 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [state, dispatch] = useReducer(pointsReducer, initialState);
   const { user } = useAuth();
 
-  // 从 Supabase 加载积分数据
+  // Load points data from Supabase
   useEffect(() => {
     const loadPointsFromSupabase = async () => {
       if (!user?.id) {
-        // 如果用户未登录，从 AsyncStorage 加载
+        // If user is not logged in, load from AsyncStorage
         loadPointsFromStorage();
         return;
       }
 
       try {
-        // 从 users 表加载积分总数
+        // Load total points from users table
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('total_points')
           .eq('id', user.id)
           .single();
 
-        // 从 user_points 表加载积分历史
+        // Load points history from user_points table
         const { data: pointsHistory, error: historyError } = await supabase
           .from('user_points')
           .select('*')
@@ -144,16 +144,16 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           .order('created_at', { ascending: false });
 
         if (userError && !historyError) {
-          // 如果 users 表没有 total_points 字段，这是正常的
+          // If users table doesn't have total_points field, this is normal
           console.log('total_points field may not exist, using calculated points');
         }
 
-        // 计算积分总数（从历史记录或 users 表）
+        // Calculate total points (from history or users table)
         let totalPoints = userData?.total_points || 0;
         const activities: PointsActivity[] = [];
 
         if (pointsHistory && !historyError) {
-          // 如果有历史记录，使用它
+          // If history exists, use it
           pointsHistory.forEach((point: any) => {
             activities.push({
               id: point.id,
@@ -164,15 +164,15 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               recipeId: point.recipe_id,
             });
           });
-          // 重新计算总数
+          // Recalculate total
           totalPoints = activities.reduce((sum, activity) => sum + activity.points, 0);
         } else {
-          // 如果没有历史记录，从 AsyncStorage 加载
+          // If no history, load from AsyncStorage
           loadPointsFromStorage();
           return;
         }
 
-        // 更新状态
+        // Update state
         dispatch({ type: 'SET_POINTS', payload: { totalPoints, activities } });
       } catch (error) {
         console.error('Error loading points from Supabase:', error);

@@ -102,12 +102,12 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [state, dispatch] = useReducer(commentReducer, initialState);
   const { user } = useAuth();
 
-  // 从 Supabase 加载评论
+  // Load comments from Supabase when user is authenticated
   useEffect(() => {
     const loadCommentsFromSupabase = async () => {
-      // 加载所有评论（不只是当前用户的），这样可以看到所有用户对食谱的评论
+      // Load all comments (not just current user's) so we can see all users' comments on recipes
       try {
-        // 获取所有评论（按 recipe_id 分组显示）
+        // Fetch all comments grouped by recipe_id for display
         const { data: comments, error } = await supabase
           .from('comments')
           .select(`
@@ -123,19 +123,19 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         if (error) {
           console.error('Failed to load comments from Supabase:', error);
-          // Fallback to AsyncStorage
+          // Fallback to AsyncStorage if Supabase fails
           loadCommentsFromStorage();
           return;
         }
 
-        // 将评论按 recipe_id 分组
+        // Group comments by recipe_id
         const commentsByRecipe: { [recipeId: string]: Comment[] } = {};
         if (comments) {
           comments.forEach((comment: any) => {
             if (!commentsByRecipe[comment.recipe_id]) {
               commentsByRecipe[comment.recipe_id] = [];
             }
-            // comment.users 可能是一个对象或数组，需要正确处理
+            // Handle case where comment.users might be an object or array
             const userData = Array.isArray(comment.users) 
               ? comment.users[0] 
               : comment.users;
@@ -165,7 +165,7 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
         const storedComments = await AsyncStorage.getItem('comments');
         if (storedComments) {
           const parsedComments = JSON.parse(storedComments);
-          // 转换日期字符串为Date对象
+          // Convert date strings back to Date objects
           Object.keys(parsedComments).forEach(recipeId => {
             parsedComments[recipeId] = parsedComments[recipeId].map((comment: any) => ({
               ...comment,
@@ -186,7 +186,7 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [user?.id]);
 
-  // 保存评论到AsyncStorage
+  // Save comments to AsyncStorage whenever they change
   useEffect(() => {
     const saveComments = async () => {
       try {
@@ -204,7 +204,7 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const addComment = async (recipeId: string, content: string) => {
     if (!user?.id) {
-      // 如果用户未登录，只保存到本地
+      // If user is not logged in, save comment locally only
       const newComment: Comment = {
         id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         recipeId,
@@ -220,7 +220,7 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
 
     try {
-      // 同步到 Supabase
+      // Sync comment to Supabase
       const { data: commentData, error } = await supabase
         .from('comments')
         .insert({
@@ -242,7 +242,7 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       if (error) {
         console.error('Failed to add comment to Supabase:', error);
-        // Fallback to local only
+        // Fallback to local storage if Supabase fails
         const newComment: Comment = {
           id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           recipeId,
@@ -257,8 +257,8 @@ export const CommentProvider: React.FC<{ children: ReactNode }> = ({ children })
         return;
       }
 
-      // 成功添加到 Supabase
-      // commentData.users 可能是一个对象或数组，需要正确处理
+      // Successfully added to Supabase
+      // Handle case where commentData.users might be an object or array
       const userData = Array.isArray(commentData.users) 
         ? commentData.users[0] 
         : commentData.users;

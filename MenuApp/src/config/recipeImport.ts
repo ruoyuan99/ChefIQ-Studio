@@ -66,3 +66,8 @@ export const RECIPE_SCAN_ENDPOINT = '/api/scan-recipe';
  */
 export const RECIPE_TEXT_IMPORT_ENDPOINT = '/api/import-recipe-text';
 
+/**
+ * Generate Recipe from Ingredients API endpoint
+ */
+export const RECIPE_GENERATE_FROM_INGREDIENTS_ENDPOINT = '/api/generate-recipe-from-ingredients';
+

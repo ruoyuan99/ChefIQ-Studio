@@ -39,7 +39,11 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   const showImportOnMount = route?.params?.showImport || false;
   const importedRecipe = route?.params?.importedRecipe;
   const scannedImageUri = route?.params?.scannedImageUri; // Image URI from scan
+  const fromChallenge = route?.params?.fromChallenge || false; // Check if coming from challenge
   const existingRecipe = isEditing ? getRecipeById(route.params.recipeId) : null;
+
+  // Set default cookware to "Chef iQ Mini Oven" if from challenge
+  const defaultCookware = fromChallenge ? 'Chef iQ Mini Oven' : (existingRecipe?.cookware || '');
 
   const [recipeData, setRecipeData] = useState({
     title: existingRecipe?.title || recipeName || '',
@@ -51,12 +55,39 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     servings: existingRecipe?.servings || '',
     ingredients: existingRecipe?.ingredients || [],
     instructions: existingRecipe?.instructions || [],
-    cookware: existingRecipe?.cookware || '',
+    cookware: defaultCookware,
   });
 
-  // 使用ref存储最新的recipeData，避免闭包问题
+  // Use ref to store latest recipeData to avoid closure issues
   const recipeDataRef = useRef(recipeData);
   recipeDataRef.current = recipeData;
+
+  // Ensure cookware is always "Chef iQ Mini Oven" if from challenge
+  // Also ensure "Chef iQ Challenge" tag is present
+  useEffect(() => {
+    if (fromChallenge) {
+      setRecipeData(prev => {
+        const updatedData: any = {};
+        let needsUpdate = false;
+
+        // Force cookware to "Chef iQ Mini Oven"
+        if (prev.cookware !== 'Chef iQ Mini Oven') {
+          updatedData.cookware = 'Chef iQ Mini Oven';
+          needsUpdate = true;
+        }
+
+        // Add "Chef iQ Challenge" tag if not present
+        const currentTags = prev.tags || [];
+        const challengeTag = 'Chef iQ Challenge';
+        if (!currentTags.includes(challengeTag)) {
+          updatedData.tags = [...currentTags, challengeTag];
+          needsUpdate = true;
+        }
+
+        return needsUpdate ? { ...prev, ...updatedData } : prev;
+      });
+    }
+  }, [fromChallenge]);
 
   const [items, setItems] = useState<MenuItem[]>(
     existingRecipe?.items || []
@@ -134,9 +165,14 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               ? importedRecipe.servings.join(', ') 
               : (typeof importedRecipe.servings === 'string' ? importedRecipe.servings : String(importedRecipe.servings || '')))
           : prev.servings,
-        cookware: importedRecipe.cookware !== undefined && importedRecipe.cookware !== null 
-          ? importedRecipe.cookware 
-          : prev.cookware,
+        cookware: fromChallenge 
+          ? 'Chef iQ Mini Oven' 
+          : (importedRecipe.cookware !== undefined && importedRecipe.cookware !== null 
+              ? importedRecipe.cookware 
+              : prev.cookware),
+        // Preserve YouTube videos if available
+        youtubeVideos: importedRecipe.youtubeVideos || prev.youtubeVideos,
+        youtubeSearchUrl: importedRecipe.youtubeSearchUrl || prev.youtubeSearchUrl,
       }));
 
       // Backend already provides ingredients and instructions with proper IDs
@@ -151,11 +187,11 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
         instructions: importedInstructions,
       });
       
-      // 先更新 state
+      // First update state
       setIngredients(importedIngredients);
       setInstructions(importedInstructions);
 
-      // 然后更新 recipeData（确保同步）
+      // Then update recipeData (ensure synchronization)
       setRecipeData(prev => ({
         ...prev,
         ingredients: importedIngredients,
@@ -190,7 +226,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese'
   ];
 
-  const cookingTimeOptions = [
+const cookingTimeOptions = [
     'Under 15 minutes', '15-30 minutes', '30-45 minutes', '45-60 minutes',
     '1-2 hours', '2-4 hours', '4+ hours', 'Overnight'
   ];
@@ -208,6 +244,16 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     'can', 'cans', 'bottle', 'bottles', 'package', 'packages',
     'pinch', 'dash', 'to taste', 'as needed'
   ];
+
+const commonIngredientTags = [
+  'Chicken', 'Beef', 'Pork', 'Shrimp', 'Salmon', 'Tofu',
+  'Eggs', 'Milk', 'Butter', 'Cheddar Cheese', 'Parmesan',
+  'Tomato', 'Onion', 'Garlic', 'Bell Pepper', 'Potato',
+  'Carrot', 'Broccoli', 'Spinach', 'Mushroom', 'Zucchini',
+  'Rice', 'Pasta', 'Quinoa', 'Flour', 'Sugar',
+  'Brown Sugar', 'Salt', 'Black Pepper', 'Olive Oil', 'Soy Sauce',
+  'Lemon', 'Basil', 'Cilantro', 'Parsley', 'Ginger'
+];
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -229,7 +275,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       console.log('Image picked:', asset.uri);
       console.log('Base64 length:', asset.base64 ? asset.base64.length : 'No base64');
       
-      // 直接使用文件URI，不使用base64
+      // Use file URI directly, don't use base64
       const imageUri = asset.uri;
       console.log('Using file URI:', imageUri);
       setRecipeData(prevData => {
@@ -260,7 +306,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       console.log('Photo taken:', asset.uri);
       console.log('Base64 length:', asset.base64 ? asset.base64.length : 'No base64');
       
-      // 直接使用文件URI，不使用base64
+      // Use file URI directly, don't use base64
       const imageUri = asset.uri;
       console.log('Using file URI:', imageUri);
       setRecipeData(prevData => {
@@ -310,7 +356,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
 
   const addTagsFromString = (input: string) => {
     if (!input) return;
-    // 支持逗号/空格分隔，一次添加多个；去重、去空
+    // Support comma/space separated tags, add multiple at once; remove duplicates and empty values
     const pieces = input
       .split(/[\s,]+/)
       .map(t => t.trim())
@@ -334,6 +380,19 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   };
 
   const removeTag = (index: number) => {
+    const tagToRemove = recipeData.tags[index];
+    const challengeTag = 'Chef iQ Challenge';
+    
+    // Prevent removal of "Chef iQ Challenge" tag if from challenge
+    if (fromChallenge && tagToRemove === challengeTag) {
+      Alert.alert(
+        'Cannot Remove Tag',
+        'The "Chef iQ Challenge" tag cannot be removed for challenge submissions.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     const updatedTags = recipeData.tags.filter((_, i) => i !== index);
     setRecipeData({ ...recipeData, tags: updatedTags });
   };
@@ -383,6 +442,14 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     setNewIngredient({ ...newIngredient, unit });
     setShowUnitDropdown(false);
   };
+
+const handleIngredientTagPress = (ingredientName: string) => {
+  if (!ingredientName) return;
+  setNewIngredient(prev => ({
+    ...prev,
+    name: ingredientName,
+  }));
+};
 
   const addInstruction = () => {
     if (newInstruction.description.trim()) {
@@ -632,48 +699,48 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   };
 
   const handleSaveAsDraft = () => {
-    // 草稿验证：只需要标题，其他字段可以缺失
+    // Draft validation: only title is required, other fields can be missing
     if (!validateRecipe(false)) {
-      return; // 至少需要标题
+      return; // At least title is required
     }
     
-    // 草稿保存：允许部分字段为空，用户可以在后续补充
+    // Draft save: allow some fields to be empty, user can complete them later
     saveRecipeDataWithVisibility(false);
     Alert.alert('Success', 'Recipe saved as draft. You can complete missing fields later.', [
       { text: 'OK', onPress: () => navigation.navigate('RecipeList') },
     ]);
   };
 
-  // 验证recipe数据的函数
-  // isPublish: true 表示发布验证（需要完整数据），false 表示草稿验证（允许部分缺失）
+  // Function to validate recipe data
+  // isPublish: true means publish validation (requires complete data), false means draft validation (allows partial data)
   const validateRecipe = (isPublish: boolean = false) => {
-    // 使用ref中的最新值
+    // Use the latest value from ref
     const currentRecipeData = recipeDataRef.current;
     
-    // 调试信息
+    // Debug logging
     console.log(`Validation (${isPublish ? 'Publish' : 'Draft'}) - Full recipeData object:`, JSON.stringify(currentRecipeData, null, 2));
     
-    // 1. 验证标题（必需，无论发布还是草稿）
+    // 1. Validate title (required for both publish and draft)
     if (!currentRecipeData.title || currentRecipeData.title.trim() === '') {
       Alert.alert('Validation Error', 'Recipe title is required. Please enter a title for your recipe.');
       return false;
     }
 
-    // 草稿模式：只需要标题，其他字段可以缺失
+    // Draft mode: only title required, other fields can be missing
     if (!isPublish) {
       console.log('✅ Draft validation: Only title required, other fields can be empty');
       return true;
     }
 
-    // 发布模式：需要所有字段完整
+    // Publish mode: all fields must be complete
     const missingFields: string[] = [];
 
-    // 2. 验证主页照片
+    // 2. Validate recipe photo
     if (!currentRecipeData.imageUri) {
       missingFields.push('Recipe Photo');
     }
 
-    // 3. 验证烹饪时间
+    // 3. Validate cooking time
     const cookingTime = typeof currentRecipeData.cookingTime === 'string' 
       ? currentRecipeData.cookingTime.trim() 
       : String(currentRecipeData.cookingTime || '').trim();
@@ -681,7 +748,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       missingFields.push('Cooking Time');
     }
 
-    // 4. 验证份量（处理可能是数组的情况）
+    // 4. Validate servings (handle case where it might be an array)
     let servingsValue = '';
     if (Array.isArray(currentRecipeData.servings)) {
       servingsValue = currentRecipeData.servings.join(', ').trim();
@@ -694,17 +761,17 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       missingFields.push('Servings');
     }
 
-    // 5. 验证至少一个配料
+    // 5. Validate at least one ingredient
     if (!currentRecipeData.ingredients || currentRecipeData.ingredients.length === 0) {
       missingFields.push('Ingredients (at least one)');
     }
 
-    // 6. 验证至少一个步骤
+    // 6. Validate at least one instruction
     if (!currentRecipeData.instructions || currentRecipeData.instructions.length === 0) {
       missingFields.push('Instructions (at least one)');
     }
 
-    // 如果有缺失字段，显示错误
+    // If there are missing fields, show error
     if (missingFields.length > 0) {
       const fieldsList = missingFields.join(', ');
       Alert.alert(
@@ -722,30 +789,44 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   };
 
   const handlePublishRecipe = () => {
-    // 使用setTimeout确保状态已更新
+    // Use setTimeout to ensure state is updated
     setTimeout(() => {
-      // 发布验证：需要完整数据
+      // Publish validation: requires complete data
       if (!validateRecipe(true)) {
-        return; // 验证失败，不继续执行
+        return; // Validation failed, don't continue
       }
       
-      // 验证通过，继续保存流程
+      // Validation passed, continue with save process
       saveRecipeDataWithVisibility(true);
-    }, 200); // 增加延迟时间确保状态更新
+    }, 200); // Increase delay to ensure state update
   };
 
   const saveRecipeDataWithVisibility = (isPublic: boolean) => {
-    // 使用ref中的最新值
+    // Use the latest value from ref
     const currentRecipeData = recipeDataRef.current;
 
-    // 关键修复：优先使用 recipeData 中的数据，因为 state 更新可能还没完成
-    // 如果 recipeData 中没有，则使用 state（作为后备）
-    // 这样可以确保导入的数据被正确保存
+    // Prepare tags array - add "Chef iQ Challenge" tag if from challenge
+    const currentTags = currentRecipeData.tags || [];
+    const challengeTag = 'Chef iQ Challenge';
+    let tagsToSave = [...currentTags];
+    
+    // Add challenge tag if from challenge and not already present
+    if (fromChallenge && !tagsToSave.includes(challengeTag)) {
+      tagsToSave.push(challengeTag);
+    }
+
+    // Key fix: prioritize data from recipeData, as state updates may not be complete yet
+    // If recipeData doesn't have it, use state as fallback
+    // This ensures imported data is saved correctly
     const recipeDataToSave = {
       ...currentRecipeData,
-      isPublic, // 由调用方决定是否公开（发布=true；草稿=false）
+      isPublic, // Determined by caller (publish=true; draft=false)
       items,
-      // 优先使用 recipeData 中的数据（包含导入的数据），如果为空则使用 state
+      // Force cookware to "Chef iQ Mini Oven" if from challenge
+      cookware: fromChallenge ? 'Chef iQ Mini Oven' : currentRecipeData.cookware,
+      // Add challenge tag if from challenge
+      tags: tagsToSave,
+      // Prioritize data from recipeData (includes imported data), use state if empty
       ingredients: (currentRecipeData.ingredients && currentRecipeData.ingredients.length > 0) 
         ? currentRecipeData.ingredients 
         : ingredients,
@@ -754,7 +835,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
         : instructions,
     };
 
-    // 调试信息
+    // Debug logging
     console.log('💾 Saving recipe with data:', {
       title: recipeDataToSave.title,
       description: recipeDataToSave.description,
@@ -767,12 +848,12 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       isPublic: recipeDataToSave.isPublic
     });
     
-    // 详细调试信息
+    // Detailed debug logging
     console.log('📋 Full recipeDataToSave object:', JSON.stringify(recipeDataToSave, null, 2));
     console.log('🥘 Ingredients details:', recipeDataToSave.ingredients);
     console.log('📝 Instructions details:', recipeDataToSave.instructions);
     
-    // 验证 ingredients 和 instructions 是否存在
+    // Validate that ingredients and instructions exist
     if (!recipeDataToSave.ingredients || recipeDataToSave.ingredients.length === 0) {
       console.warn('⚠️ WARNING: No ingredients in recipeDataToSave!');
     }
@@ -780,7 +861,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       console.warn('⚠️ WARNING: No instructions in recipeDataToSave!');
     }
     
-    // 验证 state 中的 ingredients 和 instructions
+    // Validate ingredients and instructions in state
     console.log('🔍 State check:', {
       ingredientsStateLength: ingredients.length,
       instructionsStateLength: instructions.length,
@@ -797,8 +878,8 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       updateRecipe(updatedRecipe);
       savedRecipe = updatedRecipe;
     } else {
-      // 调用addRecipe方法，它会返回创建的recipe对象
-      console.log('➕ 创建新食谱 - 传递给 addRecipe:', {
+      // Call addRecipe method, which returns the created recipe object
+      console.log('➕ Creating new recipe - passing to addRecipe:', {
         title: recipeDataToSave.title,
         ingredientsCount: recipeDataToSave.ingredients?.length || 0,
         instructionsCount: recipeDataToSave.instructions?.length || 0,
@@ -807,11 +888,11 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       });
       savedRecipe = addRecipe(recipeDataToSave);
       
-      // 添加创建菜谱积分（使用当前的ID，如果同步后ID更新，这个积分记录可能会有问题，但这是次要的）
+      // Award points for creating recipe (using current ID, if ID updates after sync, points record might have issues, but this is minor)
       addPoints('create_recipe', `Created recipe: ${savedRecipe.title}`, savedRecipe.id).catch(err => console.error('Failed to add points:', err));
     }
 
-    // 保存后的调试信息
+    // Debug logging after save
     console.log('✅ Recipe saved successfully:', {
       id: savedRecipe.id,
       title: savedRecipe.title,
@@ -822,53 +903,53 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       hasInstructions: !!savedRecipe.instructions && savedRecipe.instructions.length > 0,
     });
     
-    // 验证保存后的数据
+    // Validate saved data
     if (!savedRecipe.ingredients || savedRecipe.ingredients.length === 0) {
-      console.error('❌ CRITICAL: savedRecipe 没有 ingredients!');
+      console.error('❌ CRITICAL: savedRecipe has no ingredients!');
       console.error('savedRecipe:', JSON.stringify(savedRecipe, null, 2));
     }
     if (!savedRecipe.instructions || savedRecipe.instructions.length === 0) {
-      console.error('❌ CRITICAL: savedRecipe 没有 instructions!');
+      console.error('❌ CRITICAL: savedRecipe has no instructions!');
       console.error('savedRecipe:', JSON.stringify(savedRecipe, null, 2));
     }
 
-    // 直接跳转到菜谱预览页面，并设置返回目标为My Recipe
-    // 注意：addRecipe 内部已经触发了同步，但同步是异步的
-    // 我们等待一段时间让同步完成，然后从context获取更新后的recipe ID
-    // 如果找不到，说明同步还没完成，使用本地ID导航（后续会从云端刷新）
+    // Navigate directly to recipe preview page and set return target to My Recipe
+    // Note: addRecipe internally triggers sync, but sync is asynchronous
+    // We wait a bit for sync to complete, then get updated recipe ID from context
+    // If not found, sync hasn't completed yet, use local ID for navigation (will refresh from cloud later)
     const originalId = savedRecipe.id;
     const isUUID = originalId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(originalId);
     
     if (user && !isEditing && !isUUID) {
-      // 新创建的recipe（时间戳ID），等待同步完成，然后从context获取更新后的ID
-      // 注意：不重复调用 syncRecipe，因为 addRecipe 内部已经调用了
+      // Newly created recipe (timestamp ID), wait for sync to complete, then get updated ID from context
+      // Note: Don't call syncRecipe again, as addRecipe already called it internally
       setTimeout(() => {
-        // 尝试从context获取最新的recipe（可能ID已更新为数据库UUID）
+        // Try to get latest recipe from context (ID might have been updated to database UUID)
         const latestRecipe = getRecipeById(originalId);
-        // 如果找到了且ID已更新，使用新ID；否则尝试通过title查找
+        // If found and ID updated, use new ID; otherwise try to find by title
         let recipeIdToUse = latestRecipe?.id || originalId;
         
-        // 如果通过原始ID找不到或ID仍是时间戳，尝试通过title查找最新的recipe
+        // If not found by original ID or ID is still timestamp, try to find latest recipe by title
         if (!latestRecipe || latestRecipe.id === originalId) {
-          // 找到所有同名recipe，选择最新的（createdAt最大的）且ID是UUID的
+          // Find all recipes with same title, select the newest (largest createdAt) with UUID ID
           const recipesByTitle = state.recipes.filter((r: Recipe) => r.title === savedRecipe.title);
           if (recipesByTitle.length > 0) {
-            // 优先选择UUID ID的recipe（已同步到数据库的），然后选择createdAt最新的
+            // Prioritize recipes with UUID ID (synced to database), then select newest by createdAt
             const uuidRecipes = recipesByTitle.filter((r: Recipe) => 
               /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.id)
             );
             
             if (uuidRecipes.length > 0) {
-              // 如果有UUID recipe，选择createdAt最新的
+              // If UUID recipes exist, select the newest by createdAt
               const newestUUIDRecipe = uuidRecipes.reduce((latest, current) => {
                 const latestDate = new Date(latest.createdAt).getTime();
                 const currentDate = new Date(current.createdAt).getTime();
                 return currentDate > latestDate ? current : latest;
               });
               recipeIdToUse = newestUUIDRecipe.id;
-              console.log('🔍 通过title找到最新的UUID recipe ID:', recipeIdToUse);
+              console.log('🔍 Found latest UUID recipe ID by title:', recipeIdToUse);
             } else {
-              // 如果没有UUID recipe，选择createdAt最新的
+              // If no UUID recipes, select the newest by createdAt
               const newestRecipe = recipesByTitle.reduce((latest, current) => {
                 const latestDate = new Date(latest.createdAt).getTime();
                 const currentDate = new Date(current.createdAt).getTime();
@@ -876,30 +957,70 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               });
               if (newestRecipe.id !== originalId) {
                 recipeIdToUse = newestRecipe.id;
-                console.log('🔍 通过title找到最新的recipe ID:', recipeIdToUse);
+                console.log('🔍 Found latest recipe ID by title:', recipeIdToUse);
               }
             }
           }
         }
         
-        console.log('🧭 导航到RecipeDetail:', {
+        console.log('🧭 Navigating to RecipeDetail:', {
           originalId: originalId,
           latestId: latestRecipe?.id,
           usingId: recipeIdToUse,
           idChanged: recipeIdToUse !== originalId,
         });
         
+        // Check if this is from challenge and recipe is published
+        if (fromChallenge && isPublic) {
+          // Show challenge participation success message
+          Alert.alert(
+            '🎉 Challenge Participation Success!',
+            'Congratulations! Your recipe has been submitted to the Chef iQ Challenge. Good luck!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('RecipeDetail', { 
+                    recipeId: recipeIdToUse,
+                    returnTo: 'RecipeList'
+                  });
+                }
+              }
+            ]
+          );
+        } else {
+          navigation.navigate('RecipeDetail', { 
+            recipeId: recipeIdToUse,
+            returnTo: 'RecipeList'
+          });
+        }
+      }, 1000); // Increase to 1000ms to ensure sync and ID update complete
+    } else {
+      // Edit mode, no user, or already UUID, navigate directly
+      // Check if this is from challenge and recipe is published
+      if (fromChallenge && isPublic) {
+        // Show challenge participation success message
+        Alert.alert(
+          '🎉 Challenge Participation Success!',
+          'Congratulations! Your recipe has been submitted to the Chef iQ Challenge. Good luck!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('RecipeDetail', { 
+                  recipeId: savedRecipe.id,
+                  returnTo: 'RecipeList'
+                });
+              }
+            }
+          ]
+        );
+      } else {
         navigation.navigate('RecipeDetail', { 
-          recipeId: recipeIdToUse,
+          recipeId: savedRecipe.id,
           returnTo: 'RecipeList'
         });
-      }, 1000); // 增加到1000ms，确保同步和ID更新完成
-    } else {
-      // 编辑模式、没有用户，或已经是UUID，直接导航
-      navigation.navigate('RecipeDetail', { 
-        recipeId: savedRecipe.id,
-        returnTo: 'RecipeList'
-      });
+      }
     }
   };
 
@@ -1073,7 +1194,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
               placeholder="Enter a tag and press Enter"
               value={newTag}
               onChangeText={(text) => {
-                // 如果用户输入了分隔符（逗号/空格/回车前捕获），自动提交当前片段
+                // If user entered separator (comma/space), automatically submit current segment
                 if (/[\s,]$/.test(text)) {
                   addTagsFromString(text);
                   setNewTag('');
@@ -1116,14 +1237,34 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
             )}
           {recipeData.tags && recipeData.tags.length > 0 && (
             <View style={styles.tagsList}>
-              {recipeData.tags.map((tag, index) => (
-                <View key={index} style={styles.tagItem}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                  <TouchableOpacity onPress={() => removeTag(index)}>
-                    <Ionicons name="close" size={16} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {recipeData.tags.map((tag, index) => {
+                const isChallengeTag = fromChallenge && tag === 'Chef iQ Challenge';
+                return (
+                  <View key={index} style={[
+                    styles.tagItem,
+                    isChallengeTag && styles.challengeTagItem
+                  ]}>
+                    {isChallengeTag && (
+                      <Ionicons name="trophy" size={14} color="#FF6B35" style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={[
+                      styles.tagText,
+                      isChallengeTag && styles.challengeTagText
+                    ]}>{tag}</Text>
+                    <TouchableOpacity 
+                      onPress={() => removeTag(index)}
+                      disabled={isChallengeTag}
+                      style={isChallengeTag && styles.disabledButton}
+                    >
+                      <Ionicons 
+                        name="close" 
+                        size={16} 
+                        color={isChallengeTag ? "#ccc" : "#666"} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -1134,19 +1275,43 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
           {/* Cookware Selection */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Main Cookware</Text>
+            {fromChallenge && (
+              <View style={styles.challengeBadge}>
+                <Ionicons name="trophy" size={16} color="#FF6B35" />
+                <Text style={styles.challengeBadgeText}>Chef iQ Challenge</Text>
+              </View>
+            )}
             <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowCookwareDropdown(!showCookwareDropdown)}
+              style={[
+                styles.dropdownButton,
+                fromChallenge && styles.dropdownButtonDisabled
+              ]}
+              onPress={() => !fromChallenge && setShowCookwareDropdown(!showCookwareDropdown)}
+              disabled={fromChallenge}
             >
               <Text style={[styles.dropdownText, !recipeData.cookware && styles.placeholderText]}>
                 {recipeData.cookware || 'Select main cookware'}
               </Text>
-              <Ionicons
-                name={showCookwareDropdown ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color="#666"
-              />
+              {!fromChallenge && (
+                <Ionicons
+                  name={showCookwareDropdown ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color="#666"
+                />
+              )}
+              {fromChallenge && (
+                <Ionicons
+                  name="lock-closed"
+                  size={20}
+                  color="#999"
+                />
+              )}
             </TouchableOpacity>
+            {fromChallenge && (
+              <Text style={styles.challengeNote}>
+                Cookware is locked to "Chef iQ Mini Oven" for challenge participation
+              </Text>
+            )}
             {showCookwareDropdown && (
               <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
                 <ScrollView showsVerticalScrollIndicator={true}>
@@ -1270,6 +1435,40 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
                   value={newIngredient.name}
                   onChangeText={text => setNewIngredient({ ...newIngredient, name: text })}
                 />
+                <View style={styles.ingredientSuggestionContainer}>
+                  <View style={styles.ingredientSuggestionHeader}>
+                    <Text style={styles.ingredientSuggestionLabel}>Quick add common ingredients</Text>
+                    <Text style={styles.ingredientSuggestionHint}>Tap to autofill</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.ingredientSuggestionList}
+                  >
+                    {commonIngredientTags.map(tag => {
+                      const isActive = newIngredient.name.trim().toLowerCase() === tag.toLowerCase();
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[
+                            styles.ingredientSuggestionChip,
+                            isActive && styles.ingredientSuggestionChipActive,
+                          ]}
+                          onPress={() => handleIngredientTagPress(tag)}
+                        >
+                          <Text
+                            style={[
+                              styles.ingredientSuggestionChipText,
+                              isActive && styles.ingredientSuggestionChipTextActive,
+                            ]}
+                          >
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
               </View>
               <View style={[styles.ingredientField, { flex: 1, marginHorizontal: 4 }]}>
                 <Text style={styles.ingredientLabel}>Amount</Text>
@@ -1942,10 +2141,22 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
+  challengeTagItem: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FF6B35',
+    borderWidth: 1,
+  },
   tagText: {
     fontSize: 14,
     color: '#1976d2',
     marginRight: 6,
+  },
+  challengeTagText: {
+    color: '#FF6B35',
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   tagSuggestions: {
     backgroundColor: '#f8f9fa',
@@ -2000,6 +2211,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     zIndex: 99998,
     elevation: 49,
+  },
+  dropdownButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#e0e0e0',
+    opacity: 0.7,
+  },
+  challengeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  challengeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF6B35',
+    marginLeft: 4,
+  },
+  challengeNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 6,
   },
   dropdownText: {
     fontSize: 16,
@@ -2064,6 +2302,47 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 14,
     backgroundColor: 'white',
+  },
+  ingredientSuggestionContainer: {
+    marginTop: 8,
+  },
+  ingredientSuggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  ingredientSuggestionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#555',
+  },
+  ingredientSuggestionHint: {
+    fontSize: 12,
+    color: '#999',
+  },
+  ingredientSuggestionList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 4,
+  },
+  ingredientSuggestionChip: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  ingredientSuggestionChipActive: {
+    backgroundColor: '#d96709',
+  },
+  ingredientSuggestionChipText: {
+    fontSize: 12,
+    color: '#555',
+    fontWeight: '500',
+  },
+  ingredientSuggestionChipTextActive: {
+    color: '#fff',
   },
   unitDropdownButton: {
     flexDirection: 'row',

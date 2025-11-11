@@ -261,7 +261,7 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
             )}
 
             {!previewData ? (
-              // 初始状态：只显示 Preview 按钮
+              // Initial state: only show Preview button
               <TouchableOpacity
                 style={[
                   styles.button, 
@@ -282,7 +282,7 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
                 )}
               </TouchableOpacity>
             ) : (
-              // 有预览数据后：显示两个按钮 - Import 和 AI Import
+              // After preview data: show two buttons - Import and AI Import
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[

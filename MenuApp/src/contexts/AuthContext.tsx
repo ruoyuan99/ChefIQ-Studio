@@ -39,10 +39,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 获取初始会话
+    // Get initial session
     getInitialSession();
     
-    // 监听认证状态变化
+    // Listen for authentication state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadUserProfile = async (authUser: any) => {
     try {
-      // 从数据库获取用户详细信息
+      // Get user details from database
       const { data: profile, error } = await supabase
         .from('users')
         .select('*')
@@ -82,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) {
         console.error('获取用户资料失败:', error);
-        // 如果按 id 未找到，尝试按 email 合并已有资料
+        // If not found by id, try to merge existing data by email
         await createOrMergeUserProfile(authUser);
         return;
       }
@@ -116,10 +116,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
-        // 如果是邮箱唯一键冲突（已存在同邮箱但不同 id），执行合并：把该邮箱的记录 id 改为当前 authUser.id
+        // If email unique key conflict (same email but different id exists), perform merge: change that email's record id to current authUser.id
         const isDuplicateEmail = (error as any)?.code === '23505' || ((error as any)?.message || '').includes('duplicate key value')
         if (isDuplicateEmail && authUser.email) {
-          // 找到当前邮箱的旧记录
+          // Find old record with current email
           const { data: existingByEmail } = await supabase
             .from('users')
             .select('*')
@@ -127,7 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             .maybeSingle();
 
           if (existingByEmail && existingByEmail.id !== authUser.id) {
-            // 将该记录更新为新 id 与最新资料
+            // Update that record with new id and latest data
             const { error: updateErr } = await supabase
               .from('users')
               .update({
@@ -150,7 +150,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
 
-      // 如果是 insert 成功，或已完成合并，则以最新 id/email 载入
+      // If insert succeeded or merge completed, load with latest id/email
       if (!error) {
         const userData: User = {
           id: (data as any).id,
@@ -162,7 +162,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await AsyncStorage.setItem('user', JSON.stringify(userData));
         return;
       }
-      // 合并完成的情况，按 id 重新读取并设置
+      // If merge completed, re-read and set by id
       const { data: merged, error: mergedErr } = await supabase
         .from('users')
         .select('*')
@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const ensureAdminUserExists = async (adminUser: User) => {
     try {
-      // 检查管理员用户是否已存在
+      // Check if admin user already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -193,7 +193,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (!existingUser) {
-        // 创建管理员用户
+        // Create admin user
         const { error } = await supabase
           .from('users')
           .insert({
@@ -235,7 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
-        // 创建用户资料
+        // Create user profile
         await createOrMergeUserProfile(data.user);
         return { 
           success: true, 
@@ -255,7 +255,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      // 正常Supabase登录
+      // Normal Supabase login
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -297,7 +297,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, message: 'User not logged in' };
       }
 
-      // 更新用户资料，包括 updated_at 时间戳
+      // Update user profile, including updated_at timestamp
       const { data, error } = await supabase
         .from('users')
         .update({
@@ -313,7 +313,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, message: error.message };
       }
 
-      // 更新本地用户数据
+      // Update local user data
       const updatedUser: User = {
         id: data.id,
         email: data.email,

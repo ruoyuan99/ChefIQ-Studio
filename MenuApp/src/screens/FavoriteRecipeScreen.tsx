@@ -192,31 +192,20 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
       </Modal>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Chef iQ Challenge Card */}
-        <TouchableOpacity style={styles.challengeCard}>
-          <View style={styles.challengeHeader}>
-            <View style={styles.challengeIconContainer}>
-              <Ionicons name="trophy" size={28} color="#d96709" />
+        {/* Generate Recipe from Ingredients Card */}
+        <TouchableOpacity 
+          style={styles.generateRecipeCard}
+          onPress={() => navigation.navigate('GenerateRecipe')}
+        >
+          <View style={styles.generateRecipeHeader}>
+            <View style={styles.generateRecipeIconContainer}>
+              <Ionicons name="sparkles" size={28} color="#d96709" />
             </View>
-            <View style={styles.challengeTitleContainer}>
-              <Text style={styles.challengeBadge}>CHALLENGE</Text>
-              <Text style={styles.challengeTitle}>Chef iQ Challenge</Text>
+            <View style={styles.generateRecipeContent}>
+              <Text style={styles.generateRecipeTitle}>Generate Recipe from Ingredients</Text>
+              <Text style={styles.generateRecipeSubtitle}>Not sure what to cook? Let AI turn your fridge into recipes.</Text>
             </View>
-          </View>
-          
-          <View style={styles.challengeContentNoPadding}>
-            <Image
-              source={require('../../assets/challenge.png')}
-              style={styles.productImageFull}
-              resizeMode="cover"
-            />
-
-            <View style={styles.challengeRewardsWrapper}>
-              <TouchableOpacity style={styles.challengeButton}>
-                <Text style={styles.challengeButtonText}>Join Challenge</Text>
-                <Ionicons name="arrow-forward" size={18} color="white" />
-              </TouchableOpacity>
-            </View>
+            <Ionicons name="chevron-forward" size={24} color="#d96709" />
           </View>
         </TouchableOpacity>
 
@@ -269,184 +258,46 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
   },
-  // Challenge Card Styles
-  challengeCard: {
+  // Generate Recipe Card Styles
+  generateRecipeCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#d96709',
-  },
-  challengeHeader: {
-    backgroundColor: '#FFF5F0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: '#d96709',
-  },
-  challengeIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
+    borderRadius: 12,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
   },
-  challengeTitleContainer: {
-    flex: 1,
-  },
-  challengeBadge: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#d96709',
-    letterSpacing: 1.5,
-    marginBottom: 4,
-  },
-  challengeTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  challengeContent: {
-    padding: 16,
-    paddingTop: 12,
-  },
-  challengeContentNoPadding: {
-    width: '100%',
-  },
-  challengeProductInfo: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  productImageContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  productImage: {
-    width: '100%',
-    height: 180,
-  },
-  productImageFull: {
-    width: '100%',
-    height: 180,
-  },
-  productDetails: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 6,
-  },
-  challengeDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  challengeRewardsWrapper: {
-    padding: 16,
-  },
-  challengeRewards: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-  },
-  rewardItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  rewardText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 4,
-  },
-  challengeButton: {
-    backgroundColor: '#d96709',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+  generateRecipeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#d96709',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
+    padding: 16,
   },
-  challengeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    marginRight: 8,
-  },
-  challengeImagePlaceholder: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#d96709',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  placeholderSubtext: {
-    color: 'white',
-    fontSize: 12,
-    opacity: 0.9,
-  },
-  introSection: {
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingVertical: 20,
-  },
-  introIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  generateRecipeIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#FFF3E0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginRight: 12,
   },
-  introTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
+  generateRecipeContent: {
+    flex: 1,
   },
-  introDescription: {
+  generateRecipeTitle: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  generateRecipeSubtitle: {
+    fontSize: 13,
     color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-    maxWidth: 300,
+    lineHeight: 18,
   },
   recipesSection: {
     marginBottom: 20,
