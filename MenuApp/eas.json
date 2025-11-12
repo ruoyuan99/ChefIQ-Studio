@@ -1,29 +1,48 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.2.0"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "simulator": false
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
         "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "preview"
       }
     },
     "production": {
       "ios": {
         "simulator": false
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./path/to/api-key.json",
+        "track": "internal"
+      }
+    }
   }
 }
-
