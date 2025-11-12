@@ -1,6 +1,27 @@
 import React from 'react';
-import { renderHook, act } from '@testing-library/react';
+import { render } from '@testing-library/react-native';
 import { PointsProvider, POINTS_RULES, usePoints } from '../PointsContext';
+
+// Helper function to render hook in React Native testing environment
+function renderHook<T>(hook: () => T, options?: { wrapper?: React.ComponentType }) {
+  let result: { current: T } = { current: null as any };
+  const TestComponent = () => {
+    result.current = hook();
+    return null;
+  };
+  const Wrapper = options?.wrapper || React.Fragment;
+  render(
+    <Wrapper>
+      <TestComponent />
+    </Wrapper>
+  );
+  return { result };
+}
+
+// Mock act for React Native
+const act = (callback: () => void) => {
+  callback();
+};
 
 // Mock AuthContext
 const mockUser = { id: 'test-user', email: 'test@example.com' };
