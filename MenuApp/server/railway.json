@@ -11,6 +11,9 @@
   },
   "source": {
     "rootDirectory": "MenuApp/server"
+  },
+  "variables": {
+    "NODE_VERSION": "20"
   }
 }
 
