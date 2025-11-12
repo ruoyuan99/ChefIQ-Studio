@@ -24,7 +24,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: MenuApp
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       
       - name: TypeScript check
         working-directory: MenuApp
