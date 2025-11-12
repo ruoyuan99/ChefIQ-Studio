@@ -9,7 +9,6 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useLike } from '../contexts/LikeContext';
  
@@ -26,25 +25,7 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
   const { state } = useFavorite();
   const { getTriedCount } = useTried();
   const { getStats } = useSocialStats();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  // 检查用户是否已经看过弹窗
-  useEffect(() => {
-    const checkModalStatus = async () => {
-      try {
-        const hasSeenModal = await AsyncStorage.getItem('hasSeenCreateRecipeModal');
-        if (!hasSeenModal) {
-          setShowCreateModal(true);
-        }
-      } catch (error) {
-        console.error('Error checking modal status:', error);
-        // 如果出错，默认显示弹窗
-        setShowCreateModal(true);
-      }
-    };
-    
-    checkModalStatus();
-  }, []);
+  const [showCreateModal, setShowCreateModal] = useState(true);
   
   // 使用FavoriteContext中的recipes（已包含示例recipes）
   const allFavoriteRecipes = state.favoriteRecipes;
@@ -115,23 +96,11 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
 
   const handleCreateRecipe = async () => {
     setShowCreateModal(false);
-    try {
-      // 保存用户已经看过弹窗的状态
-      await AsyncStorage.setItem('hasSeenCreateRecipeModal', 'true');
-    } catch (error) {
-      console.error('Error saving modal status:', error);
-    }
     navigation.navigate('RecipeName');
   };
 
   const handleCloseModal = async () => {
     setShowCreateModal(false);
-    try {
-      // 保存用户已经看过弹窗的状态
-      await AsyncStorage.setItem('hasSeenCreateRecipeModal', 'true');
-    } catch (error) {
-      console.error('Error saving modal status:', error);
-    }
   };
 
   return (
