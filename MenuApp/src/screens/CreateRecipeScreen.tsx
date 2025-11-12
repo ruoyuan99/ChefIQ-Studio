@@ -58,7 +58,9 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     ingredients: existingRecipe?.ingredients || [],
     instructions: existingRecipe?.instructions || [],
     cookware: defaultCookware,
-  });
+    youtubeVideos: existingRecipe?.youtubeVideos || undefined,
+    youtubeSearchUrl: existingRecipe?.youtubeSearchUrl || undefined,
+  } as any);
 
   // Use ref to store latest recipeData to avoid closure issues
   const recipeDataRef = useRef(recipeData);
@@ -68,7 +70,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   // Also ensure "Chef iQ Challenge" tag is present
   useEffect(() => {
     if (fromChallenge) {
-      setRecipeData(prev => {
+      setRecipeData((prev: any) => {
         const updatedData: any = {};
         let needsUpdate = false;
 
@@ -115,13 +117,20 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   });
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [instructions, setInstructions] = useState<any[]>(existingRecipe?.instructions || []);
-  const [newInstruction, setNewInstruction] = useState({
+  const [newInstruction, setNewInstruction] = useState<{
+    step: string;
+    description: string;
+    imageUri: string | null;
+  }>({
     step: '',
     description: '',
     imageUri: null,
   });
   const [editingInstruction, setEditingInstruction] = useState<any>(null);
-  const [editInstructionData, setEditInstructionData] = useState({
+  const [editInstructionData, setEditInstructionData] = useState<{
+    description: string;
+    imageUri: string | null;
+  }>({
     description: '',
     imageUri: null,
   });
@@ -151,7 +160,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       // Update recipe data with imported content
       // Note: Empty strings are allowed for draft saving, only update if imported value exists
       // Priority: scannedImageUri > importedRecipe.imageUri > importedRecipe.image_url > prev.imageUri
-      setRecipeData(prev => ({
+      setRecipeData((prev: any) => ({
         ...prev,
         title: importedRecipe.title || prev.title,
         description: importedRecipe.description || prev.description,
@@ -194,7 +203,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
       setInstructions(importedInstructions);
 
       // Then update recipeData (ensure synchronization)
-      setRecipeData(prev => ({
+      setRecipeData((prev: any) => ({
         ...prev,
         ingredients: importedIngredients,
         instructions: importedInstructions,
@@ -207,7 +216,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   // Sync ingredients and instructions to recipeData whenever they change
   // This ensures they are always saved correctly
   useEffect(() => {
-    setRecipeData(prev => ({
+    setRecipeData((prev: any) => ({
       ...prev,
       ingredients: ingredients,
       instructions: instructions,
@@ -280,7 +289,7 @@ const commonIngredientTags = [
       // Use file URI directly, don't use base64
       const imageUri = asset.uri;
       console.log('Using file URI:', imageUri);
-      setRecipeData(prevData => {
+      setRecipeData((prevData: any) => {
         const newData = { ...prevData, imageUri: imageUri };
         console.log('Image uploaded successfully, recipeData.imageUri set to:', imageUri);
         console.log('Updated recipeData:', newData);
@@ -311,7 +320,7 @@ const commonIngredientTags = [
       // Use file URI directly, don't use base64
       const imageUri = asset.uri;
       console.log('Using file URI:', imageUri);
-      setRecipeData(prevData => {
+      setRecipeData((prevData: any) => {
         const newData = { ...prevData, imageUri: imageUri };
         console.log('Photo taken successfully, recipeData.imageUri set to:', imageUri);
         console.log('Updated recipeData:', newData);
@@ -330,7 +339,7 @@ const commonIngredientTags = [
     console.log('📥 Received imported recipe from backend:', importedRecipe);
     
     // Update recipe data with imported content
-    setRecipeData(prev => ({
+    setRecipeData((prev: any) => ({
       ...prev,
       title: importedRecipe.title || prev.title,
       description: importedRecipe.description || prev.description,
@@ -347,7 +356,7 @@ const commonIngredientTags = [
     setInstructions(importedRecipe.instructions || []);
 
     // Update recipeData with ingredients and instructions
-    setRecipeData(prev => ({
+    setRecipeData((prev: any) => ({
       ...prev,
       ingredients: importedRecipe.ingredients || [],
       instructions: importedRecipe.instructions || [],
@@ -361,10 +370,10 @@ const commonIngredientTags = [
     // Support comma/space separated tags, add multiple at once; remove duplicates and empty values
     const pieces = input
       .split(/[\s,]+/)
-      .map(t => t.trim())
+      .map((t: string) => t.trim())
       .filter(Boolean);
     if (pieces.length === 0) return;
-    const existing = new Set((recipeData.tags || []).map(t => t.toLowerCase()));
+    const existing = new Set((recipeData.tags || []).map((t: string) => t.toLowerCase()));
     const merged: string[] = [...(recipeData.tags || [])];
     for (const p of pieces) {
       const key = p.toLowerCase();
@@ -395,7 +404,7 @@ const commonIngredientTags = [
       return;
     }
     
-    const updatedTags = recipeData.tags.filter((_, i) => i !== index);
+    const updatedTags = recipeData.tags.filter((_: any, i: number) => i !== index);
     setRecipeData({ ...recipeData, tags: updatedTags });
   };
 
@@ -871,7 +880,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
       instructionsState: instructions,
     });
 
-    let savedRecipe;
+    let savedRecipe: any;
     if (isEditing && existingRecipe) {
       const updatedRecipe = {
         ...existingRecipe,
@@ -1150,7 +1159,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
             </View>
             {recipeData.imageUri ? (
               <View style={styles.recipeImagePreview}>
-                <Image source={{ uri: recipeData.imageUri }} style={styles.recipeImage} />
+                <Image source={{ uri: typeof recipeData.imageUri === 'string' ? recipeData.imageUri : String(recipeData.imageUri) }} style={styles.recipeImage} />
                 <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
                   <Ionicons name="close-circle" size={20} color="#F44336" />
                 </TouchableOpacity>
@@ -1272,7 +1281,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
             )}
           {recipeData.tags && recipeData.tags.length > 0 && (
             <View style={styles.tagsList}>
-              {recipeData.tags.map((tag, index) => {
+              {recipeData.tags.map((tag: string, index: number) => {
                 const isChallengeTag = fromChallenge && tag === 'Chef iQ Challenge';
                 return (
                   <View key={index} style={[
@@ -1366,7 +1375,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                       key={cookware}
                       style={styles.dropdownItem}
                       onPress={() => {
-                        setRecipeData(prev => ({ ...prev, cookware }));
+                        setRecipeData((prev: any) => ({ ...prev, cookware }));
                         setShowCookwareDropdown(false);
                       }}
                     >
@@ -2644,7 +2653,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stepNumberText: {
+  stepNumberTextSmall: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',

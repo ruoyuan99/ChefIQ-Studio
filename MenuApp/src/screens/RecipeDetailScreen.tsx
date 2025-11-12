@@ -29,6 +29,7 @@ import { useBadges } from '../contexts/BadgeContext';
 import { sampleRecipes } from '../data/sampleRecipes';
 import { MenuItem, Ingredient, Instruction, YouTubeVideo } from '../types';
 import OptimizedImage from '../components/OptimizedImage';
+import { Image } from 'react-native';
 
 interface RecipeDetailScreenProps {
   navigation: any;

@@ -11,7 +11,6 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CookingTimeCategory } from '../types';
 
 interface GenerateRecipeScreenProps {
   navigation: any;
@@ -53,7 +52,7 @@ const CUISINES = [
 const SERVINGS_OPTIONS = ['2', '4', '6', '8', '10+'];
 
 const COOKING_TIME_OPTIONS = ['Quick', 'Medium', 'Long'] as const;
-export type CookingTimeCategory = typeof COOKING_TIME_OPTIONS[number];
+// CookingTimeCategory is imported from '../types'
 
 const COOKWARE_OPTIONS = [
   'Oven',
@@ -87,7 +86,7 @@ const GenerateRecipeScreen: React.FC<GenerateRecipeScreenProps> = ({ navigation 
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string[]>([]);
   const [selectedCuisine, setSelectedCuisine] = useState<string>('');
   const [selectedServings, setSelectedServings] = useState<string>('');
-  const [selectedCookingTime, setSelectedCookingTime] = useState<CookingTimeCategory | ''>('');
+  const [selectedCookingTime, setSelectedCookingTime] = useState<string>('');
   const [selectedCookware, setSelectedCookware] = useState<string>('');
 
   const handleAddIngredient = () => {

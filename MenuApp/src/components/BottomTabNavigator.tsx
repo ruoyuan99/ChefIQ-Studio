@@ -83,7 +83,7 @@ const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ navigation, act
                 <View style={styles.centerTabGlow}>
                   <View style={styles.centerTabIcon}>
                     <Ionicons
-                      name={tab.icon}
+                      name={tab.icon as any}
                       size={24}
                       color="#FFFFFF"
                     />
@@ -96,7 +96,7 @@ const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ navigation, act
                 isActive(tab.id) && styles.activeTabIcon
               ]}>
                 <Ionicons
-                  name={isActive(tab.id) && tab.activeIcon ? tab.activeIcon : tab.icon}
+                  name={(isActive(tab.id) && tab.activeIcon ? tab.activeIcon : tab.icon) as any}
                   size={20}
                   color={
                     isActive(tab.id) 

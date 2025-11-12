@@ -9,26 +9,31 @@ export class DataMigrationService {
     
     try {
       // 1. 迁移用户数据
-      await this.migrateUsers();
+      const userId = await this.migrateUsers();
+      
+      if (!userId) {
+        console.log('⚠️ 无法获取用户ID，跳过其他数据迁移');
+        return { success: false, message: '需要先迁移用户数据' };
+      }
       
       // 2. 迁移菜谱数据
-      await this.migrateRecipes();
+      await this.migrateRecipes(userId);
       
       // 3. 迁移收藏数据
-      await this.migrateFavorites();
+      await this.migrateFavorites(userId);
       
       // 4. 迁移评论数据
-      await this.migrateComments();
+      await this.migrateComments(userId);
       
       // 5. 迁移社交统计数据
-      await this.migrateSocialStats();
+      await this.migrateSocialStats(userId);
       
       console.log('✅ 数据迁移完成！');
       return { success: true, message: '所有数据迁移成功' };
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ 数据迁移失败:', error);
-      return { success: false, message: `迁移失败: ${error.message}` };
+      return { success: false, message: `迁移失败: ${error?.message || 'Unknown error'}` };
     }
   }
 

@@ -57,7 +57,7 @@ const ScanRecipeModal: React.FC<ScanRecipeModalProps> = ({
               if (!result.canceled && result.assets && result.assets.length > 0) {
                 const asset = result.assets[0];
                 setSelectedImage(asset.uri);
-                setImageBase64(asset.base64);
+                setImageBase64(asset.base64 || undefined);
               }
             } catch (error: any) {
               console.error('Error picking image:', error);
@@ -84,7 +84,7 @@ const ScanRecipeModal: React.FC<ScanRecipeModalProps> = ({
               if (!result.canceled && result.assets && result.assets.length > 0) {
                 const asset = result.assets[0];
                 setSelectedImage(asset.uri);
-                setImageBase64(asset.base64);
+                setImageBase64(asset.base64 || undefined);
               }
             } catch (error: any) {
               console.error('Error taking photo:', error);

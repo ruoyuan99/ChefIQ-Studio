@@ -47,7 +47,7 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
     >
       <OptimizedImage
-        source={item.imageUri || item.image_url || item.image}
+        source={item.imageUri || item.image_url || undefined}
         style={styles.recipeImage}
         contentFit="cover"
         showLoader={true}

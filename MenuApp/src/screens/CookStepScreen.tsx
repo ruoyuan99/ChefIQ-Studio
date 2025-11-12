@@ -61,6 +61,14 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
   // 最大循环播放次数（5次后提示）
   const MAX_LOOP_COUNT = 5;
   
+  // 根据ID判断数据来源
+  let recipe: any;
+  if (recipeId.startsWith('sample_')) {
+    recipe = sampleRecipes.find(r => r.id === recipeId);
+  } else {
+    recipe = getRecipeById(recipeId);
+  }
+
   // 在 recipe 加载后设置正确的 serving size
   useEffect(() => {
     if (recipe?.servings) {
@@ -316,8 +324,8 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
   
   // 计算调整后的食材用量
   const calculateAdjustedAmount = (ingredient: any) => {
-    const originalServings = parseFloat(recipe?.servings) || 4;
-    const currentServings = parseFloat(servingSize) || 4;
+    const originalServings = parseFloat(recipe?.servings || '4') || 4;
+    const currentServings = parseFloat(String(servingSize)) || 4;
     const multiplier = currentServings / originalServings;
     const amount = parseFloat(ingredient.amount) || 0;
     const adjustedAmount = amount * multiplier;
@@ -353,14 +361,6 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
       }
     },
   });
-  
-  // 根据ID判断数据来源
-  let recipe: any;
-  if (recipeId.startsWith('sample_')) {
-    recipe = sampleRecipes.find(r => r.id === recipeId);
-  } else {
-    recipe = getRecipeById(recipeId);
-  }
 
   if (!recipe || !recipe.instructions || recipe.instructions.length === 0) {
     return (
@@ -479,7 +479,7 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
         <View style={styles.stepContainer}>
           {/* Step Number */}
           <View style={styles.stepNumberContainer}>
-            <View style={styles.stepNumber}>
+            <View style={styles.stepNumberCircle}>
               <Text style={styles.stepNumberText}>{currentInstruction.step}</Text>
             </View>
             {completedSteps.has(currentStep) && (
@@ -1092,13 +1092,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  stepNumberContainer: {
+  stepNumberContainerLarge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
   },
-  stepNumber: {
+  stepNumberLarge: {
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -1420,6 +1420,14 @@ const styles = StyleSheet.create({
   },
   stepNumberContainerCompleted: {
     backgroundColor: '#4CAF50',
+  },
+  stepNumberCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FF6B35',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   stepNumber: {
     color: 'white',

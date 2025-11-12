@@ -81,11 +81,11 @@ export class AutoSyncService {
         syncedCount 
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Automatic sync failed:', error);
       return { 
         success: false, 
-        message: `Sync failed: ${error.message}` 
+        message: `Sync failed: ${error?.message || 'Unknown error'}` 
       };
     } finally {
       this.isSyncing = false;

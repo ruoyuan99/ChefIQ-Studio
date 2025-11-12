@@ -200,7 +200,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.log('✅ 同步完成，数据库recipe ID:', dbRecipeId);
           
           // 如果返回了数据库ID，更新本地recipe的ID
-          if (dbRecipeId && dbRecipeId !== originalLocalId) {
+          if (dbRecipeId && typeof dbRecipeId === 'string' && dbRecipeId !== originalLocalId) {
             console.log('🔄 更新本地recipe ID:', originalLocalId, '->', dbRecipeId);
             // 使用新的 action type 来更新 recipe ID，reducer 会检查重复
             const updatedRecipe = { ...newRecipe, id: dbRecipeId };

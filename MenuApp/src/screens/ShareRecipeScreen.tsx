@@ -143,7 +143,7 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
   const shareAsText = () => {
     const textContent = `${recipe.title}\n\n${recipe.description}\n\n菜品列表:\n${recipe.items
       .filter(item => item.isAvailable)
-      .map(item => `• ${item.name} - ¥${item.price}`)
+      .map((item: any) => `• ${item.name} - ¥${item.price}`)
       .join('\n')}`;
     
     Clipboard.setString(textContent);
@@ -179,7 +179,7 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
             <Text style={styles.primaryBtnText}>Save</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.cardPreview}>
+        <View style={styles.shareCardContainer}>
           <View ref={cardRef} collapsable={false}>
             <ShareRecipeContent
               width={Math.round(screenWidth * 0.95)}

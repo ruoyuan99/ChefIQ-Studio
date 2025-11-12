@@ -3,7 +3,7 @@ import { uploadRecipeImage } from './storageService';
 
 export class RealTimeSyncService {
   // 实时同步菜谱到Supabase
-  static async syncRecipe(recipe: any, userId: string): Promise<void> {
+  static async syncRecipe(recipe: any, userId: string): Promise<string | null> {
     try {
       // Require a valid Supabase session (mock admin has no session)
       const { data: sessionData } = await supabase.auth.getSession();

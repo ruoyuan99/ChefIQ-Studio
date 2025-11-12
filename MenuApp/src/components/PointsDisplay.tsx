@@ -220,7 +220,7 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
             onPress={async () => {
               if (checkinActive) return;
               try {
-                await addPoints('daily_checkin', 'Daily Check-in', undefined, false);
+                await addPoints('daily_checkin', 'Daily Check-in');
                 setCheckinActive(true);
                 // Check for badge unlocks
                 const unlocked = await checkBadgeUnlock('first_checkin');
@@ -257,24 +257,24 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
           <View style={styles.bubbleContent}>
             <Text style={[styles.bubblePoints, likedToday && styles.bubblePointsActive]}>+12</Text>
             <Text style={[styles.bubbleLabel, likedToday && styles.bubbleLabelActive]}>Get Likes</Text>
-          </View>
+        </View>
         </Animated.View>
         <Animated.View style={[styles.bubble, styles.bubbleRightBottom, floatStyle(rbAnim, 3, 5), triedToday && styles.bubbleActive]}>
           <View style={styles.bubbleContent}>
             <Text style={[styles.bubblePoints, triedToday && styles.bubblePointsActive]}>+20</Text>
             <Text style={[styles.bubbleLabel, triedToday && styles.bubbleLabelActive]}>Try a Recipe</Text>
-          </View>
+        </View>
         </Animated.View>
       </View>
       {pointsToNextLevel > 0 && (
         <View style={styles.footerRow}>
           <Text style={styles.progressLabel}>{pointsToNextLevel} points to next level</Text>
           <View style={styles.progressBar}>
-            <View
+            <View 
               style={[
-                styles.progressFill,
+                styles.progressFill, 
                 { width: `${progressPercentage}%`, backgroundColor: getLevelColor(level) },
-              ]}
+              ]} 
             />
           </View>
         </View>

@@ -279,7 +279,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             >
               <View style={styles.menuItemContent}>
                 <View style={styles.menuItemLeft}>
-                  <Ionicons name={item.icon} size={24} color="#666" />
+                  <Ionicons name={item.icon as any} size={24} color="#666" />
                   <Text style={styles.menuItemText}>{item.title}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#ccc" />

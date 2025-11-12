@@ -45,7 +45,7 @@ const ShareRecipeContent: React.FC<ShareRecipeContentProps> = ({
   cookware,
   logoSource,
   qrSource,
-}) => {
+}: ShareRecipeContentProps & { qrSource?: any }) => {
   const imageHeight = Math.round(width * 0.56);
   return (
     <View style={[styles.card, { width }]} collapsable={false}>
