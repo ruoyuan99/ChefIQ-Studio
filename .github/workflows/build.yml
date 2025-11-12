@@ -35,6 +35,15 @@ jobs:
         working-directory: MenuApp
         run: npm ci
       
+      - name: Check EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "::error::EXPO_TOKEN secret is not configured. Please add it in GitHub Settings > Secrets and variables > Actions"
+            exit 1
+          else
+            echo "✅ EXPO_TOKEN is configured"
+          fi
+      
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
@@ -44,14 +53,24 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
       
+      - name: Verify EAS authentication
+        working-directory: MenuApp
+        run: |
+          eas whoami || {
+            echo "::error::EAS authentication failed. Please check EXPO_TOKEN secret."
+            exit 1
+          }
+      
       - name: Configure EAS (if needed)
         working-directory: MenuApp
         run: |
-          if [ -z "$(grep -o '"projectId": "[^"]*"' eas.json | grep -v '""')" ]; then
-            echo "Configuring EAS project..."
-            eas build:configure --non-interactive || true
+          if [ -z "$(grep -o '"projectId": "[^"]*"' app.json | grep -v '""')" ]; then
+            echo "⚠️  EAS project not configured, attempting to configure..."
+            eas build:configure --non-interactive || {
+              echo "::warning::EAS configuration failed, but continuing..."
+            }
           else
-            echo "EAS project already configured"
+            echo "✅ EAS project already configured"
           fi
         continue-on-error: true
       
@@ -60,7 +79,9 @@ jobs:
           (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all' || github.event.inputs.platform == '') &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
         working-directory: MenuApp
-        run: eas build --platform android --profile preview --non-interactive --no-wait
+        run: |
+          echo "🚀 Starting Android build..."
+          eas build --platform android --profile preview --non-interactive --no-wait
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       
