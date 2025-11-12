@@ -23,7 +23,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "preview"
-      }
+      },
+      "node": "22.x.x"
     },
     "production": {
       "ios": {
@@ -34,7 +35,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production"
-      }
+      },
+      "node": "22.x.x"
     }
   },
   "submit": {

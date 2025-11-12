@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react';
 import { PointsProvider, POINTS_RULES, usePoints } from '../PointsContext';
 
 // Mock AuthContext
