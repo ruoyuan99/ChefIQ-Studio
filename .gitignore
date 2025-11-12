@@ -94,3 +94,7 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# Large files (PowerPoint presentations)
+*.pptx
+*.ppt
+
