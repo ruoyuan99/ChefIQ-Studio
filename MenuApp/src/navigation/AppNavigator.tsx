@@ -24,6 +24,7 @@ import GenerateRecipeScreen from '../screens/GenerateRecipeScreen';
 import GenerateRecipeLoadingScreen from '../screens/GenerateRecipeLoadingScreen';
 import GenerateRecipeResultsScreen from '../screens/GenerateRecipeResultsScreen';
 import ChefIQChallengeScreen from '../screens/ChefIQChallengeScreen';
+import PointsHistoryScreen from '../screens/PointsHistoryScreen';
 import BottomTabNavigator from '../components/BottomTabNavigator';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -211,6 +212,14 @@ const AppNavigator: React.FC = () => {
           options={{
             title: 'Chef iQ Challenge',
             headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="PointsHistory"
+          component={PointsHistoryScreen}
+          options={{
+            title: 'Points History',
+            headerBackTitle: 'Back',
           }}
         />
       </Stack.Navigator>

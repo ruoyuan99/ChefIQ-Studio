@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   TextInput,
   StatusBar,
   Platform,
@@ -18,6 +17,9 @@ import { useSocialStats } from '../contexts/SocialStatsContext';
 import { useLike } from '../contexts/LikeContext';
 import { useFavorite } from '../contexts/FavoriteContext';
 import { sampleRecipes } from '../data/sampleRecipes';
+import { UserPreferenceService } from '../services/userPreferenceService';
+import { RecommendationService } from '../services/recommendationService';
+import OptimizedImage from '../components/OptimizedImage';
 
 interface ExploreScreenProps {
   navigation: any;
@@ -35,12 +37,15 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const { state } = useRecipe();
   const { getTriedCount } = useTried();
   const { getStats } = useSocialStats();
-  const { isLiked } = useLike();
-  const { isFavorite } = useFavorite();
+  const likeContext = useLike();
+  const favoriteContext = useFavorite();
+  const triedContext = useTried();
+  const { isLiked } = likeContext;
+  const { isFavorite } = favoriteContext;
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
-  const [sortBy, setSortBy] = useState<'relevance' | 'popular' | 'newest' | 'oldest' | 'title'>('relevance');
+  const [sortBy, setSortBy] = useState<'relevance' | 'popular' | 'newest' | 'oldest' | 'title' | 'recommend'>('relevance');
   
   const [filters, setFilters] = useState<FilterState>({
     cookingTime: null,
@@ -55,6 +60,26 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     ...state.recipes.filter(recipe => recipe.isPublic),
     ...sampleRecipes,
   ], [state.recipes]);
+
+  // Get user interactions for recommendation
+  const likedRecipeIds = likeContext.state.likedRecipes;
+  const favoriteRecipes = favoriteContext.state.favoriteRecipes;
+  const triedRecipeIds = triedContext.state.triedRecipes;
+
+  // Analyze user preferences (memoized for performance)
+  const userPreference = useMemo(() => {
+    return UserPreferenceService.analyzeUserPreferences(
+      likedRecipeIds,
+      favoriteRecipes,
+      triedRecipeIds,
+      allPublicRecipes
+    );
+  }, [likedRecipeIds, favoriteRecipes, triedRecipeIds, allPublicRecipes]);
+
+  // Check if user has enough data for recommendation
+  const hasEnoughDataForRecommendation = useMemo(() => {
+    return UserPreferenceService.hasEnoughData(userPreference);
+  }, [userPreference]);
 
   // 获取所有可用的筛选选项
   const availableOptions = useMemo(() => {
@@ -152,35 +177,55 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     });
 
     // 应用排序
-    const sorted = [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case 'popular':
+    let sorted = [...filtered];
+    
+    if (sortBy === 'recommend') {
+      // Recommendation sorting
+      if (hasEnoughDataForRecommendation) {
+        // Use recommendation service to sort
+        sorted = RecommendationService.sortByRecommendation(filtered, userPreference);
+      } else {
+        // Cold start: Fall back to popularity sorting
+        sorted = sorted.sort((a, b) => {
           const aStats = getStats(a.id);
           const bStats = getStats(b.id);
           const aPopularity = aStats.likes + aStats.favorites + aStats.views + getTriedCount(a.id);
           const bPopularity = bStats.likes + bStats.favorites + bStats.views + getTriedCount(b.id);
           return bPopularity - aPopularity;
-        case 'newest':
-          return (new Date(b.createdAt || b.updatedAt || 0).getTime()) - (new Date(a.createdAt || a.updatedAt || 0).getTime());
-        case 'oldest':
-          return (new Date(a.createdAt || a.updatedAt || 0).getTime()) - (new Date(b.createdAt || b.updatedAt || 0).getTime());
-        case 'title':
-          return a.title.localeCompare(b.title);
-        case 'relevance':
-        default:
-          // 如果有搜索词，按相关性排序（标题匹配优先）
-          if (searchQuery) {
-            const aTitleMatch = a.title.toLowerCase().includes(searchQuery.toLowerCase());
-            const bTitleMatch = b.title.toLowerCase().includes(searchQuery.toLowerCase());
-            if (aTitleMatch && !bTitleMatch) return -1;
-            if (!aTitleMatch && bTitleMatch) return 1;
-          }
-          return 0;
+        });
       }
-    });
+    } else {
+      // Other sorting options
+      sorted = sorted.sort((a, b) => {
+        switch (sortBy) {
+          case 'popular':
+            const aStats = getStats(a.id);
+            const bStats = getStats(b.id);
+            const aPopularity = aStats.likes + aStats.favorites + aStats.views + getTriedCount(a.id);
+            const bPopularity = bStats.likes + bStats.favorites + bStats.views + getTriedCount(b.id);
+            return bPopularity - aPopularity;
+          case 'newest':
+            return (new Date(b.createdAt || b.updatedAt || 0).getTime()) - (new Date(a.createdAt || a.updatedAt || 0).getTime());
+          case 'oldest':
+            return (new Date(a.createdAt || a.updatedAt || 0).getTime()) - (new Date(b.createdAt || b.updatedAt || 0).getTime());
+          case 'title':
+            return a.title.localeCompare(b.title);
+          case 'relevance':
+          default:
+            // 如果有搜索词，按相关性排序（标题匹配优先）
+            if (searchQuery) {
+              const aTitleMatch = a.title.toLowerCase().includes(searchQuery.toLowerCase());
+              const bTitleMatch = b.title.toLowerCase().includes(searchQuery.toLowerCase());
+              if (aTitleMatch && !bTitleMatch) return -1;
+              if (!aTitleMatch && bTitleMatch) return 1;
+            }
+            return 0;
+        }
+      });
+    }
 
     return sorted;
-  }, [allPublicRecipes, searchQuery, filters, sortBy, getStats, getTriedCount]);
+  }, [allPublicRecipes, searchQuery, filters, sortBy, getStats, getTriedCount, userPreference, hasEnoughDataForRecommendation]);
 
   // 清除所有筛选
   const clearFilters = () => {
@@ -213,17 +258,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       style={styles.recipeCard}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
     >
-      {(recipe.image_url || recipe.imageUri || recipe.image) && (
-        <Image 
-          source={
-            (() => {
-              const src = (recipe.image_url || recipe.imageUri || recipe.image);
-              return typeof src === 'string' ? { uri: src } : src;
-            })()
-          }
-          style={styles.recipeImage} 
-        />
-      )}
+      <OptimizedImage
+        source={recipe.image_url || recipe.imageUri || recipe.image}
+        style={styles.recipeImage}
+        contentFit="cover"
+        showLoader={true}
+        cachePolicy="memory-disk"
+        priority="normal"
+      />
       <View style={styles.recipeContent}>
         <View style={styles.recipeHeader}>
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
@@ -312,13 +354,16 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sortButton, sortBy !== 'relevance' && styles.sortButtonActive]}
+            style={[
+              styles.sortButton, 
+              (sortBy !== 'relevance') && styles.sortButtonActive
+            ]}
             onPress={() => setShowSortOptions(true)}
           >
             <Ionicons 
-              name="swap-vertical" 
+              name={sortBy === 'recommend' ? 'heart' : 'swap-vertical'} 
               size={20} 
-              color={sortBy !== 'relevance' ? "#fff" : "#d96709"} 
+              color={(sortBy !== 'relevance') ? "#fff" : "#d96709"} 
             />
           </TouchableOpacity>
         </View>
@@ -499,6 +544,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             <View style={styles.sortOptions}>
               {[
                 { value: 'relevance', label: 'Relevance', icon: 'search' },
+                { value: 'recommend', label: 'Recommended', icon: 'heart' },
                 { value: 'popular', label: 'Most Popular', icon: 'flame' },
                 { value: 'newest', label: 'Newest First', icon: 'time' },
                 { value: 'oldest', label: 'Oldest First', icon: 'hourglass' },
@@ -548,9 +594,30 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             <Text style={styles.emptyStateSubtext}>Try adjusting your filters or search</Text>
           </View>
         ) : (
-          <View style={styles.recipesGrid}>
-            {filteredRecipes.map(renderRecipeCard)}
-          </View>
+          <>
+            {sortBy === 'recommend' && (
+              <>
+                {hasEnoughDataForRecommendation ? (
+                  <View style={styles.recommendationHeader}>
+                    <Ionicons name="heart" size={20} color="#d96709" />
+                    <Text style={styles.recommendationHeaderText}>
+                      Personalized recommendations based on your preferences
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.recommendationHint}>
+                    <Ionicons name="information-circle" size={16} color="#d96709" />
+                    <Text style={styles.recommendationHintText}>
+                      Like or favorite recipes to get personalized recommendations. Showing popular recipes for now.
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+            <View style={styles.recipesGrid}>
+              {filteredRecipes.map(renderRecipeCard)}
+            </View>
+          </>
         )}
       </ScrollView>
     </View>
@@ -899,6 +966,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginLeft: 3,
+  },
+  recommendationHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    marginHorizontal: 16,
+  },
+  recommendationHintText: {
+    fontSize: 12,
+    color: '#d96709',
+    marginLeft: 8,
+    flex: 1,
+  },
+  recommendationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    marginHorizontal: 16,
+  },
+  recommendationHeaderText: {
+    fontSize: 14,
+    color: '#d96709',
+    marginLeft: 8,
+    fontWeight: '500',
   },
 });
 

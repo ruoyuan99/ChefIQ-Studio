@@ -110,4 +110,5 @@ export type RootStackParamList = {
     selectedOptionIndex?: number;
   };
   ChefIQChallenge: undefined;
+  PointsHistory: undefined;
 };

@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { generateRecipeFromIngredients } from '../services/recipeImportService';
 import { RecipeOption, CookingTimeCategory } from '../types';
 
@@ -64,6 +65,12 @@ const FEATURE_INTRODUCTIONS = [
   },
 ];
 
+// Module-level tracking to prevent duplicate generation even across component remounts
+// This persists across component instances, preventing duplicate API calls
+let activeGenerationKey: string | null = null;
+let isGenerationInProgress = false;
+let mountCount = 0; // Track mount count for debugging
+
 const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = ({ navigation, route }) => {
   // Validate route params - use safe defaults if missing
   const routeParams = route?.params || {};
@@ -74,27 +81,48 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
   const cookingTime = routeParams.cookingTime;
   const cookware = routeParams.cookware || '';
   
-  console.log('📱 GenerateRecipeLoadingScreen mounted with params:', {
-    ingredientsCount: ingredients?.length,
-    cookware,
-    cookingTime,
-    cuisine,
-    servings,
-    hasParams: !!route?.params,
-  });
+  // Increment mount count
+  mountCount += 1;
+  
+  // Only log detailed info on first mount, subsequent mounts just log count
+  if (mountCount === 1) {
+    console.log('📱 GenerateRecipeLoadingScreen mounted (first time) with params:', {
+      ingredientsCount: ingredients?.length,
+      cookware,
+      cookingTime,
+      cuisine,
+      servings,
+      hasParams: !!route?.params,
+    });
+  } else {
+    // Subsequent mounts - just log count (this is normal in React Navigation, especially in dev mode)
+    console.log(`📱 GenerateRecipeLoadingScreen remounted (count: ${mountCount}) - this is normal, generation will not duplicate`);
+  }
 
   // Validate required params after a brief delay to allow UI to render
+  // Use ref to prevent duplicate validation
+  const hasValidated = useRef(false);
+  
   useEffect(() => {
+    // Only validate once
+    if (hasValidated.current) {
+      return;
+    }
+    
     const validateTimer = setTimeout(() => {
       if (!route?.params || !ingredients || ingredients.length === 0 || !cookware) {
         console.error('❌ GenerateRecipeLoadingScreen: Missing required params');
+        hasValidated.current = true;
         Alert.alert('Error', 'Missing required information. Please try again.');
         navigation.goBack();
+      } else {
+        hasValidated.current = true;
       }
     }, 500); // Small delay to allow UI to render first
     
     return () => clearTimeout(validateTimer);
-  }, [route?.params, ingredients, cookware, navigation]);
+    // Remove navigation from dependencies - it's stable
+  }, [route?.params, ingredients?.length, cookware]);
 
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -151,78 +179,145 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
     return () => clearInterval(interval);
   }, [fadeAnim, scaleAnim]);
 
-  // Generate recipes - only run if we have valid params
-  useEffect(() => {
-    // Skip if missing required params - but still show loading screen
-    if (!ingredients || ingredients.length === 0 || !cookware) {
-      console.warn('⚠️ GenerateRecipeLoadingScreen: Missing required params, waiting for validation...');
-      // Don't return early - let the validation useEffect handle navigation
-      return;
-    }
+  // Generate a unique key from params to identify this specific generation request
+  const currentGenerationKey = React.useMemo(() => {
+    return JSON.stringify({
+      ingredients: ingredients?.sort().join(','),
+      cookware,
+      cookingTime,
+      servings,
+      cuisine,
+      dietaryRestrictions: dietaryRestrictions?.sort().join(','),
+    });
+  }, [ingredients, cookware, cookingTime, servings, cuisine, dietaryRestrictions]);
 
-    console.log('✅ GenerateRecipeLoadingScreen: All params validated, starting generation...');
+  // Local ref for timeout cleanup
+  const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const generateRecipes = async () => {
-      try {
-        console.log('🍳 Starting recipe generation in loading screen...');
-        console.log('📋 Generation params:', {
-          ingredients: ingredients.join(', '),
-          cookware,
-          cookingTime,
-          servings,
-          cuisine,
-          dietaryRestrictions,
-        });
-        
-        const recipeOptions: RecipeOption[] = await generateRecipeFromIngredients(ingredients, {
-          dietaryRestrictions: dietaryRestrictions && dietaryRestrictions.length > 0 ? dietaryRestrictions : undefined,
-          cuisine: cuisine && cuisine !== 'None' ? cuisine : undefined,
-          servings: servings || undefined,
-          cookingTime: cookingTime || undefined,
-          cookware: cookware,
-        });
-
-        if (!recipeOptions || recipeOptions.length === 0) {
-          throw new Error('No recipes were generated. Please try again with different inputs.');
+  // Generate recipes - use useFocusEffect to ensure it only runs when screen is focused
+  // and use module-level tracking to prevent duplicate executions even across remounts
+  useFocusEffect(
+    React.useCallback(() => {
+      // Skip if this exact generation request has already been started (module-level check)
+      if (activeGenerationKey === currentGenerationKey) {
+        // Only log once to avoid spam
+        if (mountCount === 1) {
+          console.log('⚠️ GenerateRecipeLoadingScreen: This generation request already started (module-level), skipping duplicate call');
         }
-
-        console.log('✅ Recipe generation completed, navigating to results...');
-        console.log('📊 Generated recipes:', recipeOptions.map(r => r.recipe?.title));
-        
-        // Navigate to results screen
-        navigation.replace('GenerateRecipeResults', {
-          recipeOptions,
-          userIngredients: ingredients,
-          selectedOptionIndex: 0,
-        });
-      } catch (error: any) {
-        console.error('❌ Error generating recipe:', error);
-        console.error('❌ Error details:', {
-          message: error.message,
-          stack: error.stack,
-        });
-        
-        // Navigate back to generate screen
-        navigation.goBack();
-        
-        // Show error alert after navigation completes
-        setTimeout(() => {
-          Alert.alert(
-            'Generation Failed',
-            error.message || 'Failed to generate recipes. Please check your inputs and try again.',
-            [{ text: 'OK' }]
-          );
-        }, 300);
+        return;
       }
-    };
 
-    // Small delay to ensure UI is fully rendered and animations have started
-    const timer = setTimeout(() => {
-      generateRecipes();
-    }, 300);
+      // Skip if currently generating (module-level check)
+      if (isGenerationInProgress) {
+        // Only log once to avoid spam
+        if (mountCount === 1) {
+          console.log('⚠️ GenerateRecipeLoadingScreen: Generation already in progress (module-level), skipping duplicate call');
+        }
+        return;
+      }
 
-    return () => clearTimeout(timer);
-  }, [ingredients, dietaryRestrictions, cuisine, servings, cookingTime, cookware, navigation]);
+      // Skip if missing required params
+      if (!ingredients || ingredients.length === 0 || !cookware) {
+        console.warn('⚠️ GenerateRecipeLoadingScreen: Missing required params, waiting for validation...');
+        return;
+      }
+
+      // Mark this generation request as started (module-level)
+      activeGenerationKey = currentGenerationKey;
+      isGenerationInProgress = true;
+
+      console.log('✅ GenerateRecipeLoadingScreen: All params validated, starting generation...');
+      console.log('🔑 Generation key:', currentGenerationKey.substring(0, 50) + '...');
+      console.log('📊 Module-level tracking: activeGenerationKey set, isGenerationInProgress = true');
+
+      const generateRecipes = async () => {
+        try {
+          console.log('🍳 Starting recipe generation in loading screen...');
+          console.log('📋 Generation params:', {
+            ingredients: ingredients.join(', '),
+            cookware,
+            cookingTime,
+            servings,
+            cuisine,
+            dietaryRestrictions,
+          });
+          
+          const recipeOptions: RecipeOption[] = await generateRecipeFromIngredients(ingredients, {
+            dietaryRestrictions: dietaryRestrictions && dietaryRestrictions.length > 0 ? dietaryRestrictions : undefined,
+            cuisine: cuisine && cuisine !== 'None' ? cuisine : undefined,
+            servings: servings || undefined,
+            cookingTime: cookingTime || undefined,
+            cookware: cookware,
+          });
+
+          if (!recipeOptions || recipeOptions.length === 0) {
+            throw new Error('No recipes were generated. Please try again with different inputs.');
+          }
+
+          console.log('✅ Recipe generation completed, navigating to results...');
+          console.log('📊 Generated recipes:', recipeOptions.map(r => r.recipe?.title));
+          
+          // Mark as no longer generating before navigation (module-level)
+          isGenerationInProgress = false;
+          // Clear active generation key after successful completion
+          activeGenerationKey = null;
+          // Reset mount count for next generation
+          mountCount = 0;
+          
+          // Navigate to results screen
+          navigation.replace('GenerateRecipeResults', {
+            recipeOptions,
+            userIngredients: ingredients,
+            selectedOptionIndex: 0,
+          });
+        } catch (error: any) {
+          console.error('❌ Error generating recipe:', error);
+          console.error('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+          });
+          
+          // Mark as no longer generating (module-level)
+          isGenerationInProgress = false;
+          // Reset generation key so user can retry with same params
+          activeGenerationKey = null;
+          // Reset mount count for next generation
+          mountCount = 0;
+          
+          // Navigate back to generate screen
+          navigation.goBack();
+          
+          // Show error alert after navigation completes
+          setTimeout(() => {
+            Alert.alert(
+              'Generation Failed',
+              error.message || 'Failed to generate recipes. Please check your inputs and try again.',
+              [{ text: 'OK' }]
+            );
+          }, 300);
+        }
+      };
+
+      // Small delay to ensure UI is fully rendered and animations have started
+      generationTimeoutRef.current = setTimeout(() => {
+        generateRecipes();
+      }, 300);
+
+      // Cleanup function - runs when screen loses focus or component unmounts
+      return () => {
+        if (generationTimeoutRef.current) {
+          clearTimeout(generationTimeoutRef.current);
+          generationTimeoutRef.current = null;
+        }
+        // Only reset if generation hasn't completed (user navigated away)
+        // Keep activeGenerationKey to prevent re-running if user comes back
+        if (isGenerationInProgress) {
+          console.log('⚠️ GenerateRecipeLoadingScreen: Screen lost focus during generation, cleaning up timeout...');
+          // Don't reset module-level flags here - they will be reset when generation completes or fails
+        }
+      };
+    }, [currentGenerationKey, ingredients, cookware, navigation])
+  );
 
   const currentFeature = FEATURE_INTRODUCTIONS[currentFeatureIndex];
 

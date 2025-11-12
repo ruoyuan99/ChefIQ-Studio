@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Image,
   Modal,
   Alert,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { useLike } from '../contexts/LikeContext';
 import { useFavorite } from '../contexts/FavoriteContext';
 import { useTried } from '../contexts/TriedContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
+import OptimizedImage from '../components/OptimizedImage';
 
 interface FavoriteRecipeScreenProps {
   navigation: any;
@@ -57,17 +57,14 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
       style={styles.favoriteCard}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
     >
-      {(recipe.image_url || recipe.imageUri || recipe.image) && (
-        <Image 
-          source={
-            (() => {
-              const src = (recipe.image_url || recipe.imageUri || recipe.image);
-              return typeof src === 'string' ? { uri: src } : src;
-            })()
-          }
-          style={styles.favoriteImage} 
-        />
-      )}
+      <OptimizedImage
+        source={recipe.image_url || recipe.imageUri || recipe.image}
+        style={styles.favoriteImage}
+        contentFit="cover"
+        showLoader={true}
+        cachePolicy="memory-disk"
+        priority="normal"
+      />
       <View style={styles.favoriteContent}>
         <View style={styles.favoriteInfo}>
           <Text style={styles.favoriteTitle}>{recipe.title}</Text>

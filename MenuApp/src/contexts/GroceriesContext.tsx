@@ -16,8 +16,10 @@ interface GroceriesState {
 
 type GroceriesAction =
   | { type: 'ADD_ITEMS'; payload: { recipeId: string; recipeTitle: string; ingredients: Array<{ name: string; amount: string; unit: string }> } }
+  | { type: 'ADD_SINGLE_ITEM'; payload: { name: string; amount?: string; unit?: string; recipeTitle?: string } }
   | { type: 'TOGGLE_ITEM'; payload: string }
   | { type: 'REMOVE_ITEM'; payload: string }
+  | { type: 'REMOVE_CATEGORY'; payload: string }
   | { type: 'CLEAR_COMPLETED' };
 
 const initialState: GroceriesState = {
@@ -52,6 +54,25 @@ const groceriesReducer = (state: GroceriesState, action: GroceriesAction): Groce
         ...state,
         items: state.items.filter(item => item.id !== action.payload),
       };
+    case 'ADD_SINGLE_ITEM':
+      const singleItem: GroceryItem = {
+        id: `manual-${Date.now()}-${Math.random()}`,
+        name: action.payload.name,
+        amount: action.payload.amount || '',
+        unit: action.payload.unit || '',
+        recipeId: 'manual',
+        recipeTitle: action.payload.recipeTitle || 'Manual Items',
+        isCompleted: false,
+      };
+      return {
+        ...state,
+        items: [...state.items, singleItem],
+      };
+    case 'REMOVE_CATEGORY':
+      return {
+        ...state,
+        items: state.items.filter(item => item.recipeTitle !== action.payload),
+      };
     case 'CLEAR_COMPLETED':
       return {
         ...state,
@@ -65,8 +86,10 @@ const groceriesReducer = (state: GroceriesState, action: GroceriesAction): Groce
 interface GroceriesContextType {
   state: GroceriesState;
   addItemsToGroceries: (recipeId: string, recipeTitle: string, ingredients: Array<{ name: string; amount: string; unit: string }>) => void;
+  addSingleItem: (name: string, amount?: string, unit?: string, recipeTitle?: string) => void;
   toggleItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
+  removeCategory: (recipeTitle: string) => void;
   clearCompleted: () => void;
 }
 
@@ -79,12 +102,20 @@ export const GroceriesProvider: React.FC<{ children: ReactNode }> = ({ children 
     dispatch({ type: 'ADD_ITEMS', payload: { recipeId, recipeTitle, ingredients } });
   };
 
+  const addSingleItem = (name: string, amount?: string, unit?: string, recipeTitle?: string) => {
+    dispatch({ type: 'ADD_SINGLE_ITEM', payload: { name, amount, unit, recipeTitle } });
+  };
+
   const toggleItem = (itemId: string) => {
     dispatch({ type: 'TOGGLE_ITEM', payload: itemId });
   };
 
   const removeItem = (itemId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: itemId });
+  };
+
+  const removeCategory = (recipeTitle: string) => {
+    dispatch({ type: 'REMOVE_CATEGORY', payload: recipeTitle });
   };
 
   const clearCompleted = () => {
@@ -95,8 +126,10 @@ export const GroceriesProvider: React.FC<{ children: ReactNode }> = ({ children 
     <GroceriesContext.Provider value={{
       state,
       addItemsToGroceries,
+      addSingleItem,
       toggleItem,
       removeItem,
+      removeCategory,
       clearCompleted,
     }}>
       {children}

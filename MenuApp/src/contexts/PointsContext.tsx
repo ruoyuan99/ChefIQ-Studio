@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 
 export interface PointsActivity {
   id: string;
-  type: 'create_recipe' | 'try_recipe' | 'favorite_recipe' | 'like_recipe' | 'share_recipe' | 'complete_profile' | 'add_comment';
+  type: 'create_recipe' | 'try_recipe' | 'favorite_recipe' | 'like_recipe' | 'share_recipe' | 'complete_profile' | 'add_comment' | 'daily_checkin';
   points: number;
   description: string;
   timestamp: Date;
@@ -40,6 +40,7 @@ export const POINTS_RULES = {
   share_recipe: 15,
   complete_profile: 25,
   add_comment: 8,
+  daily_checkin: 15,
 };
 
 // Level system

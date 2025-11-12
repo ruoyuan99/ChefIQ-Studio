@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRecipe } from '../contexts/RecipeContext';
 import { usePoints } from '../contexts/PointsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useBadges } from '../contexts/BadgeContext';
 import { RealTimeSyncService } from '../services/realTimeSyncService';
 import { Recipe, MenuItem } from '../types';
 import ImportRecipeModal from '../components/ImportRecipeModal';
@@ -34,6 +35,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   const { addRecipe, updateRecipe, getRecipeById, state } = useRecipe();
   const { addPoints } = usePoints();
   const { user } = useAuth();
+  const { checkBadgeUnlock, getBadgeById } = useBadges();
   const isEditing = route?.params?.recipeId;
   const recipeName = route?.params?.recipeName;
   const showImportOnMount = route?.params?.showImport || false;
@@ -890,6 +892,39 @@ const handleIngredientTagPress = (ingredientName: string) => {
       
       // Award points for creating recipe (using current ID, if ID updates after sync, points record might have issues, but this is minor)
       addPoints('create_recipe', `Created recipe: ${savedRecipe.title}`, savedRecipe.id).catch(err => console.error('Failed to add points:', err));
+      
+      // Check for badge unlocks after publishing
+      setTimeout(async () => {
+        const unlocked = await checkBadgeUnlock('first_recipe');
+        if (unlocked) {
+          const badge = getBadgeById('first_recipe');
+          if (badge) {
+            Alert.alert(
+              '🎉 Badge Unlocked!',
+              `You earned the "${badge.name}" badge!\n\n${badge.description}`,
+              [{ text: 'Awesome!' }]
+            );
+          }
+        }
+        // Check for recipe count badges
+        await checkBadgeUnlock('recipe_creator_10');
+        await checkBadgeUnlock('recipe_creator_50');
+        
+        // Check for Chef iQ Challenge badge
+        if (fromChallenge || savedRecipe.tags?.includes('Chef iQ Challenge')) {
+          const challengeUnlocked = await checkBadgeUnlock('chef_iq_champion');
+          if (challengeUnlocked) {
+            const badge = getBadgeById('chef_iq_champion');
+            if (badge) {
+              Alert.alert(
+                '🏆 Badge Unlocked!',
+                `You earned the "${badge.name}" badge!\n\n${badge.description}`,
+                [{ text: 'Awesome!' }]
+              );
+            }
+          }
+        }
+      }, 500);
     }
 
     // Debug logging after save

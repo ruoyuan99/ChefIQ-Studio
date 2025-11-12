@@ -9,6 +9,7 @@ import { TriedProvider } from './src/contexts/TriedContext';
 import { PointsProvider } from './src/contexts/PointsContext';
 import { SocialStatsProvider } from './src/contexts/SocialStatsContext';
 import { CommentProvider } from './src/contexts/CommentContext';
+import { BadgeProvider } from './src/contexts/BadgeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
@@ -20,12 +21,14 @@ export default function App() {
             <LikeProvider>
               <TriedProvider>
                 <PointsProvider>
-                  <SocialStatsProvider>
-                    <CommentProvider>
-                      <AppNavigator />
-                      <StatusBar style="auto" />
-                    </CommentProvider>
-                  </SocialStatsProvider>
+                  <BadgeProvider>
+                    <SocialStatsProvider>
+                      <CommentProvider>
+                        <AppNavigator />
+                        <StatusBar style="auto" />
+                      </CommentProvider>
+                    </SocialStatsProvider>
+                  </BadgeProvider>
                 </PointsProvider>
               </TriedProvider>
             </LikeProvider>

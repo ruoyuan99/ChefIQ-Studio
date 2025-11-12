@@ -10,13 +10,14 @@ import {
   Linking,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Buttons, Typography } from '../styles/theme';
 import { Recipe, YouTubeVideo, CookingTimeCategory, RecipeOption } from '../types';
 import { findRelatedRecipes } from '../utils/recipeMatcher';
 import { useRecipe } from '../contexts/RecipeContext';
 import { sampleRecipes } from '../data/sampleRecipes';
+import OptimizedImage from '../components/OptimizedImage';
 
 interface GenerateRecipeResultsScreenProps {
   navigation: any;
@@ -33,7 +34,7 @@ interface GenerateRecipeResultsScreenProps {
 }
 
 const { width: WINDOW_WIDTH } = Dimensions.get('window');
-const CARD_HORIZONTAL_PADDING = 16;
+const CARD_HORIZONTAL_PADDING = 20; // Increased from 16 to 20 for more side spacing
 const CARD_INNER_PADDING = 20;
 const CARD_WIDTH = WINDOW_WIDTH - CARD_HORIZONTAL_PADDING * 2;
 
@@ -112,12 +113,17 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
   if (!generatedRecipe) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
-        <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 16 }}>
+        <Text style={{ fontSize: 16, color: Colors.textSecondary, textAlign: 'center', marginBottom: 16 }}>
           Unable to display recipe results. Please try generating recipes again.
         </Text>
-        <TouchableOpacity style={[styles.useRecipeButton, { marginTop: 16 }]} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          style={[Buttons.primary.container, { marginTop: 16, width: '60%' }]}
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="arrow-back" size={20} color="#fff" />
-          <Text style={styles.useRecipeButtonText}>Back</Text>
+          <Text style={Buttons.primary.text}>Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -339,10 +345,13 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                       <View style={styles.youtubeThumbnailContainer}>
                         {video.thumbnail ? (
                           <>
-                            <Image 
-                              source={{ uri: video.thumbnail }} 
+                            <OptimizedImage
+                              source={video.thumbnail}
                               style={styles.youtubeThumbnail}
-                              resizeMode="cover"
+                              contentFit="cover"
+                              showLoader={true}
+                              cachePolicy="memory-disk"
+                              priority="normal"
                             />
                             <View style={styles.youtubePlayButtonOverlay}>
                               <Ionicons name="play-circle" size={56} color="#FF0000" />
@@ -365,25 +374,24 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                 })}
               </>
             ) : (
-              <>
-                {displayYoutubeSearchUrl && (
-                  <View style={styles.noVideosMessage}>
-                    <Ionicons name="information-circle-outline" size={20} color="#666" style={{ marginRight: 8 }} />
-                    <Text style={styles.noVideosText}>
-                      Video previews are not available. Tap below to search for cooking videos on YouTube.
-                    </Text>
-                    </View>
-                )}
-              </>
+              <View style={styles.noVideosMessage}>
+                <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={styles.noVideosText}>
+                  No video previews are available.
+                  {displayYoutubeSearchUrl ? ' Tap the button below to search on YouTube.' : ' Please try again later.'}
+                </Text>
+              </View>
             )}
             
             {displayYoutubeSearchUrl && (
               <TouchableOpacity
-                style={[styles.youtubeSearchButton, { marginTop: 12 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Search more videos on YouTube"
+                style={[Buttons.primary.container, { backgroundColor: '#FF0000', marginTop: 12 }]}
                 onPress={() => Linking.openURL(displayYoutubeSearchUrl)}
               >
                 <Ionicons name="logo-youtube" size={20} color="#fff" />
-                <Text style={styles.youtubeSearchButtonText}>Search More Videos on YouTube</Text>
+                <Text style={[Buttons.primary.text, { marginLeft: 8 }]}>Search on YouTube</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -397,23 +405,28 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
             </View>
             <Text style={styles.sectionSubtitle}>Recipes in the app that match your ingredients</Text>
 
-            {relatedRecipes.slice(0, 3).map((recipe) => (
+            {relatedRecipes.length === 0 ? (
+              <View style={styles.noVideosMessage}>
+                <Ionicons name="search-outline" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={styles.noVideosText}>
+                  No related recipes found. Try adjusting your ingredients or generate again.
+                </Text>
+              </View>
+            ) : (
+            relatedRecipes.slice(0, 3).map((recipe) => (
               <TouchableOpacity
                 key={recipe.id}
                 style={styles.relatedRecipeCard}
                 onPress={() => handleSelectRecipe(recipe)}
               >
-                {(recipe.imageUri || recipe.image_url) ? (
-                  <Image
-                    source={{ uri: (recipe.imageUri || recipe.image_url) as string }}
-                    style={styles.relatedRecipeImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.relatedRecipeImagePlaceholder}>
-                    <Ionicons name="restaurant" size={32} color="#ccc" />
-                  </View>
-                )}
+                <OptimizedImage
+                  source={(recipe.imageUri || recipe.image_url) as string}
+                  style={styles.relatedRecipeImage}
+                  contentFit="cover"
+                  showLoader={true}
+                  cachePolicy="memory-disk"
+                  priority="normal"
+                />
                 <View style={styles.relatedRecipeInfo}>
                   <Text style={styles.relatedRecipeTitle}>{recipe.title}</Text>
                   {recipe.description ? (
@@ -432,7 +445,7 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#d96709" />
               </TouchableOpacity>
-            ))}
+            )))}
           </View>
         )}
 
@@ -446,16 +459,23 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
           </Text>
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="refresh-outline" size={20} color="#d96709" />
-              <Text style={styles.secondaryButtonText}>Try Again</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              style={Buttons.secondary.container}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="refresh-outline" size={20} color={Colors.primary} />
+              <Text style={Buttons.secondary.text}>Try Again</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.secondaryButton}
+              accessibilityRole="button"
+              accessibilityLabel="Import recipe from URL"
+              style={Buttons.secondary.container}
               onPress={() => navigation.navigate('ImportRecipe', { mode: 'url' })}
             >
-              <Ionicons name="link-outline" size={20} color="#d96709" />
-              <Text style={styles.secondaryButtonText}>Import from URL</Text>
+              <Ionicons name="link-outline" size={20} color={Colors.primary} />
+              <Text style={Buttons.secondary.text}>Import from URL</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -574,22 +594,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   useRecipeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#d96709',
-    borderRadius: 8,
-    padding: 14,
+    ...Buttons.primary.container,
     marginHorizontal: CARD_INNER_PADDING,
+    marginBottom: CARD_INNER_PADDING,
     marginTop: 8,
-    marginBottom: 20,
   },
-  useRecipeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
+  useRecipeButtonText: Buttons.primary.text,
   // YouTube Videos
   youtubeVideoCard: {
     backgroundColor: '#fff',
@@ -641,21 +651,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'left',
   },
-  youtubeSearchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF0000',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-  },
-  youtubeSearchButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
+  youtubeSearchButton: Buttons.primary.container,
+  youtubeSearchButtonText: Buttons.primary.text,
   noVideosMessage: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -742,13 +739,13 @@ const styles = StyleSheet.create({
   },
   recipeCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16, // Increased from 12 to 16 for more rounded corners
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 }, // Increased shadow offset for more depth
+    shadowOpacity: 0.12, // Slightly increased shadow opacity
+    shadowRadius: 8, // Increased shadow radius for softer shadow
+    elevation: 4, // Increased elevation for Android
     width: CARD_WIDTH,
     alignSelf: 'center',
   },

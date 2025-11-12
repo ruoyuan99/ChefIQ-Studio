@@ -7,11 +7,11 @@ import {
   FlatList,
   SafeAreaView,
   Alert,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
 import { Recipe } from '../types';
+import OptimizedImage from '../components/OptimizedImage';
 
 interface RecipeListScreenProps {
   navigation: any;
@@ -46,16 +46,14 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
       style={styles.menuCard}
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
     >
-      {item.imageUri && (
-        <Image 
-          source={
-            typeof item.imageUri === 'string' 
-              ? { uri: item.imageUri } 
-              : item.imageUri
-          } 
-          style={styles.recipeImage} 
-        />
-      )}
+      <OptimizedImage
+        source={item.imageUri || item.image_url || item.image}
+        style={styles.recipeImage}
+        contentFit="cover"
+        showLoader={true}
+        cachePolicy="memory-disk"
+        priority="normal"
+      />
       <View style={styles.menuHeader}>
         <View style={styles.menuInfo}>
           <Text style={styles.menuTitle}>{item.title}</Text>

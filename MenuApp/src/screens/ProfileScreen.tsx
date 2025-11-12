@@ -6,14 +6,16 @@ import {
   ScrollView,
   SafeAreaView,
   TouchableOpacity,
-  Image,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Buttons, Colors } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
+import { useBadges } from '../contexts/BadgeContext';
 import PointsDisplay from '../components/PointsDisplay';
+import OptimizedImage from '../components/OptimizedImage';
 
 interface ProfileScreenProps {
   navigation: any;
@@ -23,6 +25,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { user, signOut } = useAuth();
   const { state } = useRecipe();
   const { getStats } = useSocialStats();
+  const { badges, getBadgesByCategory, unlockedBadges } = useBadges();
 
   // 计算用户所有食谱的社交统计
   const calculateSocialStats = () => {
@@ -112,7 +115,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Points Display */}
-        <PointsDisplay />
+        <PointsDisplay onPress={() => navigation.navigate('PointsHistory')} />
         
         {/* Chef iQ Challenge Card - Prominent placement at top */}
         <TouchableOpacity
@@ -128,7 +131,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               <Text style={styles.challengeTitle}>Chef iQ Challenge</Text>
               <Text style={styles.challengeDescription}>Test your cooking skills and compete with others!</Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color="#FF6B35" />
+            <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
           </View>
         </TouchableOpacity>
         
@@ -137,7 +140,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               {user?.avatar_url ? (
-                <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+                <OptimizedImage
+                  source={user.avatar_url}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  showLoader={true}
+                  cachePolicy="memory-disk"
+                  priority="high"
+                />
               ) : (
               <Ionicons name="person" size={40} color="#FF6B35" />
               )}
@@ -146,11 +156,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <Text style={styles.userName}>{user?.name || 'Recipe Chef'}</Text>
           <Text style={styles.userEmail}>{user?.email || 'chef@recipeapp.com'}</Text>
           <TouchableOpacity
-            style={styles.editButton}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile"
+            style={[Buttons.secondary.container, { paddingVertical: 10, paddingHorizontal: 16 }]}
             onPress={() => navigation.navigate('EditProfile')}
           >
-            <Ionicons name="create-outline" size={16} color="#d96709" />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
+            <Ionicons name="create-outline" size={16} color={Colors.primary} />
+            <Text style={Buttons.secondary.text}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
 
@@ -191,9 +203,74 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Badges Section */}
+        <View style={styles.badgesContainer}>
+          <View style={styles.badgesHeader}>
+            <Text style={styles.sectionTitle}>Achievements</Text>
+            <Text style={styles.badgesCount}>
+              {unlockedBadges.size} / {badges.length}
+            </Text>
+          </View>
+          
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.badgesScrollContent}
+            style={styles.badgesScrollView}
+          >
+            {badges
+              .sort((a, b) => {
+                // Sort: unlocked badges first, then locked badges
+                const aUnlocked = unlockedBadges.has(a.id);
+                const bUnlocked = unlockedBadges.has(b.id);
+                if (aUnlocked && !bUnlocked) return -1;
+                if (!aUnlocked && bUnlocked) return 1;
+                return 0;
+              })
+              .map((badge) => {
+                const isUnlocked = unlockedBadges.has(badge.id);
+                return (
+                  <View
+                    key={badge.id}
+                    style={[
+                      styles.badgeItemHorizontal,
+                      !isUnlocked && styles.badgeItemLocked,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.badgeIconContainer,
+                        { backgroundColor: isUnlocked ? badge.color : '#e0e0e0' },
+                      ]}
+                    >
+                      <Ionicons
+                        name={badge.icon as any}
+                        size={24}
+                        color={isUnlocked ? '#fff' : '#999'}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.badgeName,
+                        !isUnlocked && styles.badgeNameLocked,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {badge.name}
+                    </Text>
+                    {isUnlocked && (
+                      <View style={styles.badgeUnlockedIndicator}>
+                        <Ionicons name="checkmark-circle" size={16} color={badge.color} />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+          </ScrollView>
+        </View>
+
         {/* Menu Items */}
         <View style={styles.menuContainer}>
-          <Text style={styles.sectionTitle}>Menu</Text>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -364,6 +441,76 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
     textAlign: 'center',
+  },
+  badgesContainer: {
+    backgroundColor: 'white',
+    marginTop: 16,
+    marginHorizontal: 16,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  badgesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  badgesCount: {
+    fontSize: 14,
+    color: '#DA6809',
+    fontWeight: '600',
+  },
+  badgesScrollView: {
+    marginHorizontal: -20,
+  },
+  badgesScrollContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  badgeItemHorizontal: {
+    width: 100,
+    alignItems: 'center',
+    marginRight: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    position: 'relative',
+  },
+  badgeItemLocked: {
+    opacity: 0.6,
+  },
+  badgeIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  badgeName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  badgeNameLocked: {
+    color: '#999',
+  },
+  badgeUnlockedIndicator: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
   },
   menuContainer: {
     backgroundColor: 'white',

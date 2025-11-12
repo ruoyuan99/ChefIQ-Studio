@@ -7,7 +7,6 @@ import {
   ScrollView,
   Alert,
   Share,
-  Image,
   StatusBar,
   Platform,
   TextInput,
@@ -26,8 +25,10 @@ import { usePoints } from '../contexts/PointsContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
 import { useComment } from '../contexts/CommentContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useBadges } from '../contexts/BadgeContext';
 import { sampleRecipes } from '../data/sampleRecipes';
 import { MenuItem, Ingredient, Instruction, YouTubeVideo } from '../types';
+import OptimizedImage from '../components/OptimizedImage';
 
 interface RecipeDetailScreenProps {
   navigation: any;
@@ -45,6 +46,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const { toggleTried, isTried, getTriedCount } = useTried();
   const { addPoints } = usePoints();
   const { getStats, fetchStats, incrementViews, adjustLikes, adjustFavorites, adjustTried } = useSocialStats();
+  const { checkBadgeUnlock, getBadgeById } = useBadges();
 
   // Derived display helpers for social numbers with sensible minimums
   const getDisplayLikes = (id: string) => {
@@ -289,7 +291,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     );
   };
 
-  const handleTried = () => {
+  const handleTried = async () => {
     const wasTried = isTried(recipe.id);
     toggleTried(recipe.id);
     // update social stats
@@ -297,6 +299,25 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     
     if (!wasTried) {
       addPoints('try_recipe', `Tried ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add points:', err));
+      
+      // Check for badge unlocks
+      setTimeout(async () => {
+        const unlocked = await checkBadgeUnlock('first_try');
+        if (unlocked) {
+          const badge = getBadgeById('first_try');
+          if (badge) {
+            Alert.alert(
+              '🎉 Badge Unlocked!',
+              `You earned the "${badge.name}" badge!\n\n${badge.description}`,
+              [{ text: 'Awesome!' }]
+            );
+            return;
+          }
+        }
+        // Check for cuisine explorer badges
+        await checkBadgeUnlock('cuisine_explorer_5');
+        await checkBadgeUnlock('cuisine_explorer_10');
+      }, 500);
     }
     
     Alert.alert(
@@ -386,19 +407,16 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         style={styles.scrollView}
       >
         {/* Recipe Main Image */}
-        {(recipe.image_url || recipe.imageUri || recipe.image) && (
-          <View style={styles.recipeImageSection}>
-            <Image 
-              source={
-                (() => {
-                  const src = (recipe.image_url || recipe.imageUri || recipe.image);
-                  return typeof src === 'string' ? { uri: src } : src;
-                })()
-              } 
-              style={styles.recipeImage} 
-            />
-          </View>
-        )}
+        <View style={styles.recipeImageSection}>
+          <OptimizedImage
+            source={recipe.image_url || recipe.imageUri || recipe.image}
+            style={styles.recipeImage}
+            contentFit="cover"
+            showLoader={true}
+            cachePolicy="memory-disk"
+            priority="high"
+          />
+        </View>
 
         {/* Recipe Name */}
         <View style={styles.recipeNameSection}>
@@ -601,7 +619,14 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
                   <View style={styles.instructionContent}>
                     <Text style={styles.instructionDescription}>{instruction.description}</Text>
                     {instruction.imageUri && (
-                      <Image source={{ uri: instruction.imageUri }} style={styles.instructionImage} />
+                      <OptimizedImage
+                        source={instruction.imageUri}
+                        style={styles.instructionImage}
+                        contentFit="cover"
+                        showLoader={true}
+                        cachePolicy="memory-disk"
+                        priority="normal"
+                      />
                     )}
                   </View>
                 </View>

@@ -1,3 +1,6 @@
+// Import gesture handler at the top - required for React Navigation
+import 'react-native-gesture-handler';
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

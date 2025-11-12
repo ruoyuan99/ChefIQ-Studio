@@ -34,15 +34,28 @@ const PROD_BACKEND_URL = 'https://your-backend-domain.com';
 
 /**
  * Get the backend URL based on environment
+ * Supports environment variables for flexible configuration
  */
 export const getBackendUrl = (): string => {
-  // In development, use localhost (with Android emulator support)
+  // Priority 1: Use environment variable if available (works for both dev and prod)
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  
+  // Priority 2: Environment-specific environment variables
   if (__DEV__) {
+    // Development: Use dev-specific env var or fallback to local network IP
+    if (process.env.EXPO_PUBLIC_BACKEND_URL_DEV) {
+      return process.env.EXPO_PUBLIC_BACKEND_URL_DEV;
+    }
     return getDevBackendUrl();
   }
   
-  // In production, use the configured production URL
-  // You can also use environment variables if needed
+  // Production: Use prod-specific env var or fallback to configured URL
+  if (process.env.EXPO_PUBLIC_BACKEND_URL_PROD) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL_PROD;
+  }
+  
   return PROD_BACKEND_URL;
 };
 

@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Buttons, Colors } from '../styles/theme';
 import { importRecipeFromURL, importRecipeViaBackend, optimizeRecipeViaBackend } from '../services/recipeImportService';
 
 interface ImportRecipeModalProps {
@@ -142,9 +143,9 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
         recipe = await importRecipeViaBackend(url);
         // Success - clear blocked state
         setIsBlocked(false);
-      } catch (backendError) {
+      } catch (backendError: any) {
         console.log('Backend import failed:', backendError);
-        const backendMsg = String((backendError && backendError.message) || backendError || '');
+        const backendMsg = String((backendError && (backendError.message as any)) || backendError || '');
         // If backend indicates website restriction/IP protection, do NOT fallback to direct parsing
         if (
           backendMsg.includes('does not allow importing') ||
@@ -263,21 +264,18 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
             {!previewData ? (
               // Initial state: only show Preview button
               <TouchableOpacity
-                style={[
-                  styles.button, 
-                  styles.previewButton, 
-                  styles.singleButton,
-                  (loading || !url.trim() || isBlocked) && styles.buttonDisabled
-                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Preview recipe from URL"
+                style={[Buttons.secondary.container, { width: '100%', opacity: (loading || !url.trim() || isBlocked) ? 0.6 : 1 }]}
                 onPress={handlePreview}
                 disabled={loading || !url.trim() || isBlocked}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={Colors.primary} />
                 ) : (
                   <>
-                    <Ionicons name="eye-outline" size={20} color="#fff" />
-                    <Text style={[styles.buttonText, { marginLeft: 8 }]}>Preview</Text>
+                    <Ionicons name="eye-outline" size={20} color={Colors.primary} />
+                    <Text style={Buttons.secondary.text}>Preview</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -285,12 +283,9 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
               // After preview data: show two buttons - Import and AI Import
               <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  style={[
-                    styles.button, 
-                    styles.importButton, 
-                    { flex: 1, marginRight: 8 },
-                    (loading || optimizing || isBlocked) && styles.buttonDisabled
-                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Import recipe"
+                  style={[Buttons.primary.container, { flex: 1, marginRight: 8, opacity: (loading || optimizing || isBlocked) ? 0.6 : 1 }]}
                   onPress={handleImport}
                   disabled={loading || optimizing || isBlocked}
                 >
@@ -299,18 +294,15 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
                   ) : (
                     <>
                       <Ionicons name="download-outline" size={20} color="#fff" />
-                      <Text style={[styles.buttonText, { marginLeft: 8 }]}>Import</Text>
+                      <Text style={Buttons.primary.text}>Import</Text>
                     </>
                   )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.button, 
-                    styles.aiImportButton, 
-                    { flex: 1, marginLeft: 8 },
-                    (loading || optimizing || isBlocked) && styles.buttonDisabled
-                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="AI Import recipe"
+                  style={[Buttons.primary.container, { flex: 1, marginLeft: 8, backgroundColor: '#7B1FA2', opacity: (loading || optimizing || isBlocked) ? 0.6 : 1 }]}
                   onPress={handleAIImport}
                   disabled={loading || optimizing || isBlocked}
                 >
@@ -319,7 +311,7 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
                   ) : (
                     <>
                       <Ionicons name="sparkles-outline" size={20} color="#fff" />
-                      <Text style={[styles.buttonText, { marginLeft: 8 }]}>AI Import</Text>
+                      <Text style={Buttons.primary.text}>AI Import</Text>
                     </>
                   )}
                 </TouchableOpacity>
