@@ -17,7 +17,7 @@ export const testSupabaseConnection = async () => {
     }
     
     console.log('✅ Supabase连接成功!')
-    console.log('📊 项目URL:', supabase.supabaseUrl)
+    // Note: supabaseUrl is protected, using alternative check
     console.log('🔑 API密钥已配置')
     
     return true
