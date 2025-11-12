@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../config/supabase';
+import { uploadRecipeImage } from './storageService';
 
 // 数据迁移服务
 export class DataMigrationService {
@@ -258,8 +259,8 @@ export class DataMigrationService {
       const recipeMap = new Map(recipes?.map(r => [r.title, r.id]) || []);
 
       const favoritesDataToInsert = favorites
-        .filter(fav => recipeMap.has(fav.title))
-        .map(fav => ({
+        .filter((fav: any) => recipeMap.has(fav.title))
+        .map((fav: any) => ({
           user_id: userId,
           recipe_id: recipeMap.get(fav.title)
         }));

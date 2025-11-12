@@ -327,7 +327,7 @@ export class FavoriteService {
       .order('created_at', { ascending: false })
     
     if (error) throw error
-    return data?.map(item => item.recipes).filter(Boolean) || []
+    return (data?.map((item: any) => item.recipes).filter(Boolean).flat() || []) as any[]
   }
 
   // 添加收藏

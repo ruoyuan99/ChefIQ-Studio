@@ -142,7 +142,7 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
 
   const shareAsText = () => {
     const textContent = `${recipe.title}\n\n${recipe.description}\n\n菜品列表:\n${recipe.items
-      .filter(item => item.isAvailable)
+      .filter((item: any) => item.isAvailable)
       .map((item: any) => `• ${item.name} - ¥${item.price}`)
       .join('\n')}`;
     
@@ -433,6 +433,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  shareCardContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
   },
 });
 

@@ -10,7 +10,7 @@ export class RealTimeSyncService {
       if (!sessionData?.session) {
         console.log('⚠️ Skipping Supabase sync: no authenticated session');
         console.log('ℹ️ Provided userId:', userId, 'title:', recipe?.title);
-        return;
+        return null;
       }
       console.log('✅ Supabase session present. auth.user.id =', sessionData.session.user.id, 'app userId =', userId);
       

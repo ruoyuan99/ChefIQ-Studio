@@ -1,4 +1,4 @@
-import { supabase } from './src/config/supabase'
+import { supabase } from '../config/supabase'
 
 // 测试Supabase连接
 export const testSupabaseConnection = async () => {
