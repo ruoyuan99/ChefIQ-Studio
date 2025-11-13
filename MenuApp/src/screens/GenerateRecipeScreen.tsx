@@ -22,12 +22,7 @@ const DIETARY_RESTRICTIONS = [
   'Vegan',
   'Gluten-Free',
   'Dairy-Free',
-  'Nut-Free',
   'Keto',
-  'Paleo',
-  'Low-Carb',
-  'Low-Sodium',
-  'Halal',
   'Kosher',
 ];
 
@@ -55,16 +50,14 @@ const COOKING_TIME_OPTIONS = ['Quick', 'Medium', 'Long'] as const;
 // CookingTimeCategory is imported from '../types'
 
 const COOKWARE_OPTIONS = [
-  'Oven',
-  'Microwave',
+  'Stovetop – Pan or Pot',
   'Air Fryer',
-  'Rice Cooker',
-  'Stovetop',
+  'Oven',
+  'Pizza Oven',
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',
-  'Blender',
-  'Food Processor',
+  'Wok',
 ];
 
 const QUICK_INGREDIENTS = [
@@ -172,7 +165,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Generate Recipe from Ingredients</Text>
+        <Text style={styles.headerTitle}>Generate from Ingredients</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -416,7 +409,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -424,7 +417,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 24),
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 20,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -449,6 +442,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingTop: 24,
     paddingBottom: 100,
   },
   section: {
@@ -514,7 +508,7 @@ const styles = StyleSheet.create({
     marginRight: -8,
   },
   quickIngredientChip: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderRadius: 12,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -545,7 +539,7 @@ const styles = StyleSheet.create({
   ingredientTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -574,7 +568,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,

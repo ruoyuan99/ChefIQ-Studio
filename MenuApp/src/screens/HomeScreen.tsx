@@ -37,16 +37,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
     console.log('showRecipeOptions changed:', showRecipeOptions);
   }, [showRecipeOptions]);
 
-  // Automatically show create recipe modal
-  useEffect(() => {
-    // Delay showing modal to ensure page is fully loaded
-    const timer = setTimeout(() => {
-      console.log('Auto-showing create recipe modal');
-      setShowRecipeOptions(true);
-    }, 1000);
+  // Automatically show create recipe modal - DISABLED
+  // The create recipe modal is now only shown in FavoriteRecipeScreen
+  // useEffect(() => {
+  //   // Delay showing modal to ensure page is fully loaded
+  //   const timer = setTimeout(() => {
+  //     console.log('Auto-showing create recipe modal');
+  //     setShowRecipeOptions(true);
+  //   }, 1000);
 
-    return () => clearTimeout(timer);
-  }, []);
+  //   return () => clearTimeout(timer);
+  // }, []);
 
   const recipeStats = {
     totalRecipes: state.recipes.length,
@@ -297,7 +298,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     paddingBottom: 100, // Add bottom padding for spacing
   },
   scrollContent: {

@@ -4,10 +4,10 @@
     "slug": "chef-iq",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/AppLogo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/AppLogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#DA6809"
     },
@@ -26,7 +26,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/AppLogo.png",
         "backgroundColor": "#DA6809"
       },
       "package": "com.chefiq.app",
@@ -43,7 +43,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/AppLogo.png"
     },
     "plugins": [
       [

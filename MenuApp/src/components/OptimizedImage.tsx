@@ -151,7 +151,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
   },
   errorPlaceholder: {
     width: 40,

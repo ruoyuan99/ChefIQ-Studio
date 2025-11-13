@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '../config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -37,6 +38,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
     // Get initial session
@@ -57,6 +59,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Listen for app state changes to auto sign out when app goes to background
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (
+        appState.current.match(/active|foreground/) &&
+        nextAppState.match(/inactive|background/)
+      ) {
+        // App is going to background or being closed
+        console.log('📱 App going to background, signing out...');
+        if (user) {
+          try {
+            setLoading(true);
+            const currentUser = user;
+            await supabase.auth.signOut();
+            setUser(null);
+            await AsyncStorage.removeItem('user');
+            
+            // Clear old login session data (cleanup legacy keys)
+            if (currentUser?.id) {
+              try {
+                const keys = await AsyncStorage.getAllKeys();
+                // Remove old session-based keys
+                const loginSessionKey = `loginSession_${currentUser.id}`;
+                const oldSessionKeys = keys.filter(key => 
+                  key === loginSessionKey || 
+                  (key.startsWith(`modalShown_session_`) && key.includes(currentUser.id))
+                );
+                if (oldSessionKeys.length > 0) {
+                  await AsyncStorage.multiRemove(oldSessionKeys);
+                }
+              } catch (error) {
+                // Ignore cleanup errors
+                console.log('Cleanup old session keys:', error);
+              }
+            }
+          } catch (error) {
+            console.error('Auto sign out failed:', error);
+          } finally {
+            setLoading(false);
+          }
+        }
+      }
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [user]);
 
   const getInitialSession = async () => {
     try {
@@ -281,9 +335,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = async (): Promise<void> => {
     try {
       setLoading(true);
+      const currentUser = user;
       await supabase.auth.signOut();
       setUser(null);
       await AsyncStorage.removeItem('user');
+      
+      // Clear old login session data (cleanup legacy keys)
+      if (currentUser?.id) {
+        try {
+          const keys = await AsyncStorage.getAllKeys();
+          // Remove old session-based keys
+          const loginSessionKey = `loginSession_${currentUser.id}`;
+          const oldSessionKeys = keys.filter(key => 
+            key === loginSessionKey || 
+            (key.startsWith(`modalShown_session_`) && key.includes(currentUser.id))
+          );
+          if (oldSessionKeys.length > 0) {
+            await AsyncStorage.multiRemove(oldSessionKeys);
+          }
+        } catch (error) {
+          // Ignore cleanup errors
+          console.log('Cleanup old session keys:', error);
+        }
+      }
     } catch (error) {
       console.error('Sign out failed:', error);
     } finally {

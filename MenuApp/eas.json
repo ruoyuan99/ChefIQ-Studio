@@ -22,8 +22,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "preview",
-        "EXPO_PUBLIC_BACKEND_URL": "https://chefiq-studio-production.up.railway.app"
+        "EXPO_PUBLIC_ENV": "preview"
       },
       "node": "22.11.0"
     },
@@ -35,8 +34,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_BACKEND_URL": "https://chefiq-studio-production.up.railway.app"
+        "EXPO_PUBLIC_ENV": "production"
       },
       "node": "22.11.0"
     }

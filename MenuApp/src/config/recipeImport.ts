@@ -30,7 +30,7 @@ const getDevBackendUrl = (): string => {
 // - Railway: 'https://your-app.railway.app'
 // - Render: 'https://your-app.onrender.com'
 // - Custom domain: 'https://api.yourdomain.com'
-const PROD_BACKEND_URL = 'https://chefiq-studio-production.up.railway.app';
+const PROD_BACKEND_URL = 'https://your-backend-domain.com';
 
 /**
  * Get the backend URL based on environment

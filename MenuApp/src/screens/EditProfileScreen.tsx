@@ -268,7 +268,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   keyboardView: {
     flex: 1,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
   },
   avatarPlaceholder: {
     width: 120,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   inputDisabled: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     color: '#999',
   },
   textArea: {

@@ -51,7 +51,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../assets/ChefiQStudioLogo.png')}
+                source={require('../../assets/AppLogo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -130,7 +130,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   keyboardAvoidingView: {
     flex: 1,

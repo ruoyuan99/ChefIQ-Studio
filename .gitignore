@@ -62,6 +62,7 @@ coverage/
 *.tmp
 *.temp
 *.log
+server/*.log
 *.swp
 *.swo
 *~

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useLike } from '../contexts/LikeContext';
- 
+import { useAuth } from '../contexts/AuthContext';
 import { useFavorite } from '../contexts/FavoriteContext';
 import { useTried } from '../contexts/TriedContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
@@ -25,7 +26,87 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
   const { state } = useFavorite();
   const { getTriedCount } = useTried();
   const { getStats } = useSocialStats();
-  const [showCreateModal, setShowCreateModal] = useState(true);
+  const { user } = useAuth();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const hasCheckedRef = useRef<boolean>(false);
+  const cleanedUpRef = useRef<boolean>(false);
+
+  // 清理旧的登录会话记录（一次性清理，只在用户ID变化时执行）
+  useEffect(() => {
+    const cleanupOldSessionKeys = async () => {
+      if (!user?.id || cleanedUpRef.current) {
+        return;
+      }
+
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const oldSessionKeys = keys.filter(key => 
+          key === `loginSession_${user.id}` || 
+          (key.startsWith(`modalShown_session_`) && key.includes(user.id))
+        );
+        if (oldSessionKeys.length > 0) {
+          await AsyncStorage.multiRemove(oldSessionKeys);
+          console.log('🧹 Cleaned up old session keys:', oldSessionKeys.length);
+        }
+        cleanedUpRef.current = true;
+      } catch (error) {
+        console.log('Cleanup old session keys:', error);
+      }
+    };
+
+    // 当用户ID变化时，重置清理状态并执行清理
+    cleanedUpRef.current = false;
+    cleanupOldSessionKeys();
+  }, [user?.id]);
+
+  // 检查并显示弹窗（基于日期）- 每天第一次登录时显示
+  useEffect(() => {
+    const checkAndShowModal = async () => {
+      // 如果没有用户，不显示弹窗
+      if (!user || !user.id) {
+        hasCheckedRef.current = false;
+        setShowCreateModal(false);
+        return;
+      }
+
+      // 如果已经检查过，不再重复检查（避免重复触发）
+      if (hasCheckedRef.current) {
+        return;
+      }
+
+      try {
+        // 获取今天的日期键（格式：YYYY-M-D）
+        const today = new Date();
+        const todayKey = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+        
+        // 获取用户最后登录日期
+        const lastLoginDateKey = `lastLoginDate_${user.id}`;
+        const lastLoginDate = await AsyncStorage.getItem(lastLoginDateKey);
+
+        // 如果今天还没有登录过，显示弹窗
+        if (lastLoginDate !== todayKey) {
+          console.log('🆕 First login of the day detected, showing create recipe modal');
+          setShowCreateModal(true);
+          // 更新最后登录日期
+          await AsyncStorage.setItem(lastLoginDateKey, todayKey);
+        } else {
+          console.log('✅ Already logged in today, not showing modal');
+          setShowCreateModal(false);
+        }
+        
+        hasCheckedRef.current = true;
+      } catch (error) {
+        console.error('Error checking daily login status:', error);
+        // 如果出错，默认不显示弹窗（避免重复）
+        setShowCreateModal(false);
+        hasCheckedRef.current = true;
+      }
+    };
+
+    // 当用户ID变化时，重置检查状态
+    hasCheckedRef.current = false;
+    checkAndShowModal();
+  }, [user?.id]);
   
   // 使用FavoriteContext中的recipes（已包含示例recipes）
   const allFavoriteRecipes = state.favoriteRecipes;
@@ -168,7 +249,7 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
               <Ionicons name="sparkles" size={28} color="#d96709" />
             </View>
             <View style={styles.generateRecipeContent}>
-              <Text style={styles.generateRecipeTitle}>Generate Recipe from Ingredients</Text>
+              <Text style={styles.generateRecipeTitle}>Generate from Ingredients</Text>
               <Text style={styles.generateRecipeSubtitle}>Not sure what to cook? Let AI turn your fridge into recipes.</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#d96709" />
@@ -198,7 +279,7 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     paddingBottom: 100, // 增加底部流白空间
   },
   header: {

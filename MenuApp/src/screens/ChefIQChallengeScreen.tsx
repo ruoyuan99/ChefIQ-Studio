@@ -291,7 +291,7 @@ const ChefIQChallengeScreen: React.FC<ChefIQChallengeScreenProps> = ({ navigatio
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',

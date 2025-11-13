@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,12 @@ interface PointsHistoryScreenProps {
 const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation }) => {
   const { state, getPointsHistory } = usePoints();
   const history = getPointsHistory();
+  
+  // Force refresh when state changes
+  useEffect(() => {
+    // This will trigger a re-render when state.activities changes
+    console.log('PointsHistoryScreen: State updated, activities count:', state.activities.length);
+  }, [state.activities]);
 
   // Group activities by date
   const groupedHistory = useMemo(() => {
@@ -101,7 +107,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -203,7 +209,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',

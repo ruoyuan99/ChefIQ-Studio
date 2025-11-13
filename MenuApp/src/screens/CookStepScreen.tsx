@@ -1010,7 +1010,7 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -1069,7 +1069,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -1383,7 +1383,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   servingButtonDisabled: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderColor: '#ddd',
   },
   servingValue: {
@@ -1520,7 +1520,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#ddd',
     marginRight: 8,
@@ -1578,7 +1578,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   speechRateButtonDisabled: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderColor: '#ddd',
   },
   speechRateValue: {
@@ -1616,7 +1616,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   speechPitchButtonDisabled: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderColor: '#ddd',
   },
   speechPitchValue: {
@@ -1797,7 +1797,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tutorialButtonSecondary: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#ddd',
   },
@@ -1872,7 +1872,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   intervalButtonDisabled: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderColor: '#ddd',
   },
   intervalValueContainer: {

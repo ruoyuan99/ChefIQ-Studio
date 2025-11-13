@@ -1,18 +1,40 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, AccessibilityInfo, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePoints } from '../contexts/PointsContext';
 import { useBadges } from '../contexts/BadgeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
   const { state, getLevelInfo, addPoints, getPointsHistory } = usePoints();
   const { checkBadgeUnlock, getBadgeById } = useBadges();
+  const { user } = useAuth();
   const { level, pointsToNextLevel, totalPoints } = getLevelInfo();
   const history = getPointsHistory();
-  const todayKey = useMemo(() => {
+  // 获取今天的日期键（格式：YYYY-M-D），使用 state 确保跨天时更新
+  const [todayKey, setTodayKey] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-  }, []);
+  });
+  
+  // 每分钟检查一次日期是否变化（用于跨天检测）
+  useEffect(() => {
+    const checkDate = () => {
+      const d = new Date();
+      const newKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      if (newKey !== todayKey) {
+        setTodayKey(newKey);
+      }
+    };
+    
+    // 立即检查一次
+    checkDate();
+    
+    // 每分钟检查一次
+    const interval = setInterval(checkDate, 60000);
+    return () => clearInterval(interval);
+  }, [todayKey]);
   const isTodayActivity = (type: string) =>
     history.some(h => {
       const d = new Date(h.timestamp);
@@ -23,10 +45,33 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
   const createdToday = useMemo(() => isTodayActivity('create_recipe'), [history, todayKey]);
   const likedToday = useMemo(() => isTodayActivity('like_recipe'), [history, todayKey]);
   const triedToday = useMemo(() => isTodayActivity('try_recipe'), [history, todayKey]);
-  const [checkinActive, setCheckinActive] = useState<boolean>(checkedInToday);
+  
+  // 检查今天是否已经登录过（基于日期），只有今天已登录且未签到才能激活
+  const [checkinActive, setCheckinActive] = useState<boolean>(false);
+  
   useEffect(() => {
-    setCheckinActive(checkedInToday);
-  }, [checkedInToday]);
+    const checkDailyLogin = async () => {
+      if (!user?.id) {
+        setCheckinActive(checkedInToday);
+        return;
+      }
+
+      try {
+        const lastLoginDateKey = `lastLoginDate_${user.id}`;
+        const lastLoginDate = await AsyncStorage.getItem(lastLoginDateKey);
+        const todayLoggedIn = lastLoginDate === todayKey;
+        
+        // 只有今天已经登录过且还没有签到，才能激活签到
+        // 如果已经签到过，则禁用
+        setCheckinActive(checkedInToday || !todayLoggedIn);
+      } catch (error) {
+        console.error('Error checking daily login:', error);
+        setCheckinActive(checkedInToday);
+      }
+    };
+
+    checkDailyLogin();
+  }, [user?.id, todayKey, checkedInToday]);
 
   const getLevelTitle = (level: number): string => {
     const titles: { [key: number]: string } = {
@@ -219,7 +264,33 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
             disabled={checkinActive}
             onPress={async () => {
               if (checkinActive) return;
+              
+              // 检查今天是否已经登录过
+              if (!user?.id) {
+                Alert.alert('Login Required', 'Please log in to check in.');
+                return;
+              }
+
               try {
+                const lastLoginDateKey = `lastLoginDate_${user.id}`;
+                const lastLoginDate = await AsyncStorage.getItem(lastLoginDateKey);
+                
+                // 只有今天已经登录过才能签到
+                if (lastLoginDate !== todayKey) {
+                  Alert.alert(
+                    'Check-in Not Available',
+                    'Daily check-in is only available on your first login of the day.'
+                  );
+                  return;
+                }
+
+                // 检查是否已经签到过
+                if (checkedInToday) {
+                  Alert.alert('Already Checked In', 'You have already checked in today.');
+                  setCheckinActive(true);
+                  return;
+                }
+
                 await addPoints('daily_checkin', 'Daily Check-in');
                 setCheckinActive(true);
                 // Check for badge unlocks
@@ -238,7 +309,8 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
                 await checkBadgeUnlock('checkin_streak_7');
                 await checkBadgeUnlock('checkin_streak_30');
               } catch (e) {
-                // no-op
+                console.error('Error during check-in:', e);
+                Alert.alert('Error', 'Failed to check in. Please try again.');
               }
             }}
           >

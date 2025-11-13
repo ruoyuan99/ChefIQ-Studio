@@ -145,7 +145,7 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,

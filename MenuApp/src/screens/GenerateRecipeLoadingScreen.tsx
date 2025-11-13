@@ -323,7 +323,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="white" translucent />
       
       {/* Main Content */}
       <View style={styles.content}>
@@ -398,7 +398,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   content: {
     flex: 1,

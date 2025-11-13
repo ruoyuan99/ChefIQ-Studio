@@ -193,7 +193,7 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
               ingredients={recipe.ingredients || []}
               instructions={recipe.instructions || []}
               cookware={recipe.cookware}
-              logoSource={require('../../assets/ChefiQStudioLogo.png')}
+              logoSource={require('../../assets/AppLogo.png')}
             />
           </View>
         </View>
@@ -208,7 +208,7 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -260,9 +260,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   menuTitle: {
     fontSize: 20,
@@ -296,9 +296,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sectionTitle: {
     fontSize: 18,
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   shareCodeDisplay: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     padding: 16,
     borderRadius: 8,
     marginRight: 12,
@@ -360,9 +360,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   shareOption: {
     flexDirection: 'row',
@@ -404,9 +404,9 @@ const styles = StyleSheet.create({
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   tipItem: {
     flexDirection: 'row',

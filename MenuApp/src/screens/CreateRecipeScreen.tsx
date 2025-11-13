@@ -226,6 +226,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   const titleInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
   const tagInputRef = useRef<TextInput>(null);
+  const recipeInfoSectionRef = useRef<View>(null);
 
   const categories = ['Appetizer', 'Main Course', 'Dessert', 'Beverage', 'Other'];
   
@@ -242,9 +243,17 @@ const cookingTimeOptions = [
     '1-2 hours', '2-4 hours', '4+ hours', 'Overnight'
   ];
 
-  const servingsOptions = [
-    '1 serving', '2 servings', '3-4 servings', '4-6 servings',
-    '6-8 servings', '8-10 servings', '10+ servings'
+  const servingsOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+
+  const cookwareOptions = [
+    'Stovetop – Pan or Pot',
+    'Air Fryer',
+    'Oven',
+    'Pizza Oven',
+    'Grill',
+    'Slow Cooker',
+    'Pressure Cooker',
+    'Wok'
   ];
 
   const unitOptions = [
@@ -375,9 +384,15 @@ const commonIngredientTags = [
     if (pieces.length === 0) return;
     const existing = new Set((recipeData.tags || []).map((t: string) => t.toLowerCase()));
     const merged: string[] = [...(recipeData.tags || [])];
+    const maxTags = 3;
+    
     for (const p of pieces) {
       const key = p.toLowerCase();
       if (!existing.has(key)) {
+        if (merged.length >= maxTags) {
+          Alert.alert('Tag Limit Reached', `You can add a maximum of ${maxTags} tags.`);
+          break;
+        }
         existing.add(key);
         merged.push(p);
       }
@@ -409,10 +424,19 @@ const commonIngredientTags = [
   };
 
   const selectTag = (tag: string) => {
-    if (!recipeData.tags.includes(tag)) {
+    const maxTags = 3;
+    const currentTags = recipeData.tags || [];
+    
+    if (currentTags.length >= maxTags) {
+      Alert.alert('Tag Limit Reached', `You can add a maximum of ${maxTags} tags.`);
+      setShowTagSuggestions(false);
+      return;
+    }
+    
+    if (!currentTags.includes(tag)) {
       setRecipeData({
         ...recipeData,
-        tags: [...recipeData.tags, tag]
+        tags: [...currentTags, tag]
       });
     }
     setShowTagSuggestions(false);
@@ -660,6 +684,15 @@ const handleIngredientTagPress = (ingredientName: string) => {
     setTimeout(() => {
       inputRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
         const scrollY = y - 100 + offset; // 100px above the input
+        scrollViewRef.current?.scrollTo({ y: Math.max(0, scrollY), animated: true });
+      });
+    }, 100);
+  };
+
+  const scrollToSection = (sectionRef: any, offset: number = 0) => {
+    setTimeout(() => {
+      sectionRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+        const scrollY = y - 100 + offset; // 100px above the section
         scrollViewRef.current?.scrollTo({ y: Math.max(0, scrollY), animated: true });
       });
     }, 100);
@@ -1182,7 +1215,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
           </View>
         </View>
 
-        <View style={styles.recipeInfoSection}>
+        <View ref={recipeInfoSectionRef} style={styles.recipeInfoSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recipe Information</Text>
             <TouchableOpacity
@@ -1203,7 +1236,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
               value={recipeData.title}
               onChangeText={text => setRecipeData({ ...recipeData, title: text })}
               placeholder="Enter recipe title"
-              onFocus={() => scrollToInput(titleInputRef, 200)}
+              onFocus={() => scrollToSection(recipeInfoSectionRef, 100)}
             />
           </View>
           <View style={styles.inputGroup}>
@@ -1216,7 +1249,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
               placeholder="Every dish tells a story. What's yours? Capture its taste, texture, and the moment behind it..."
               multiline
               numberOfLines={3}
-              onFocus={() => scrollToInput(descriptionInputRef, 200)}
+              onFocus={() => scrollToSection(recipeInfoSectionRef, 100)}
             />
           </View>
           <View style={styles.switchGroup}>
@@ -1248,37 +1281,59 @@ const handleIngredientTagPress = (ingredientName: string) => {
               }}
               onSubmitEditing={addTag}
               onFocus={() => {
-                setShowTagSuggestions(true);
                 scrollToInput(tagInputRef, 200);
               }}
-              onBlur={() => setTimeout(() => setShowTagSuggestions(false), 300)}
               returnKeyType="done"
             />
             <TouchableOpacity style={styles.addTagButton} onPress={addTag}>
               <Ionicons name="add" size={20} color="white" />
             </TouchableOpacity>
           </View>
-            {showTagSuggestions && (
-              <View style={styles.tagSuggestions}>
-                <Text style={styles.suggestionsTitle}>Popular Tags:</Text>
-                <ScrollView showsVerticalScrollIndicator={true} style={styles.tagSuggestionsScroll}>
-                  <View style={styles.suggestionsList}>
-                    {commonTags
-                      .filter(tag => !recipeData.tags.includes(tag))
-                      .slice(0, 12)
-                      .map((tag, index) => (
+            <View style={styles.tagSuggestions}>
+              <Text style={styles.suggestionsTitle}>Popular Tags:</Text>
+              {(() => {
+                const filteredTags = commonTags.filter(tag => !recipeData.tags.includes(tag));
+                const firstRow = filteredTags.slice(0, Math.ceil(filteredTags.length / 2));
+                const secondRow = filteredTags.slice(Math.ceil(filteredTags.length / 2));
+                
+                return (
+                  <View style={styles.tagSuggestionsRows}>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false} 
+                      style={styles.tagSuggestionsRow}
+                      contentContainerStyle={styles.tagSuggestionsRowContent}
+                    >
+                      {firstRow.map((tag, index) => (
                         <TouchableOpacity
-                          key={index}
+                          key={`first-${index}`}
                           style={styles.suggestionTag}
                           onPress={() => selectTag(tag)}
                         >
                           <Text style={styles.suggestionTagText}>{tag}</Text>
                         </TouchableOpacity>
                       ))}
+                    </ScrollView>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false} 
+                      style={styles.tagSuggestionsRow}
+                      contentContainerStyle={styles.tagSuggestionsRowContent}
+                    >
+                      {secondRow.map((tag, index) => (
+                        <TouchableOpacity
+                          key={`second-${index}`}
+                          style={styles.suggestionTag}
+                          onPress={() => selectTag(tag)}
+                        >
+                          <Text style={styles.suggestionTagText}>{tag}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
-                </ScrollView>
-              </View>
-            )}
+                );
+              })()}
+            </View>
           {recipeData.tags && recipeData.tags.length > 0 && (
             <View style={styles.tagsList}>
               {recipeData.tags.map((tag: string, index: number) => {
@@ -1359,18 +1414,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
             {showCookwareDropdown && (
               <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
                 <ScrollView showsVerticalScrollIndicator={true}>
-                  {[
-                    'Regular Pan/Pot',
-                    'Air Fryer',
-                    'Oven',
-                    'Pizza Oven',
-                    'Grill',
-                    'Microwave',
-                    'Slow Cooker',
-                    'Pressure Cooker',
-                    'Wok',
-                    'Other'
-                  ].map((cookware) => (
+                  {cookwareOptions.map((cookware) => (
                     <TouchableOpacity
                       key={cookware}
                       style={styles.dropdownItem}
@@ -1397,7 +1441,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 onPress={() => setShowCookingTimeDropdown(!showCookingTimeDropdown)}
               >
                 <Text style={[styles.dropdownText, !recipeData.cookingTime && styles.placeholderText]}>
-                  {recipeData.cookingTime || 'Select cooking time'}
+                  {recipeData.cookingTime || ''}
                 </Text>
                 <Ionicons
                   name={showCookingTimeDropdown ? 'chevron-up' : 'chevron-down'}
@@ -1433,7 +1477,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 onPress={() => setShowServingsDropdown(!showServingsDropdown)}
               >
                 <Text style={[styles.dropdownText, !recipeData.servings && styles.placeholderText]}>
-                  {recipeData.servings || 'Select servings'}
+                  {recipeData.servings || ''}
                 </Text>
                 <Ionicons
                   name={showServingsDropdown ? 'chevron-up' : 'chevron-down'}
@@ -1479,40 +1523,6 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   value={newIngredient.name}
                   onChangeText={text => setNewIngredient({ ...newIngredient, name: text })}
                 />
-                <View style={styles.ingredientSuggestionContainer}>
-                  <View style={styles.ingredientSuggestionHeader}>
-                    <Text style={styles.ingredientSuggestionLabel}>Quick add common ingredients</Text>
-                    <Text style={styles.ingredientSuggestionHint}>Tap to autofill</Text>
-                  </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.ingredientSuggestionList}
-                  >
-                    {commonIngredientTags.map(tag => {
-                      const isActive = newIngredient.name.trim().toLowerCase() === tag.toLowerCase();
-                      return (
-                        <TouchableOpacity
-                          key={tag}
-                          style={[
-                            styles.ingredientSuggestionChip,
-                            isActive && styles.ingredientSuggestionChipActive,
-                          ]}
-                          onPress={() => handleIngredientTagPress(tag)}
-                        >
-                          <Text
-                            style={[
-                              styles.ingredientSuggestionChipText,
-                              isActive && styles.ingredientSuggestionChipTextActive,
-                            ]}
-                          >
-                            {tag}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
               </View>
               <View style={[styles.ingredientField, { flex: 1, marginHorizontal: 4 }]}>
                 <Text style={styles.ingredientLabel}>Amount</Text>
@@ -1806,7 +1816,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   keyboardView: {
     flex: 1,
@@ -2146,6 +2156,7 @@ const styles = StyleSheet.create({
   sectionSubtitle: {
     fontSize: 14,
     color: '#666',
+    marginTop: 8,
     marginBottom: 16,
   },
   tagsContainer: {
@@ -2174,6 +2185,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 12,
   },
   tagItem: {
     flexDirection: 'row',
@@ -2191,7 +2203,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tagText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#1976d2',
     marginRight: 6,
   },
@@ -2209,28 +2221,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#e9ecef',
-    maxHeight: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 100,
-    zIndex: 7000,
-    position: 'relative',
   },
-  tagSuggestionsScroll: {
-    maxHeight: 150,
+  tagSuggestionsRows: {
+    marginTop: 8,
+  },
+  tagSuggestionsRow: {
+    marginBottom: 8,
+  },
+  tagSuggestionsRowContent: {
+    paddingRight: 8,
   },
   suggestionsTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-  },
-  suggestionsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
   },
   suggestionTag: {
     backgroundColor: 'white',

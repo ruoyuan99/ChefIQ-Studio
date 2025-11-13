@@ -487,7 +487,7 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     marginRight: -8,
   },
   recipeOptionChip: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderRadius: 12,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   youtubeThumbnailPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
   noVideosMessage: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   ingredientChip: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     borderRadius: 16,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,

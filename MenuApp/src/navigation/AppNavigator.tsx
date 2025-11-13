@@ -185,7 +185,7 @@ const AppNavigator: React.FC = () => {
           name="GenerateRecipe"
           component={GenerateRecipeScreen}
           options={{
-            title: 'Generate Recipe',
+            title: 'Generate from Ingredients',
             headerShown: false,
           }}
         />
@@ -218,8 +218,7 @@ const AppNavigator: React.FC = () => {
           name="PointsHistory"
           component={PointsHistoryScreen}
           options={{
-            title: 'Points History',
-            headerBackTitle: 'Back',
+            headerShown: false,
           }}
         />
       </Stack.Navigator>

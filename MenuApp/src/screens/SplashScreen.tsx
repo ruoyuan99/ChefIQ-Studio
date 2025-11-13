@@ -28,7 +28,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#d96709" />
       <Image
-        source={require('../../assets/ChefiQStudioLogo.png')}
+        source={require('../../assets/AppLogo.png')}
         style={{ width: logoWidth, height: logoHeight, resizeMode: 'contain' }}
       />
     </View>

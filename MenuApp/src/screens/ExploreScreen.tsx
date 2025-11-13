@@ -627,7 +627,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     paddingBottom: 100, // 增加底部流白空间
   },
   header: {

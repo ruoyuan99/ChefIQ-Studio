@@ -10,6 +10,8 @@ const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const OpenAI = require('openai');
+const { createClient } = require('@supabase/supabase-js');
+const crypto = require('crypto');
 const { logCompletionUsage, calculateCost } = require('./aiTokenLogger');
 require('dotenv').config();
 
@@ -23,6 +25,19 @@ if (process.env.OPENAI_API_KEY) {
 } else {
   console.log('⚠️  OpenAI API key not found. AI-enhanced parsing will be disabled.');
   console.log('   Set OPENAI_API_KEY in .env file to enable AI parsing.');
+}
+
+// Initialize Supabase client for YouTube cache
+let supabase = null;
+if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
+  supabase = createClient(
+    process.env.EXPO_PUBLIC_SUPABASE_URL,
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+  );
+  console.log('✅ Supabase client initialized for YouTube cache');
+} else {
+  console.log('⚠️  Supabase credentials not found. YouTube cache will be disabled.');
+  console.log('   Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env file to enable caching.');
 }
 
 const app = express();
@@ -118,6 +133,291 @@ function clearExpiredCache() {
 
 // Clear expired cache every hour
 setInterval(clearExpiredCache, 60 * 60 * 1000); // 1 hour
+
+/**
+ * List of all valid cookware options
+ * This must match the frontend cookware options
+ */
+const cookwareOptions = [
+  'Stovetop – Pan or Pot',
+  'Air Fryer',
+  'Oven',
+  'Pizza Oven',
+  'Grill',
+  'Slow Cooker',
+  'Pressure Cooker',
+  'Wok'
+];
+
+/**
+ * Sanitize cookware references in generated recipe text
+ * Replaces any mentions of other cookware with the specified cookware
+ * @param {string} text - Text to sanitize
+ * @param {string} allowedCookware - The cookware that should be used
+ * @returns {string} Sanitized text
+ */
+function sanitizeCookwareReferences(text, allowedCookware) {
+  if (!text || !allowedCookware) return text;
+  
+  // Get other cookware options (excluding the allowed one)
+  const otherCookware = cookwareOptions.filter(c => c !== allowedCookware);
+  
+  // Common variations and synonyms for each cookware type
+  const commonVariations = {
+    'Stovetop – Pan or Pot': ['stovetop', 'pan', 'pot', 'skillet', 'frying pan', 'saucepan', 'stove top', 'stove-top'],
+    'Air Fryer': ['air fryer', 'airfryer', 'air-fryer'],
+    'Oven': ['oven', 'baking oven'],
+    'Pizza Oven': ['pizza oven'],
+    'Grill': ['grill', 'grilling', 'barbecue', 'bbq', 'barbeque'],
+    'Slow Cooker': ['slow cooker', 'crock pot', 'crockpot'],
+    'Pressure Cooker': ['pressure cooker', 'instant pot'],
+    'Wok': ['wok', 'wok pan']
+  };
+  
+  let sanitized = text;
+  
+  // Get allowed variations for the specified cookware
+  const allowedVariations = commonVariations[allowedCookware] || [];
+  const allowedVariationsLower = allowedVariations.map(v => v.toLowerCase());
+  
+  // Replace other cookware options (exact matches)
+  for (const cookware of otherCookware) {
+    // Escape special regex characters
+    const escaped = cookware.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    // Match as whole word/phrase (case-insensitive)
+    const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
+    sanitized = sanitized.replace(regex, allowedCookware);
+  }
+  
+  // Replace variations of other cookware types
+  for (const [cookware, variations] of Object.entries(commonVariations)) {
+    if (cookware !== allowedCookware) {
+      for (const variation of variations) {
+        // Only replace if it's not an allowed variation
+        if (!allowedVariationsLower.includes(variation.toLowerCase())) {
+          const regex = new RegExp(`\\b${variation.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'gi');
+          sanitized = sanitized.replace(regex, allowedCookware);
+        }
+      }
+    }
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Normalize query string for matching (lowercase, trim, remove special chars)
+ * @param {string} query - Query string
+ * @returns {string} Normalized query
+ */
+function normalizeQuery(query) {
+  if (!query) return '';
+  return query.toLowerCase().trim().replace(/[^\w\s]/g, '');
+}
+
+/**
+ * Generate hash for query (for exact matching)
+ * @param {string} query - Query string
+ * @returns {string} Hash string
+ */
+function hashQuery(query) {
+  const normalized = normalizeQuery(query);
+  return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Extract keywords from query string
+ * @param {string} query - Query string
+ * @returns {Array<string>} Array of keywords
+ */
+function extractKeywords(query) {
+  if (!query) return [];
+  // Remove common stop words
+  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those']);
+  
+  const words = query.toLowerCase().split(/\s+/).filter(word => {
+    return word.length > 2 && !stopWords.has(word);
+  });
+  
+  return [...new Set(words)]; // Remove duplicates
+}
+
+/**
+ * Find cached YouTube query in database (exact match)
+ * @param {string} searchQuery - Search query
+ * @returns {Promise<Object|null>} Cached query with videos or null
+ */
+async function findCachedYouTubeQuery(searchQuery) {
+  if (!supabase) return null;
+  
+  try {
+    const queryHash = hashQuery(searchQuery);
+    
+    // Find exact match by hash
+    const { data: queryRecord, error } = await supabase
+      .from('youtube_queries')
+      .select(`
+        *,
+        youtube_videos (*)
+      `)
+      .eq('query_hash', queryHash)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error || !queryRecord) {
+      return null;
+    }
+    
+    // Update usage statistics
+    await supabase
+      .from('youtube_queries')
+      .update({
+        use_count: queryRecord.use_count + 1,
+        last_used_at: new Date().toISOString()
+      })
+      .eq('id', queryRecord.id);
+    
+    // Format videos
+    const videos = (queryRecord.youtube_videos || [])
+      .filter(v => v.is_active)
+      .sort((a, b) => b.relevance_score - a.relevance_score)
+      .map(v => ({
+        videoId: v.video_id,
+        title: v.title,
+        description: v.description,
+        thumbnail: v.thumbnail_url,
+        channelTitle: v.channel_title,
+        publishedAt: v.published_at,
+        url: v.url,
+        embedUrl: v.embed_url,
+      }));
+    
+    console.log(`💾 Found cached YouTube query: "${searchQuery}" (${videos.length} videos)`);
+    return { query: queryRecord, videos };
+  } catch (error) {
+    console.error('❌ Error finding cached YouTube query:', error);
+    return null;
+  }
+}
+
+/**
+ * Store YouTube query and videos to database
+ * @param {string} searchQuery - Search query
+ * @param {Array} videos - Array of video objects
+ * @param {Object} context - Optional context (recipeTitle, cookware)
+ * @returns {Promise<void>}
+ */
+async function storeYouTubeQuery(searchQuery, videos, context = {}) {
+  if (!supabase || !videos || videos.length === 0) return;
+  
+  try {
+    const queryHash = hashQuery(searchQuery);
+    const normalizedQuery = normalizeQuery(searchQuery);
+    
+    // Check if query already exists
+    const { data: existingQuery } = await supabase
+      .from('youtube_queries')
+      .select('id')
+      .eq('query_hash', queryHash)
+      .single();
+    
+    let queryId;
+    
+    if (existingQuery) {
+      // Update existing query
+      queryId = existingQuery.id;
+      await supabase
+        .from('youtube_queries')
+        .update({
+          total_results: videos.length,
+          last_used_at: new Date().toISOString()
+        })
+        .eq('id', queryId);
+    } else {
+      // Create new query record
+      const { data: newQuery, error: queryError } = await supabase
+        .from('youtube_queries')
+        .insert({
+          search_query: searchQuery,
+          normalized_query: normalizedQuery,
+          query_hash: queryHash,
+          recipe_title: context.recipeTitle || null,
+          cookware: context.cookware || null,
+          total_results: videos.length,
+          api_quota_used: 100, // search.list costs 100 units
+          last_used_at: new Date().toISOString(),
+          use_count: 0
+        })
+        .select('id')
+        .single();
+      
+      if (queryError) {
+        console.error('❌ Error creating YouTube query record:', queryError);
+        return;
+      }
+      
+      queryId = newQuery.id;
+    }
+    
+    // Store videos (with deduplication)
+    const videoRecords = videos.map((video, index) => ({
+      query_id: queryId,
+      video_id: video.videoId,
+      title: video.title || '',
+      description: video.description || null,
+      thumbnail_url: video.thumbnail || null,
+      channel_title: video.channelTitle || null,
+      channel_id: null, // Not available from search API
+      published_at: video.publishedAt || null,
+      duration: null, // Not available from search API
+      view_count: null, // Not available from search API
+      like_count: null, // Not available from search API
+      url: video.url || `https://www.youtube.com/watch?v=${video.videoId}`,
+      embed_url: video.embedUrl || `https://www.youtube.com/embed/${video.videoId}`,
+      relevance_score: 1.0 - (index * 0.01), // First video = 1.0, second = 0.99, etc.
+      is_active: true,
+      last_verified_at: new Date().toISOString()
+    }));
+    
+    // Use upsert to handle duplicates (video_id is unique)
+    const { error: videoError } = await supabase
+      .from('youtube_videos')
+      .upsert(videoRecords, {
+        onConflict: 'video_id',
+        ignoreDuplicates: false
+      });
+    
+    if (videoError) {
+      console.error('❌ Error storing YouTube videos:', videoError);
+    } else {
+      console.log(`💾 Stored ${videoRecords.length} YouTube videos for query: "${searchQuery}"`);
+    }
+    
+    // Store keywords for similarity matching
+    const keywords = extractKeywords(searchQuery);
+    if (keywords.length > 0) {
+      const keywordRecords = keywords.map(keyword => ({
+        query_id: queryId,
+        keyword: keyword,
+        weight: 1.0
+      }));
+      
+      // Delete old keywords and insert new ones
+      await supabase
+        .from('youtube_query_keywords')
+        .delete()
+        .eq('query_id', queryId);
+      
+      await supabase
+        .from('youtube_query_keywords')
+        .insert(keywordRecords);
+    }
+  } catch (error) {
+    console.error('❌ Error storing YouTube query:', error);
+  }
+}
 
 /**
  * Generate complete Recipe schema with all required fields
@@ -566,7 +866,10 @@ async function getYoutubeDataFromQueries(recipeData, youtubeQueries, optionLabel
         console.log(`🔍 Searching YouTube using query "${searchQuery}" (getting top 1 video, 100 units)${optionLabel ? ` (${optionLabel})` : ''}`);
         
         try {
-          const searchVideos = await searchYouTubeVideosByQuery(searchQuery, 1);
+          const searchVideos = await searchYouTubeVideosByQuery(searchQuery, 1, {
+            recipeTitle: recipeTitle,
+            cookware: cookware
+          });
           if (searchVideos && searchVideos.length > 0) {
             console.log(`✅ Successfully retrieved ${searchVideos.length} video(s) using searchQuery "${searchQuery}"${optionLabel ? ` (${optionLabel})` : ''}`);
             
@@ -880,8 +1183,8 @@ REMINDER: All descriptions must be in English. If you write descriptions in Chin
 /**
  * Search YouTube videos by query and return the first result (for backward compatibility)
  */
-async function searchYouTubeVideoByQuery(searchQuery) {
-  const videos = await searchYouTubeVideosByQuery(searchQuery, 1);
+async function searchYouTubeVideoByQuery(searchQuery, context = {}) {
+  const videos = await searchYouTubeVideosByQuery(searchQuery, 1, context);
   return videos && videos.length > 0 ? videos[0] : null;
 }
 
@@ -891,46 +1194,61 @@ async function searchYouTubeVideoByQuery(searchQuery) {
  * @param {number} maxResults - Maximum number of videos to return (default: 2)
  * @returns {Promise<Array>} Array of video objects
  */
-async function searchYouTubeVideosByQuery(searchQuery, maxResults = 2) {
+async function searchYouTubeVideosByQuery(searchQuery, maxResults = 50, context = {}) {
+  // Step 1: Check cache first
+  const cached = await findCachedYouTubeQuery(searchQuery);
+  if (cached && cached.videos && cached.videos.length > 0) {
+    // Return cached videos (limit to requested maxResults)
+    return cached.videos.slice(0, maxResults);
+  }
+  
+  // Step 2: If not in cache, call YouTube API
   if (!process.env.YOUTUBE_API_KEY) {
+    console.warn('⚠️  YouTube API key not configured, and no cache found');
     return [];
   }
 
-      try {
-        const axios = require('axios');
-    console.log(`🔍 Searching YouTube for: "${searchQuery}" (maxResults: ${maxResults})`);
+  try {
+    const axios = require('axios');
+    console.log(`🔍 Searching YouTube API for: "${searchQuery}" (maxResults: ${maxResults})`);
     
-        const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-          params: {
-            part: 'snippet',
-            q: searchQuery,
-            type: 'video',
-        maxResults: maxResults, // Get top N results
-            key: process.env.YOUTUBE_API_KEY,
-            videoEmbeddable: true,
+    const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+      params: {
+        part: 'snippet',
+        q: searchQuery,
+        type: 'video',
+        maxResults: maxResults, // Get top N results (now 50 by default)
+        key: process.env.YOUTUBE_API_KEY,
+        videoEmbeddable: true,
         order: 'relevance', // Order by relevance (best match for the search query)
         safeSearch: 'moderate', // Moderate safe search for family-friendly content
-          },
+      },
       timeout: 10000,
-        });
+    });
 
     if (!response.data || !response.data.items || response.data.items.length === 0) {
       console.warn(`⚠️  No YouTube videos found for query: "${searchQuery}"`);
       return [];
     }
         
-        const videos = response.data.items.map((item) => ({
-          videoId: item.id.videoId,
-          title: item.snippet.title,
-          description: item.snippet.description,
+    const videos = response.data.items.map((item) => ({
+      videoId: item.id.videoId,
+      title: item.snippet.title,
+      description: item.snippet.description,
       thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
-          channelTitle: item.snippet.channelTitle,
-          publishedAt: item.snippet.publishedAt,
-          url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-          embedUrl: `https://www.youtube.com/embed/${item.id.videoId}`,
-        }));
+      channelTitle: item.snippet.channelTitle,
+      publishedAt: item.snippet.publishedAt,
+      url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+      embedUrl: `https://www.youtube.com/embed/${item.id.videoId}`,
+    }));
         
     console.log(`✅ Found ${videos.length} video(s) for query: "${searchQuery}"`);
+    
+    // Step 3: Store to database (async, don't wait)
+    storeYouTubeQuery(searchQuery, videos, context).catch(err => {
+      console.error('❌ Failed to store YouTube query to cache:', err);
+    });
+    
     return videos;
   } catch (apiError) {
     const errorData = apiError.response?.data;
@@ -1161,7 +1479,10 @@ async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, ski
               console.log(`🔍 Searching YouTube using AI query "${aiRec.searchQuery}" (getting top 1 video, 100 units)`);
               
               try {
-                const searchVideos = await searchYouTubeVideosByQuery(aiRec.searchQuery, 1);
+                const searchVideos = await searchYouTubeVideosByQuery(aiRec.searchQuery, 1, {
+                  recipeTitle: recipeTitle,
+                  cookware: cookware
+                });
                 if (searchVideos && searchVideos.length > 0) {
                   console.log(`✅ Successfully retrieved ${searchVideos.length} video(s) using searchQuery "${aiRec.searchQuery}" (100 units cost)`);
                   
@@ -1313,7 +1634,10 @@ async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, ski
           try {
             console.log(`🔍 Attempting basic YouTube search as fallback for: "${recipeTitle}"`);
             const basicSearchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : `${recipeTitle} recipe`;
-            const fallbackVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3);
+            const fallbackVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3, {
+              recipeTitle: recipeTitle,
+              cookware: cookware
+            });
             if (fallbackVideos && fallbackVideos.length > 0) {
               console.log(`✅ Basic search found ${fallbackVideos.length} video(s) as fallback`);
               const result = {
@@ -1344,7 +1668,10 @@ async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, ski
         if (process.env.YOUTUBE_API_KEY) {
           try {
             const basicSearchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : `${recipeTitle} recipe`;
-            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3);
+            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3, {
+              recipeTitle: recipeTitle,
+              cookware: cookware
+            });
             if (basicVideos && basicVideos.length > 0) {
               console.log(`✅ Basic search found ${basicVideos.length} video(s)`);
               const result = {
@@ -1364,7 +1691,10 @@ async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, ski
         if (process.env.YOUTUBE_API_KEY) {
           try {
             const basicSearchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : `${recipeTitle} recipe`;
-            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3);
+            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3, {
+              recipeTitle: recipeTitle,
+              cookware: cookware
+            });
             if (basicVideos && basicVideos.length > 0) {
               console.log(`✅ Basic search found ${basicVideos.length} video(s)`);
               const result = {
@@ -1384,7 +1714,10 @@ async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, ski
         if (process.env.YOUTUBE_API_KEY) {
           try {
             const basicSearchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : `${recipeTitle} recipe`;
-            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3);
+            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3, {
+              recipeTitle: recipeTitle,
+              cookware: cookware
+            });
             if (basicVideos && basicVideos.length > 0) {
               console.log(`✅ Basic search found ${basicVideos.length} video(s)`);
               const result = {
@@ -1404,7 +1737,10 @@ async function searchYouTubeVideos(recipeTitle, cookware, recipeData = null, ski
         if (process.env.YOUTUBE_API_KEY) {
           try {
             const basicSearchQuery = cookware ? `${recipeTitle} ${cookware} recipe` : `${recipeTitle} recipe`;
-            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3);
+            const basicVideos = await searchYouTubeVideosByQuery(basicSearchQuery, 3, {
+              recipeTitle: recipeTitle,
+              cookware: cookware
+            });
             if (basicVideos && basicVideos.length > 0) {
               console.log(`✅ Basic search found ${basicVideos.length} video(s)`);
               const result = {
@@ -2671,6 +3007,11 @@ RECIPE STRUCTURE:
 6. SERVINGS: ${servings ? servings : 'Realistic serving sizes'}
 
 7. COOKWARE: "${cookware}" (REQUIRED for all recipes)
+   - CRITICAL: You MUST use ONLY "${cookware}" for ALL recipes
+   - DO NOT mention or use any other cookware (e.g., if cookware is "Air Fryer", do NOT mention "oven", "stovetop", "pan", "pot", etc.)
+   - ALL cooking instructions must use ONLY "${cookware}"
+   - Recipe titles should reflect the cookware when appropriate (e.g., "Air Fryer Crispy Chicken")
+   - Descriptions and instructions must ONLY reference "${cookware}", never other cookware types
 
 8. TAGS: Cookware, cuisine type, meal type, dietary notes, cooking method
 
@@ -2702,9 +3043,11 @@ RULES:
    - AVOID generic terms: "Supper", "Feast", "Showcase", "Dish", "Meal"
 5. DESCRIPTIONS: "Perfect for: ..." + what makes it special (flavor, texture, occasion)
 6. RESPECT ALL USER CONSTRAINTS: cookware, time, servings, cuisine, dietary restrictions
+   - COOKWARE CONSTRAINT IS CRITICAL: Use ONLY the specified cookware "${cookware}" - NEVER mention other cookware types
 7. Use each input ingredient at least once across 3 recipes
 8. SPECIFIC quantities (US units), prep notes in parentheses, substitutions, serving suggestions
-9. DETAILED INSTRUCTIONS: Clear steps with specific times, temperatures, and techniques`;
+9. DETAILED INSTRUCTIONS: Clear steps with specific times, temperatures, and techniques
+   - ALL instructions must use ONLY "${cookware}" - do NOT reference other cookware`;
 
     console.log(`🤖 Using model for recipe generation: ${modelForRecipeGeneration}`);
     if (modelForRecipeGeneration === 'gpt-4o-mini') {
@@ -2793,6 +3136,23 @@ RULES:
         // Force user requirements to be satisfied
         cookware: cookware, // Always use user-specified cookware
       };
+      
+      // Sanitize cookware references in title, description, and instructions
+      if (generatedRecipe.title) {
+        generatedRecipe.title = sanitizeCookwareReferences(generatedRecipe.title, cookware);
+      }
+      if (generatedRecipe.description) {
+        generatedRecipe.description = sanitizeCookwareReferences(generatedRecipe.description, cookware);
+      }
+      if (Array.isArray(generatedRecipe.instructions)) {
+        generatedRecipe.instructions = generatedRecipe.instructions.map(inst => ({
+          ...inst,
+          description: sanitizeCookwareReferences(
+            typeof inst === 'string' ? inst : (inst.description || inst.step || ''),
+            cookware
+          )
+        }));
+      }
 
       // Force servings if user specified
       if (servings) {

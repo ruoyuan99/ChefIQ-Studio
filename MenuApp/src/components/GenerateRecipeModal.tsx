@@ -24,12 +24,7 @@ const DIETARY_RESTRICTIONS = [
   'Vegan',
   'Gluten-Free',
   'Dairy-Free',
-  'Nut-Free',
   'Keto',
-  'Paleo',
-  'Low-Carb',
-  'Low-Sodium',
-  'Halal',
   'Kosher',
 ];
 
@@ -54,17 +49,14 @@ const CUISINES = [
 const SERVINGS_OPTIONS = ['2', '4', '6', '8', '10+'];
 
 const COOKWARE_OPTIONS = [
-  'Oven',
-  'Microwave',
+  'Stovetop – Pan or Pot',
   'Air Fryer',
-  'Rice Cooker',
-  'Stovetop',
+  'Oven',
+  'Pizza Oven',
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',
-  'Blender',
-  'Food Processor',
-  'None',
+  'Wok',
 ];
 
 const GenerateRecipeModal: React.FC<GenerateRecipeModalProps> = ({
@@ -154,7 +146,7 @@ const GenerateRecipeModal: React.FC<GenerateRecipeModalProps> = ({
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Generate Recipe from Ingredients</Text>
+            <Text style={styles.title}>Generate from Ingredients</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -410,7 +402,7 @@ const styles = StyleSheet.create({
   ingredientTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
