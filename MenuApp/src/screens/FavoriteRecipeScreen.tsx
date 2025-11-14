@@ -92,65 +92,67 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
   const { isTried } = useTried();
 
   const renderFavoriteCard = (recipe: any) => (
-    <TouchableOpacity
-      key={recipe.id}
-      style={styles.favoriteCard}
-      onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
-    >
-      <OptimizedImage
-        source={recipe.image_url || recipe.imageUri || recipe.image}
-        style={styles.favoriteImage}
-        contentFit="cover"
-        showLoader={true}
-        cachePolicy="memory-disk"
-        priority="normal"
-      />
-      <View style={styles.favoriteContent}>
-        <View style={styles.favoriteInfo}>
-          <Text style={styles.favoriteTitle}>{recipe.title}</Text>
-          <Text style={styles.favoriteDescription}>{recipe.description}</Text>
-          <View style={styles.favoriteTags}>
-            {recipe.tags.slice(0, 3).map((tag: string, index: number) => (
-              <View key={index} style={styles.favoriteTag}>
-                <Text style={styles.favoriteTagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={styles.favoriteStats}>
-            <View style={styles.favoriteStat}>
-              <Ionicons name="time-outline" size={14} color="#666" />
-              <Text style={styles.favoriteStatText}>{recipe.cookingTime}</Text>
+    <View key={recipe.id} style={styles.favoriteCardWrapper}>
+      <TouchableOpacity
+        style={styles.favoriteCard}
+        onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
+        activeOpacity={0.9}
+      >
+        <OptimizedImage
+          source={recipe.image_url || recipe.imageUri || recipe.image}
+          style={styles.favoriteImage}
+          contentFit="cover"
+          showLoader={true}
+          cachePolicy="memory-disk"
+          priority="normal"
+        />
+        <View style={styles.favoriteContent}>
+          <View style={styles.favoriteInfo}>
+            <Text style={styles.favoriteTitle}>{recipe.title}</Text>
+            <Text style={styles.favoriteDescription}>{recipe.description}</Text>
+            <View style={styles.favoriteTags}>
+              {recipe.tags.slice(0, 3).map((tag: string, index: number) => (
+                <View key={index} style={styles.favoriteTag}>
+                  <Text style={styles.favoriteTagText}>{tag}</Text>
+                </View>
+              ))}
             </View>
-            {recipe.cookware && (
+            <View style={styles.favoriteStats}>
               <View style={styles.favoriteStat}>
-                <Ionicons name="restaurant-outline" size={14} color="#666" />
-                <Text style={styles.favoriteStatText}>{recipe.cookware}</Text>
+                <Ionicons name="time-outline" size={14} color="#666" />
+                <Text style={styles.favoriteStatText}>{recipe.cookingTime}</Text>
               </View>
-            )}
-          </View>
-          
-          {/* Social Stats */}
-          <View style={styles.favoriteSocialStats}>
-            <View style={styles.socialStatItem}>
-              <Ionicons name="heart" size={12} color="#FF6B35" />
-              <Text style={styles.socialStatText}>{isLiked(recipe.id) ? Math.max(2, getStats(recipe.id).likes) : getStats(recipe.id).likes}</Text>
+              {recipe.cookware && (
+                <View style={styles.favoriteStat}>
+                  <Ionicons name="restaurant-outline" size={14} color="#666" />
+                  <Text style={styles.favoriteStatText}>{recipe.cookware}</Text>
+                </View>
+              )}
             </View>
-            <View style={styles.socialStatItem}>
-              <Ionicons name="bookmark" size={12} color="#FF6B35" />
-              <Text style={styles.socialStatText}>{Math.max(2, getStats(recipe.id).favorites)}</Text>
-            </View>
-            <View style={styles.socialStatItem}>
-              <Ionicons name="eye" size={12} color="#FF6B35" />
-              <Text style={styles.socialStatText}>{getStats(recipe.id).views}</Text>
-            </View>
-            <View style={styles.socialStatItem}>
-              <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
-              <Text style={styles.socialStatText}>{isTried(recipe.id) ? Math.max(2, getStats(recipe.id).tried) : getStats(recipe.id).tried}</Text>
+            
+            {/* Social Stats */}
+            <View style={styles.favoriteSocialStats}>
+              <View style={styles.socialStatItem}>
+                <Ionicons name="heart" size={12} color="#FF6B35" />
+                <Text style={styles.socialStatText}>{isLiked(recipe.id) ? Math.max(2, getStats(recipe.id).likes) : getStats(recipe.id).likes}</Text>
+              </View>
+              <View style={styles.socialStatItem}>
+                <Ionicons name="bookmark" size={12} color="#FF6B35" />
+                <Text style={styles.socialStatText}>{Math.max(2, getStats(recipe.id).favorites)}</Text>
+              </View>
+              <View style={styles.socialStatItem}>
+                <Ionicons name="eye" size={12} color="#FF6B35" />
+                <Text style={styles.socialStatText}>{getStats(recipe.id).views}</Text>
+              </View>
+              <View style={styles.socialStatItem}>
+                <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+                <Text style={styles.socialStatText}>{isTried(recipe.id) ? Math.max(2, getStats(recipe.id).tried) : getStats(recipe.id).tried}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 
   const handleCreateRecipe = async () => {
@@ -338,17 +340,17 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
+  favoriteCardWrapper: {
+    marginBottom: 16,
+    shadowColor: '#A0A0A0',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 10,
+  },
   favoriteCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#000',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
     overflow: 'hidden',
   },
   favoriteImage: {
@@ -369,10 +371,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   favoriteDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     lineHeight: 20,
     marginBottom: 12,
+    textAlign: 'justify',
   },
   favoriteTags: {
     flexDirection: 'row',

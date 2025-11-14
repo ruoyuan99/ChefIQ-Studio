@@ -253,11 +253,11 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   };
 
   const renderRecipeCard = (recipe: any) => (
-    <TouchableOpacity
-      key={recipe.id}
-      style={styles.recipeCard}
-      onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
-    >
+    <View key={recipe.id} style={styles.recipeCardWrapper}>
+      <TouchableOpacity
+        style={styles.recipeCard}
+        onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
+      >
       <OptimizedImage
         source={recipe.image_url || recipe.imageUri || recipe.image}
         style={styles.recipeImage}
@@ -305,38 +305,33 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           </View>
         </View>
         
-        <View style={styles.recipeTags}>
-          {recipe.tags.slice(0, 3).map((tag: string, index: number) => (
-            <View key={index} style={styles.recipeTag}>
-              <Text style={styles.recipeTagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
       </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
+
+  const DEFAULT_HEADER_HEIGHT = (Platform.OS === 'ios' ? 8 : (StatusBar.currentHeight || 24)) + 6 + 8 + 40 + 32;
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
+
+      <View
+        style={styles.fixedHeaderContainer}
+        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Explore Recipes</Text>
-          <Text style={styles.headerSubtitle}>Discover amazing recipes from our community</Text>
         </View>
 
-        {/* Search, Sort, Filter Container */}
         <View style={styles.searchContainer}>
           <View style={styles.searchRow}>
             <View style={styles.searchInput}>
-              <Ionicons name="search" size={20} color="#666" />
+              <Ionicons name="search" size={18} color="#666" />
               <TextInput
                 style={styles.searchTextInput}
-                placeholder="Search recipes, ingredients, or tags..."
+                placeholder="Search recipes..."
                 placeholderTextColor="#999"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -348,7 +343,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             >
               <Ionicons 
                 name="filter" 
-                size={20} 
+                size={18} 
                 color={hasActiveFilters ? "#fff" : "#d96709"} 
               />
               {hasActiveFilters && (
@@ -368,14 +363,22 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             >
               <Ionicons 
                 name={sortBy === 'recommend' ? 'heart' : 'swap-vertical'} 
-                size={20} 
+                size={18} 
                 color={(sortBy !== 'relevance') ? "#fff" : "#d96709"} 
               />
             </TouchableOpacity>
           </View>
         </View>
+      </View>
 
-      {showFilters && (
+      <ScrollView 
+        style={styles.contentScroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: (headerHeight || DEFAULT_HEADER_HEIGHT) + 8 },
+        ]}
+      >
+        {showFilters && (
         <View style={styles.filtersPanel}>
           <ScrollView style={styles.filtersScroll} showsVerticalScrollIndicator={false}>
             {/* 烹饪时间筛选 */}
@@ -632,26 +635,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
   },
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight || 24) + 8,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+  fixedHeaderContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    zIndex: 10,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  header: {
+    paddingTop: Platform.OS === 'ios' ? 8 : (StatusBar.currentHeight || 24),
+    paddingHorizontal: 20,
+    paddingBottom: 6,
+    backgroundColor: 'white',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
   },
   searchContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -667,7 +679,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     marginRight: 12,
   },
   searchTextInput: {
@@ -677,14 +689,14 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   filterButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#d96709',
-    borderRadius: 12,
+    borderRadius: 10,
     position: 'relative',
     marginRight: 12,
   },
@@ -712,14 +724,14 @@ const styles = StyleSheet.create({
     color: '#d96709',
   },
   sortButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#d96709',
-    borderRadius: 12,
+    borderRadius: 10,
   },
   sortButtonActive: {
     backgroundColor: '#d96709',
@@ -860,9 +872,11 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 8,
   },
+  contentScroll: {
+    flex: 1,
+  },
   scrollContent: {
-    padding: 16,
-    paddingTop: 16, // 搜索和筛选区域已在外部，只需正常padding
+    paddingHorizontal: 16,
     paddingBottom: 100, // 为底部标签栏留出空间
   },
   recipesGrid: {
@@ -870,16 +884,19 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  recipeCard: {
+  recipeCardWrapper: {
     width: '48%',
+    marginBottom: 16,
+    shadowColor: '#A0A0A0',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  recipeCard: {
+    width: '100%',
     backgroundColor: 'white',
     borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     overflow: 'hidden',
   },
   recipeImage: {
@@ -894,7 +911,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   recipeTitle: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '600',
     color: '#333',
     marginBottom: 4,
@@ -927,6 +944,7 @@ const styles = StyleSheet.create({
   recipeTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginTop: 8,
   },
   recipeTag: {
     backgroundColor: '#FFF3E0',
@@ -937,7 +955,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   recipeTagText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#FF6B35',
     fontWeight: '500',
   },

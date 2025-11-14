@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Recipe, MenuItem } from '../types';
 import { AutoSyncService } from '../services/autoSyncService';
@@ -82,9 +82,19 @@ const RecipeContext = createContext<RecipeContextType | undefined>(undefined);
 export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(recipeReducer, initialState);
   const { user } = useAuth();
+  const previousUserIdRef = useRef<string | null>(null);
 
   // 自动同步数据到Supabase
   useEffect(() => {
+    if (user?.id && previousUserIdRef.current !== user.id) {
+      AsyncStorage.removeItem('recipes').catch(console.error);
+      dispatch({ type: 'SET_RECIPES', payload: [] });
+    }
+    if (!user && previousUserIdRef.current) {
+      dispatch({ type: 'SET_RECIPES', payload: [] });
+    }
+    previousUserIdRef.current = user?.id || null;
+
     const autoSync = async () => {
       if (user) {
         try {

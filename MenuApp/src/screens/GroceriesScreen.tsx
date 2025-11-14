@@ -205,17 +205,19 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
             />
             <View style={styles.categoryInfo}>
               <Text style={styles.categoryTitle}>{category.title}</Text>
-              <Text style={styles.categorySubtitle}>
-                {category.completedCount}/{category.totalCount} completed
-              </Text>
             </View>
           </View>
           <View style={styles.categoryHeaderRight}>
             {progress === 1 && (
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.categoryCheckIcon} />
             )}
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
+            <View style={styles.progressSection}>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {category.completedCount}/{category.totalCount} completed
+              </Text>
             </View>
             <TouchableOpacity
               style={styles.removeCategoryButton}
@@ -242,12 +244,12 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Groceries</Text>
-        <Text style={styles.headerSubtitle}>Your shopping list</Text>
         {state.items.length > 0 && (
-          <TouchableOpacity style={styles.clearButton} onPress={handleClearCompleted}>
-            <Ionicons name="trash-outline" size={16} color="#F44336" />
-            <Text style={styles.clearButtonText}>Clear Completed</Text>
-          </TouchableOpacity>
+          <View style={styles.clearButtonWrapper}>
+            <TouchableOpacity style={styles.clearButton} onPress={handleClearCompleted}>
+              <Ionicons name="trash-outline" size={20} color="#F44336" />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -497,16 +499,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight || 24) + 8,
     paddingBottom: 12,
+    alignItems: 'center',
+    position: 'relative',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
   },
   addItemContainer: {
     padding: 16,
@@ -767,14 +766,19 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 2,
   },
-  categorySubtitle: {
-    fontSize: 12,
+  progressText: {
+    fontSize: 11,
     color: '#666',
+    marginTop: 4,
+    textAlign: 'right',
   },
   categoryHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  progressSection: {
+    alignItems: 'flex-end',
   },
   categoryCheckIcon: {
     marginRight: 4,
@@ -845,17 +849,19 @@ const styles = StyleSheet.create({
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
     padding: 8,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    backgroundColor: '#fef2f2',
+    borderRadius: 20,
+    shadowColor: '#F44336',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  clearButtonText: {
-    color: '#F44336',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
+  clearButtonWrapper: {
+    position: 'absolute',
+    right: 20,
+    bottom: 12,
   },
   emptyContainer: {
     alignItems: 'center',

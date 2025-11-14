@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import { Alert } from 'react-native';
 
 export interface GroceryItem {
   id: string;
@@ -99,6 +100,11 @@ export const GroceriesProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [state, dispatch] = useReducer(groceriesReducer, initialState);
 
   const addItemsToGroceries = (recipeId: string, recipeTitle: string, ingredients: Array<{ name: string; amount: string; unit: string }>) => {
+    const alreadyAdded = state.items.some(item => item.recipeId === recipeId);
+    if (alreadyAdded) {
+      Alert.alert('Already Added', `"${recipeTitle}" is already in your groceries list.`);
+      return;
+    }
     dispatch({ type: 'ADD_ITEMS', payload: { recipeId, recipeTitle, ingredients } });
   };
 

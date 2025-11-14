@@ -1,4 +1,4 @@
-import React, { createContext, useReducer, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useReducer, useContext, ReactNode, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../config/supabase';
 import { useAuth } from './AuthContext';
@@ -123,6 +123,18 @@ const PointsContext = createContext<PointsContextType | undefined>(undefined);
 export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(pointsReducer, initialState);
   const { user } = useAuth();
+  const previousUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (user?.id && previousUserIdRef.current !== user.id) {
+      dispatch({ type: 'RESET_POINTS' });
+      AsyncStorage.removeItem('userPoints').catch(console.error);
+    }
+    if (!user && previousUserIdRef.current) {
+      dispatch({ type: 'RESET_POINTS' });
+    }
+    previousUserIdRef.current = user?.id || null;
+  }, [user?.id]);
 
   // Load points data from Supabase
   useEffect(() => {
