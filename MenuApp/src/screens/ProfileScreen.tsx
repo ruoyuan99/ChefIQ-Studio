@@ -90,6 +90,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       onPress: () => navigation.navigate('FavoriteRecipe'),
     },
     {
+      title: 'Generate from Ingredients',
+      icon: 'sparkles-outline',
+      onPress: () => navigation.navigate('GenerateRecipe'),
+    },
+    {
       title: 'Settings',
       icon: 'settings-outline',
       onPress: () => {
@@ -164,17 +169,18 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <Ionicons name="create-outline" size={16} color={Colors.primary} />
             <Text style={Buttons.secondary.text}>Edit Profile</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Stats Section */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>Your Stats</Text>
+          
+          {/* Stats Grid */}
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => navigation.navigate('RecipeList')}
+              activeOpacity={0.7}
+            >
               <Ionicons name="restaurant" size={18} color="#FF6B35" style={styles.statIcon} />
               <Text style={styles.statNumber}>{userStats.totalRecipes}</Text>
               <Text style={styles.statLabel}>My Recipes</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statCard}>
               <Ionicons name="globe" size={18} color="#FF6B35" style={styles.statIcon} />
               <Text style={styles.statNumber}>{userStats.publicRecipes}</Text>
@@ -311,6 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     alignItems: 'center',
     paddingVertical: 32,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -419,6 +426,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginTop: 24,
+    width: '100%',
   },
   statCard: {
     width: '31%',

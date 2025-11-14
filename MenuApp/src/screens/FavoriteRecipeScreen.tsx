@@ -29,37 +29,8 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
   const { user } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const hasCheckedRef = useRef<boolean>(false);
-  const cleanedUpRef = useRef<boolean>(false);
 
-  // 清理旧的登录会话记录（一次性清理，只在用户ID变化时执行）
-  useEffect(() => {
-    const cleanupOldSessionKeys = async () => {
-      if (!user?.id || cleanedUpRef.current) {
-        return;
-      }
-
-      try {
-        const keys = await AsyncStorage.getAllKeys();
-        const oldSessionKeys = keys.filter(key => 
-          key === `loginSession_${user.id}` || 
-          (key.startsWith(`modalShown_session_`) && key.includes(user.id))
-        );
-        if (oldSessionKeys.length > 0) {
-          await AsyncStorage.multiRemove(oldSessionKeys);
-          console.log('🧹 Cleaned up old session keys:', oldSessionKeys.length);
-        }
-        cleanedUpRef.current = true;
-      } catch (error) {
-        console.log('Cleanup old session keys:', error);
-      }
-    };
-
-    // 当用户ID变化时，重置清理状态并执行清理
-    cleanedUpRef.current = false;
-    cleanupOldSessionKeys();
-  }, [user?.id]);
-
-  // 检查并显示弹窗（基于日期）- 每天第一次登录时显示
+  // 检查并显示弹窗（基于登录会话）- 每次登录时显示一次
   useEffect(() => {
     const checkAndShowModal = async () => {
       // 如果没有用户，不显示弹窗
@@ -75,28 +46,35 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
       }
 
       try {
-        // 获取今天的日期键（格式：YYYY-M-D）
-        const today = new Date();
-        const todayKey = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-        
-        // 获取用户最后登录日期
-        const lastLoginDateKey = `lastLoginDate_${user.id}`;
-        const lastLoginDate = await AsyncStorage.getItem(lastLoginDateKey);
+        // 获取或创建当前登录会话键
+        const loginSessionKey = `loginSession_${user.id}`;
+        let sessionId = await AsyncStorage.getItem(loginSessionKey);
 
-        // 如果今天还没有登录过，显示弹窗
-        if (lastLoginDate !== todayKey) {
-          console.log('🆕 First login of the day detected, showing create recipe modal');
+        // 如果不存在会话ID，说明是新登录，创建新的会话ID
+        if (!sessionId) {
+          sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          await AsyncStorage.setItem(loginSessionKey, sessionId);
+          console.log('🆕 New login session detected:', sessionId);
+        }
+
+        // 检查当前会话是否已经显示过弹窗
+        const modalShownKey = `modalShown_${sessionId}`;
+        const modalShown = await AsyncStorage.getItem(modalShownKey);
+
+        // 如果当前会话还没有显示过弹窗，显示弹窗
+        if (!modalShown) {
+          console.log('🆕 First time in this login session, showing create recipe modal');
           setShowCreateModal(true);
-          // 更新最后登录日期
-          await AsyncStorage.setItem(lastLoginDateKey, todayKey);
+          // 标记当前会话已显示过弹窗
+          await AsyncStorage.setItem(modalShownKey, 'true');
         } else {
-          console.log('✅ Already logged in today, not showing modal');
+          console.log('✅ Modal already shown in this session, not showing again');
           setShowCreateModal(false);
         }
         
         hasCheckedRef.current = true;
       } catch (error) {
-        console.error('Error checking daily login status:', error);
+        console.error('Error checking login session status:', error);
         // 如果出错，默认不显示弹窗（避免重复）
         setShowCreateModal(false);
         hasCheckedRef.current = true;
@@ -363,12 +341,14 @@ const styles = StyleSheet.create({
   favoriteCard: {
     backgroundColor: 'white',
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#000',
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
     overflow: 'hidden',
   },
   favoriteImage: {

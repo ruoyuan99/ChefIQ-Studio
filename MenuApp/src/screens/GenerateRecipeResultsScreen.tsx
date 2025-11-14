@@ -366,7 +366,9 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                       <View style={styles.youtubeVideoInfo}>
                         <Text style={styles.youtubeVideoTitle}>{video.title}</Text>
                         {video.description && (
-                          <Text style={styles.youtubeDescription}>{video.description}</Text>
+                          <Text style={styles.youtubeDescription} numberOfLines={3} ellipsizeMode="tail">
+                            {video.description}
+                          </Text>
                         )}
                       </View>
                     </TouchableOpacity>

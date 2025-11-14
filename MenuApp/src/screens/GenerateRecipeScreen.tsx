@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 24),
+    paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 40),
     paddingHorizontal: 20,
     paddingBottom: 20,
     backgroundColor: 'white',
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 24,
+    paddingTop: 32,
     paddingBottom: 100,
   },
   section: {

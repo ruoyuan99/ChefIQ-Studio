@@ -319,55 +319,61 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explore Recipes</Text>
-        <Text style={styles.headerSubtitle}>Discover amazing recipes from our community</Text>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <View style={styles.searchRow}>
-          <View style={styles.searchInput}>
-            <Ionicons name="search" size={20} color="#666" />
-            <TextInput
-              style={styles.searchTextInput}
-              placeholder="Search recipes, ingredients, or tags..."
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-          <TouchableOpacity
-            style={[styles.filterButton, hasActiveFilters && styles.filterButtonActive]}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Ionicons 
-              name="filter" 
-              size={20} 
-              color={hasActiveFilters ? "#fff" : "#d96709"} 
-            />
-            {hasActiveFilters && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>
-                  {[filters.cookingTime, filters.servings, filters.cookware, filters.category].filter(Boolean).length + filters.selectedTags.length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.sortButton, 
-              (sortBy !== 'relevance') && styles.sortButtonActive
-            ]}
-            onPress={() => setShowSortOptions(true)}
-          >
-            <Ionicons 
-              name={sortBy === 'recommend' ? 'heart' : 'swap-vertical'} 
-              size={20} 
-              color={(sortBy !== 'relevance') ? "#fff" : "#d96709"} 
-            />
-          </TouchableOpacity>
+      
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Explore Recipes</Text>
+          <Text style={styles.headerSubtitle}>Discover amazing recipes from our community</Text>
         </View>
-      </View>
+
+        {/* Search, Sort, Filter Container */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchInput}>
+              <Ionicons name="search" size={20} color="#666" />
+              <TextInput
+                style={styles.searchTextInput}
+                placeholder="Search recipes, ingredients, or tags..."
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.filterButton, hasActiveFilters && styles.filterButtonActive]}
+              onPress={() => setShowFilters(!showFilters)}
+            >
+              <Ionicons 
+                name="filter" 
+                size={20} 
+                color={hasActiveFilters ? "#fff" : "#d96709"} 
+              />
+              {hasActiveFilters && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>
+                    {[filters.cookingTime, filters.servings, filters.cookware, filters.category].filter(Boolean).length + filters.selectedTags.length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.sortButton, 
+                (sortBy !== 'relevance') && styles.sortButtonActive
+              ]}
+              onPress={() => setShowSortOptions(true)}
+            >
+              <Ionicons 
+                name={sortBy === 'recommend' ? 'heart' : 'swap-vertical'} 
+                size={20} 
+                color={(sortBy !== 'relevance') ? "#fff" : "#d96709"} 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
       {showFilters && (
         <View style={styles.filtersPanel}>
@@ -584,9 +590,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
       </Modal>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-      >
         {filteredRecipes.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="search-outline" size={64} color="#ccc" />
@@ -628,20 +631,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-    paddingBottom: 100, // 增加底部流白空间
   },
   header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 24),
+    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight || 24) + 8,
     paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    zIndex: 1000,
   },
   headerTitle: {
     fontSize: 24,
@@ -658,7 +655,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    marginTop: Platform.OS === 'ios' ? 120 : (StatusBar.currentHeight || 24) + 96, // 为header留出空间
   },
   searchRow: {
     flexDirection: 'row',
@@ -867,6 +863,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingTop: 16, // 搜索和筛选区域已在外部，只需正常padding
+    paddingBottom: 100, // 为底部标签栏留出空间
   },
   recipesGrid: {
     flexDirection: 'row',

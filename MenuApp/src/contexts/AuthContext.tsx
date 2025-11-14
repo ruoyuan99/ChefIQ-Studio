@@ -77,18 +77,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setUser(null);
             await AsyncStorage.removeItem('user');
             
-            // Clear old login session data (cleanup legacy keys)
+            // Clear old login session data
             if (currentUser?.id) {
               try {
                 const keys = await AsyncStorage.getAllKeys();
-                // Remove old session-based keys
+                // Remove session-based keys
                 const loginSessionKey = `loginSession_${currentUser.id}`;
+                const sessionId = await AsyncStorage.getItem(loginSessionKey);
+                
+                const keysToRemove: string[] = [loginSessionKey];
+                if (sessionId) {
+                  keysToRemove.push(`modalShown_${sessionId}`);
+                }
+                
+                // Also remove any old modalShown_session_ keys (legacy format)
                 const oldSessionKeys = keys.filter(key => 
-                  key === loginSessionKey || 
-                  (key.startsWith(`modalShown_session_`) && key.includes(currentUser.id))
+                  key.startsWith(`modalShown_session_`) && key.includes(currentUser.id)
                 );
-                if (oldSessionKeys.length > 0) {
-                  await AsyncStorage.multiRemove(oldSessionKeys);
+                keysToRemove.push(...oldSessionKeys);
+                
+                if (keysToRemove.length > 0) {
+                  await AsyncStorage.multiRemove(keysToRemove);
                 }
               } catch (error) {
                 // Ignore cleanup errors
@@ -340,24 +349,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       await AsyncStorage.removeItem('user');
       
-      // Clear old login session data (cleanup legacy keys)
-      if (currentUser?.id) {
-        try {
-          const keys = await AsyncStorage.getAllKeys();
-          // Remove old session-based keys
-          const loginSessionKey = `loginSession_${currentUser.id}`;
-          const oldSessionKeys = keys.filter(key => 
-            key === loginSessionKey || 
-            (key.startsWith(`modalShown_session_`) && key.includes(currentUser.id))
-          );
-          if (oldSessionKeys.length > 0) {
-            await AsyncStorage.multiRemove(oldSessionKeys);
+        // Clear login session data
+        if (currentUser?.id) {
+          try {
+            const keys = await AsyncStorage.getAllKeys();
+            // Remove session-based keys
+            const loginSessionKey = `loginSession_${currentUser.id}`;
+            const sessionId = await AsyncStorage.getItem(loginSessionKey);
+            
+            const keysToRemove: string[] = [loginSessionKey];
+            if (sessionId) {
+              keysToRemove.push(`modalShown_${sessionId}`);
+            }
+            
+            // Also remove any old modalShown_session_ keys (legacy format)
+            const oldSessionKeys = keys.filter(key => 
+              key.startsWith(`modalShown_session_`) && key.includes(currentUser.id)
+            );
+            keysToRemove.push(...oldSessionKeys);
+            
+            if (keysToRemove.length > 0) {
+              await AsyncStorage.multiRemove(keysToRemove);
+            }
+          } catch (error) {
+            // Ignore cleanup errors
+            console.log('Cleanup old session keys:', error);
           }
-        } catch (error) {
-          // Ignore cleanup errors
-          console.log('Cleanup old session keys:', error);
         }
-      }
     } catch (error) {
       console.error('Sign out failed:', error);
     } finally {

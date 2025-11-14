@@ -33,7 +33,7 @@ const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Splash"
+        initialRouteName="Login"
         screenOptions={{
           headerStyle: {
             backgroundColor: 'white',
@@ -53,6 +53,7 @@ const AppNavigator: React.FC = () => {
           component={SplashScreen}
           options={{
             headerShown: false,
+            animationEnabled: false,
           }}
         />
         <Stack.Screen
@@ -60,6 +61,12 @@ const AppNavigator: React.FC = () => {
           component={LoginScreen}
           options={{
             headerShown: false,
+            animationEnabled: false,
+            animationTypeForReplace: 'push',
+            transitionSpec: {
+              open: { animation: 'timing', config: { duration: 0 } },
+              close: { animation: 'timing', config: { duration: 0 } },
+            },
           }}
         />
         {/** Register screen removed for competition build */}
@@ -177,8 +184,7 @@ const AppNavigator: React.FC = () => {
           name="EditProfile"
           component={EditProfileScreen}
           options={{
-            title: 'Edit Profile',
-            headerBackTitle: 'Back',
+            headerShown: false,
           }}
         />
         <Stack.Screen

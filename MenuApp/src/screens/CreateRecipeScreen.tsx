@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ScrollView,
   SafeAreaView,
   Alert,
@@ -138,6 +139,59 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   const [showImportModal, setShowImportModal] = useState(showImportOnMount);
   const scrollViewRef = useRef<ScrollView>(null);
   
+  // Calculate section completion status - use useMemo to ensure reactivity
+  const sectionCompletion = React.useMemo(() => ({
+    info: (): boolean => {
+      // Info section: Recipe Photo + Recipe Title
+      const hasPhoto = !!recipeData.imageUri;
+      const hasTitle = recipeData.title && recipeData.title.trim().length > 0;
+      return hasPhoto && hasTitle;
+    },
+    details: (): boolean => {
+      // Details section: Cooking Time + Servings + Main Cookware (all required)
+      const hasCookingTime = recipeData.cookingTime && String(recipeData.cookingTime).trim().length > 0;
+      const hasServings = recipeData.servings && (
+        Array.isArray(recipeData.servings) 
+          ? recipeData.servings.length > 0 
+          : String(recipeData.servings).trim().length > 0
+      );
+      const hasCookware = recipeData.cookware && recipeData.cookware.trim().length > 0;
+      const isComplete = hasCookingTime && hasServings && hasCookware;
+      return isComplete;
+    },
+    ingredients: (): boolean => {
+      // Ingredients section: at least one ingredient required
+      // Check both recipeData.ingredients and ingredients state to ensure sync
+      const recipeIngredients = recipeData.ingredients || [];
+      const stateIngredients = ingredients || [];
+      const hasIngredients = (recipeIngredients.length > 0) || (stateIngredients.length > 0);
+      return hasIngredients;
+    },
+    instructions: (): boolean => {
+      // Instructions section: at least one instruction required
+      // Check both recipeData.instructions and instructions state to ensure sync
+      const recipeInstructions = recipeData.instructions || [];
+      const stateInstructions = instructions || [];
+      const hasInstructions = (recipeInstructions.length > 0) || (stateInstructions.length > 0);
+      return hasInstructions;
+    },
+  }), [recipeData, ingredients, instructions]);
+  
+  // Calculate overall progress percentage - use useMemo to ensure reactivity
+  const { completedSections, progressPercentage } = React.useMemo(() => {
+    const completed = [
+      sectionCompletion.info(),
+      sectionCompletion.details(),
+      sectionCompletion.ingredients(),
+      sectionCompletion.instructions(),
+    ].filter(Boolean).length;
+    
+    return {
+      completedSections: completed,
+      progressPercentage: (completed / 4) * 100,
+    };
+  }, [sectionCompletion]);
+  
   // Auto-open import modal if requested
   useEffect(() => {
     if (showImportOnMount) {
@@ -227,6 +281,14 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   const descriptionInputRef = useRef<TextInput>(null);
   const tagInputRef = useRef<TextInput>(null);
   const recipeInfoSectionRef = useRef<View>(null);
+  const recipePhotoSectionRef = useRef<View>(null);
+  const recipeTagsSectionRef = useRef<View>(null);
+  const cookingDetailsSectionRef = useRef<View>(null);
+  const ingredientsSectionRef = useRef<View>(null);
+  const instructionsSectionRef = useRef<View>(null);
+  
+  // Store section positions for accurate scrolling
+  const sectionPositions = useRef<{ [key: string]: number }>({});
 
   const categories = ['Appetizer', 'Main Course', 'Dessert', 'Beverage', 'Other'];
   
@@ -256,13 +318,26 @@ const cookingTimeOptions = [
     'Wok'
   ];
 
-  const unitOptions = [
-    'cup', 'cups', 'tablespoon', 'tablespoons', 'teaspoon', 'teaspoons',
-    'pound', 'pounds', 'ounce', 'ounces', 'gram', 'grams', 'kilogram', 'kilograms',
-    'pint', 'pints', 'quart', 'quarts', 'gallon', 'gallons',
-    'piece', 'pieces', 'slice', 'slices', 'clove', 'cloves',
-    'can', 'cans', 'bottle', 'bottles', 'package', 'packages',
-    'pinch', 'dash', 'to taste', 'as needed'
+  const UNIT_OPTIONS = [
+    // Volume
+    { value: 'tsp', label: 'teaspoon (tsp)', category: 'Volume' },
+    { value: 'tbsp', label: 'tablespoon (tbsp)', category: 'Volume' },
+    { value: 'fl oz', label: 'fluid ounce (fl oz)', category: 'Volume' },
+    { value: 'c', label: 'cup (c)', category: 'Volume' },
+    { value: 'pt', label: 'pint (pt)', category: 'Volume' },
+    { value: 'qt', label: 'quart (qt)', category: 'Volume' },
+    { value: 'gal', label: 'gallon (gal)', category: 'Volume' },
+    // Weight
+    { value: 'oz', label: 'ounce (oz)', category: 'Weight' },
+    { value: 'lb', label: 'pound (lb)', category: 'Weight' },
+    // Temperature
+    { value: '°F', label: 'Fahrenheit (°F)', category: 'Temperature' },
+    // Length
+    { value: 'in', label: 'inch (in)', category: 'Length' },
+    { value: 'ft', label: 'foot (ft)', category: 'Length' },
+    // Metric
+    { value: 'g', label: 'gram (g)', category: 'Metric' },
+    { value: 'ml', label: 'milliliter (ml)', category: 'Metric' },
   ];
 
 const commonIngredientTags = [
@@ -473,8 +548,8 @@ const commonIngredientTags = [
     setRecipeData({ ...recipeData, ingredients: updatedIngredients });
   };
 
-  const selectUnit = (unit: string) => {
-    setNewIngredient({ ...newIngredient, unit });
+  const selectUnit = (unitValue: string) => {
+    setNewIngredient({ ...newIngredient, unit: unitValue });
     setShowUnitDropdown(false);
   };
 
@@ -680,6 +755,22 @@ const handleIngredientTagPress = (ingredientName: string) => {
     setNewInstruction({ ...newInstruction, imageUri: null });
   };
 
+  // Legacy scrollToSection for input focus (kept for backward compatibility)
+  const scrollToSection = (sectionRef: any, offset: number = 0) => {
+    if (sectionRef === recipeInfoSectionRef) {
+      // Use stored position for recipeInfoSection
+      scrollToSectionPosition('recipeInfo', offset);
+    } else {
+      // Fallback to measureInWindow for other refs
+      setTimeout(() => {
+        sectionRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+          const scrollY = y - 100 + offset;
+          scrollViewRef.current?.scrollTo({ y: Math.max(0, scrollY), animated: true });
+        });
+      }, 100);
+    }
+  };
+
   const scrollToInput = (inputRef: any, offset: number = 0) => {
     setTimeout(() => {
       inputRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
@@ -689,13 +780,44 @@ const handleIngredientTagPress = (ingredientName: string) => {
     }, 100);
   };
 
-  const scrollToSection = (sectionRef: any, offset: number = 0) => {
-    setTimeout(() => {
-      sectionRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
-        const scrollY = y - 100 + offset; // 100px above the section
-        scrollViewRef.current?.scrollTo({ y: Math.max(0, scrollY), animated: true });
-      });
-    }, 100);
+  // Measure section position using onLayout
+  const measureSection = (sectionKey: string, y: number) => {
+    sectionPositions.current[sectionKey] = y;
+  };
+
+  // Scroll to section using stored position
+  const scrollToSectionPosition = (sectionKey: string, offset: number = 120) => {
+    const position = sectionPositions.current[sectionKey];
+    if (position !== undefined && scrollViewRef.current) {
+      // Account for progress bar height (approximately 100px) and add offset
+      const scrollY = position - offset;
+      scrollViewRef.current.scrollTo({ y: Math.max(0, scrollY), animated: true });
+    }
+  };
+
+  // Scroll to specific sections
+  const scrollToInfo = () => {
+    scrollToSectionPosition('recipePhoto', 120);
+  };
+
+  const scrollToDetails = () => {
+    scrollToSectionPosition('cookingDetails', 120);
+  };
+
+  const scrollToIngredients = () => {
+    scrollToSectionPosition('ingredients', 120);
+  };
+
+  const scrollToInstructions = () => {
+    scrollToSectionPosition('instructions', 120);
+  };
+
+  // Close all dropdowns when clicking outside
+  const closeAllDropdowns = () => {
+    setShowCookwareDropdown(false);
+    setShowCookingTimeDropdown(false);
+    setShowServingsDropdown(false);
+    setShowUnitDropdown(false);
   };
 
   useEffect(() => {
@@ -1173,14 +1295,161 @@ const handleIngredientTagPress = (ingredientName: string) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 50}
       >
+        {/* Progress Bar - Fixed at top below header */}
+        <View style={styles.progressBarContainer}>
+          {/* Progress Bar with Dots - 4 equal segments */}
+          <View style={styles.progressBarWrapper}>
+            {/* Four equal segments */}
+            <View style={styles.progressSegments}>
+              {/* Segment 1: Info */}
+              <TouchableOpacity 
+                style={[styles.progressSegment, styles.progressSegmentFirst]}
+                onPress={scrollToInfo}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.progressSegmentFill,
+                  sectionCompletion.info() && styles.progressSegmentFillActive,
+                  sectionCompletion.info() && styles.progressSegmentFillFirst
+                ]} />
+                <View style={[
+                  styles.progressDot,
+                  sectionCompletion.info() && styles.progressDotActive
+                ]}>
+                  {sectionCompletion.info() && (
+                    <Ionicons name="checkmark" size={8} color="white" />
+                  )}
+                </View>
+              </TouchableOpacity>
+              
+              {/* Segment 2: Details */}
+              <TouchableOpacity 
+                style={styles.progressSegment}
+                onPress={scrollToDetails}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.progressSegmentFill,
+                  sectionCompletion.details() && styles.progressSegmentFillActive
+                ]} />
+                <View style={[
+                  styles.progressDot,
+                  sectionCompletion.details() && styles.progressDotActive
+                ]}>
+                  {sectionCompletion.details() && (
+                    <Ionicons name="checkmark" size={8} color="white" />
+                  )}
+                </View>
+              </TouchableOpacity>
+              
+              {/* Segment 3: Ingredients */}
+              <TouchableOpacity 
+                style={styles.progressSegment}
+                onPress={scrollToIngredients}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.progressSegmentFill,
+                  sectionCompletion.ingredients() && styles.progressSegmentFillActive
+                ]} />
+                <View style={[
+                  styles.progressDot,
+                  sectionCompletion.ingredients() && styles.progressDotActive
+                ]}>
+                  {sectionCompletion.ingredients() && (
+                    <Ionicons name="checkmark" size={8} color="white" />
+                  )}
+                </View>
+              </TouchableOpacity>
+              
+              {/* Segment 4: Instructions */}
+              <TouchableOpacity 
+                style={[styles.progressSegment, styles.progressSegmentLast]}
+                onPress={scrollToInstructions}
+                activeOpacity={0.7}
+              >
+                <View style={[
+                  styles.progressSegmentFill,
+                  sectionCompletion.instructions() && styles.progressSegmentFillActive,
+                  sectionCompletion.instructions() && styles.progressSegmentFillLast
+                ]} />
+                <View style={[
+                  styles.progressDot,
+                  sectionCompletion.instructions() && styles.progressDotActive
+                ]}>
+                  {sectionCompletion.instructions() && (
+                    <Ionicons name="checkmark" size={8} color="white" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          {/* Section Labels */}
+          <View style={styles.progressSections}>
+            <TouchableOpacity 
+              style={styles.progressSectionLabelContainer}
+              onPress={scrollToInfo}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.progressSectionLabel,
+                sectionCompletion.info() && styles.progressSectionLabelActive
+              ]}>Info</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.progressSectionLabelContainer}
+              onPress={scrollToDetails}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.progressSectionLabel,
+                sectionCompletion.details() && styles.progressSectionLabelActive
+              ]}>Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.progressSectionLabelContainer}
+              onPress={scrollToIngredients}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.progressSectionLabel,
+                sectionCompletion.ingredients() && styles.progressSectionLabelActive
+              ]}>Ingredients</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.progressSectionLabelContainer}
+              onPress={scrollToInstructions}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.progressSectionLabel,
+                sectionCompletion.instructions() && styles.progressSectionLabelActive
+              ]}>Instructions</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
         <ScrollView 
           ref={scrollViewRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={closeAllDropdowns}
+          onStartShouldSetResponder={() => {
+            closeAllDropdowns();
+            return false;
+          }}
         >
         {/* Recipe Photo Section */}
-        <View style={styles.recipePhotoSection}>
+        <View 
+          ref={recipePhotoSectionRef} 
+          style={styles.recipePhotoSection}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            measureSection('recipePhoto', y);
+          }}
+        >
           <Text style={styles.sectionTitle}>
             Add Recipe Photo <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
@@ -1215,17 +1484,15 @@ const handleIngredientTagPress = (ingredientName: string) => {
           </View>
         </View>
 
-        <View ref={recipeInfoSectionRef} style={styles.recipeInfoSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recipe Information</Text>
-            <TouchableOpacity
-              style={styles.importButton}
-              onPress={() => setShowImportModal(true)}
-            >
-              <Ionicons name="download-outline" size={18} color="#d96709" />
-              <Text style={styles.importButtonText}>Import from URL</Text>
-            </TouchableOpacity>
-          </View>
+        <View 
+          ref={recipeInfoSectionRef} 
+          style={styles.recipeInfoSection}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            measureSection('recipeInfo', y);
+          }}
+        >
+          <Text style={styles.sectionTitle}>Recipe Information</Text>
                 <View style={styles.inputGroup}>
                   <Text style={styles.requiredLabel}>
                     Recipe Title <Text style={styles.requiredAsterisk}>*</Text>
@@ -1236,7 +1503,11 @@ const handleIngredientTagPress = (ingredientName: string) => {
               value={recipeData.title}
               onChangeText={text => setRecipeData({ ...recipeData, title: text })}
               placeholder="Enter recipe title"
-              onFocus={() => scrollToSection(recipeInfoSectionRef, 100)}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollToSectionPosition('recipeInfo', 120);
+                }, 100);
+              }}
             />
           </View>
           <View style={styles.inputGroup}>
@@ -1249,7 +1520,11 @@ const handleIngredientTagPress = (ingredientName: string) => {
               placeholder="Every dish tells a story. What's yours? Capture its taste, texture, and the moment behind it..."
               multiline
               numberOfLines={3}
-              onFocus={() => scrollToSection(recipeInfoSectionRef, 100)}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollToSectionPosition('recipeInfo', 120);
+                }, 100);
+              }}
             />
           </View>
           <View style={styles.switchGroup}>
@@ -1261,7 +1536,14 @@ const handleIngredientTagPress = (ingredientName: string) => {
           </View>
         </View>
 
-        <View style={styles.recipeTagsSection}>
+        <View 
+          ref={recipeTagsSectionRef}
+          style={styles.recipeTagsSection}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            measureSection('recipeTags', y);
+          }}
+        >
           <Text style={styles.sectionTitle}>Recipe Tags</Text>
           <Text style={styles.sectionSubtitle}>Add tags to help others discover your recipe</Text>
           <View style={styles.tagsContainer}>
@@ -1281,7 +1563,9 @@ const handleIngredientTagPress = (ingredientName: string) => {
               }}
               onSubmitEditing={addTag}
               onFocus={() => {
-                scrollToInput(tagInputRef, 200);
+                setTimeout(() => {
+                  scrollToSectionPosition('recipeTags', 120);
+                }, 100);
               }}
               returnKeyType="done"
             />
@@ -1368,12 +1652,21 @@ const handleIngredientTagPress = (ingredientName: string) => {
           )}
         </View>
 
-        <View style={styles.cookingDetailsSection}>
+        <View 
+          ref={cookingDetailsSectionRef} 
+          style={styles.cookingDetailsSection}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            measureSection('cookingDetails', y);
+          }}
+        >
           <Text style={styles.sectionTitle}>Cooking Details</Text>
           
           {/* Cookware Selection */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Main Cookware</Text>
+            <Text style={styles.requiredLabel}>
+              Main Cookware <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
             {fromChallenge && (
               <View style={styles.challengeBadge}>
                 <Ionicons name="trophy" size={16} color="#FF6B35" />
@@ -1385,11 +1678,18 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 styles.dropdownButton,
                 fromChallenge && styles.dropdownButtonDisabled
               ]}
-              onPress={() => !fromChallenge && setShowCookwareDropdown(!showCookwareDropdown)}
+              onPress={() => {
+                if (!fromChallenge) {
+                  setShowCookwareDropdown(!showCookwareDropdown);
+                  setTimeout(() => {
+                    scrollToSectionPosition('cookingDetails', 120);
+                  }, 100);
+                }
+              }}
               disabled={fromChallenge}
             >
               <Text style={[styles.dropdownText, !recipeData.cookware && styles.placeholderText]}>
-                {recipeData.cookware || 'Select main cookware'}
+                {recipeData.cookware || ''}
               </Text>
               {!fromChallenge && (
                 <Ionicons
@@ -1412,7 +1712,10 @@ const handleIngredientTagPress = (ingredientName: string) => {
               </Text>
             )}
             {showCookwareDropdown && (
-              <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
+              <View 
+                style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
+                onStartShouldSetResponder={() => true}
+              >
                 <ScrollView showsVerticalScrollIndicator={true}>
                   {cookwareOptions.map((cookware) => (
                     <TouchableOpacity
@@ -1438,7 +1741,12 @@ const handleIngredientTagPress = (ingredientName: string) => {
               </Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={() => setShowCookingTimeDropdown(!showCookingTimeDropdown)}
+                onPress={() => {
+                  setShowCookingTimeDropdown(!showCookingTimeDropdown);
+                  setTimeout(() => {
+                    scrollToSectionPosition('cookingDetails', 120);
+                  }, 100);
+                }}
               >
                 <Text style={[styles.dropdownText, !recipeData.cookingTime && styles.placeholderText]}>
                   {recipeData.cookingTime || ''}
@@ -1450,7 +1758,10 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 />
               </TouchableOpacity>
               {showCookingTimeDropdown && (
-                <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
+                <View 
+                  style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
+                  onStartShouldSetResponder={() => true}
+                >
                   <ScrollView showsVerticalScrollIndicator={true}>
                     {cookingTimeOptions.map((option, index) => (
                       <TouchableOpacity
@@ -1474,7 +1785,12 @@ const handleIngredientTagPress = (ingredientName: string) => {
               </Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={() => setShowServingsDropdown(!showServingsDropdown)}
+                onPress={() => {
+                  setShowServingsDropdown(!showServingsDropdown);
+                  setTimeout(() => {
+                    scrollToSectionPosition('cookingDetails', 120);
+                  }, 100);
+                }}
               >
                 <Text style={[styles.dropdownText, !recipeData.servings && styles.placeholderText]}>
                   {recipeData.servings || ''}
@@ -1486,7 +1802,10 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 />
               </TouchableOpacity>
               {showServingsDropdown && (
-                <View style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
+                <View 
+                  style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
+                  onStartShouldSetResponder={() => true}
+                >
                   <ScrollView showsVerticalScrollIndicator={true}>
                     {servingsOptions.map((option, index) => (
                       <TouchableOpacity
@@ -1507,7 +1826,14 @@ const handleIngredientTagPress = (ingredientName: string) => {
           </View>
         </View>
 
-        <View style={styles.ingredientsSection}>
+        <View 
+          ref={ingredientsSectionRef} 
+          style={styles.ingredientsSection}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            measureSection('ingredients', y);
+          }}
+        >
           <Text style={styles.sectionTitle}>
             Ingredients <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
@@ -1522,6 +1848,11 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   placeholder="e.g., flour, salt, butter"
                   value={newIngredient.name}
                   onChangeText={text => setNewIngredient({ ...newIngredient, name: text })}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollToSectionPosition('ingredients', 120);
+                    }, 100);
+                  }}
                 />
               </View>
               <View style={[styles.ingredientField, { flex: 1, marginHorizontal: 4 }]}>
@@ -1532,38 +1863,83 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   value={newIngredient.amount}
                   onChangeText={text => setNewIngredient({ ...newIngredient, amount: text })}
                   keyboardType="numeric"
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollToSectionPosition('ingredients', 120);
+                    }, 100);
+                  }}
                 />
               </View>
               <View style={[styles.ingredientField, { flex: 1.5 }]}>
                 <Text style={styles.ingredientLabel}>Unit</Text>
-                <TouchableOpacity
-                  style={styles.unitDropdownButton}
-                  onPress={() => setShowUnitDropdown(!showUnitDropdown)}
-                >
-                  <Text style={[styles.unitDropdownText, !newIngredient.unit && styles.placeholderText]}>
-                    {newIngredient.unit || 'Select'}
-                  </Text>
-                  <Ionicons
-                    name={showUnitDropdown ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color="#666"
-                  />
-                </TouchableOpacity>
+                <View style={styles.unitContainer}>
+                  <TouchableOpacity
+                    style={styles.unitDropdownButton}
+                    onPress={() => {
+                      setShowUnitDropdown(!showUnitDropdown);
+                      setTimeout(() => {
+                        scrollToSectionPosition('ingredients', 120);
+                      }, 100);
+                    }}
+                  >
+                    <Text style={[styles.unitDropdownText, !newIngredient.unit && styles.placeholderText]}>
+                      {newIngredient.unit 
+                        ? UNIT_OPTIONS.find(u => u.value === newIngredient.unit)?.label || newIngredient.unit
+                        : 'Unit'}
+                    </Text>
+                    <Ionicons
+                      name={showUnitDropdown ? 'chevron-up' : 'chevron-down'}
+                      size={20}
+                      color="#666"
+                    />
+                  </TouchableOpacity>
                   {showUnitDropdown && (
-                    <View style={[styles.unitDropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 100, maxHeight: 200 }]}>
-                      <ScrollView showsVerticalScrollIndicator={true}>
-                        {unitOptions.map((unit, index) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={styles.unitDropdownItem}
-                            onPress={() => selectUnit(unit)}
-                          >
-                            <Text style={styles.unitDropdownItemText}>{unit}</Text>
-                          </TouchableOpacity>
+                    <View 
+                      style={styles.unitDropdownList}
+                      onStartShouldSetResponder={() => true}
+                    >
+                      <ScrollView 
+                        style={styles.unitDropdownScroll}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                      >
+                        {Object.entries(
+                          UNIT_OPTIONS.reduce((acc, unit) => {
+                            if (!acc[unit.category]) {
+                              acc[unit.category] = [];
+                            }
+                            acc[unit.category].push(unit);
+                            return acc;
+                          }, {} as Record<string, typeof UNIT_OPTIONS>)
+                        ).map(([category, units]) => (
+                          <View key={category} style={styles.unitCategoryGroup}>
+                            <Text style={styles.unitCategoryLabel}>{category}</Text>
+                            {units.map((unit) => (
+                              <TouchableOpacity
+                                key={unit.value}
+                                style={[
+                                  styles.unitDropdownItem,
+                                  newIngredient.unit === unit.value && styles.unitDropdownItemSelected
+                                ]}
+                                onPress={() => selectUnit(unit.value)}
+                              >
+                                <Text style={[
+                                  styles.unitDropdownItemText,
+                                  newIngredient.unit === unit.value && styles.unitDropdownItemTextSelected
+                                ]}>
+                                  {unit.label}
+                                </Text>
+                                {newIngredient.unit === unit.value && (
+                                  <Ionicons name="checkmark" size={20} color="#FF6B35" />
+                                )}
+                              </TouchableOpacity>
+                            ))}
+                          </View>
                         ))}
                       </ScrollView>
                     </View>
                   )}
+                </View>
               </View>
             </View>
             <TouchableOpacity 
@@ -1596,7 +1972,14 @@ const handleIngredientTagPress = (ingredientName: string) => {
           )}
         </View>
 
-        <View style={styles.instructionsSection}>
+        <View 
+          ref={instructionsSectionRef} 
+          style={styles.instructionsSection}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            measureSection('instructions', y);
+          }}
+        >
           <Text style={styles.sectionTitle}>
             Instructions <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
@@ -1615,6 +1998,11 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   onChangeText={text => setNewInstruction({ ...newInstruction, description: text })}
                   multiline
                   numberOfLines={4}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollToSectionPosition('instructions', 120);
+                    }, 100);
+                  }}
                 />
               </View>
             </View>
@@ -1712,6 +2100,11 @@ const handleIngredientTagPress = (ingredientName: string) => {
                         onChangeText={text => setEditInstructionData({ ...editInstructionData, description: text })}
                         multiline
                         numberOfLines={6}
+                        onFocus={() => {
+                          setTimeout(() => {
+                            scrollToSectionPosition('instructions', 120);
+                          }, 100);
+                        }}
                       />
 
                       <View style={[styles.instructionImageSection, { marginTop: 16 }]}>
@@ -1818,6 +2211,103 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
   },
+  progressBarContainer: {
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 10,
+  },
+  progressBarWrapper: {
+    marginBottom: 8,
+    marginHorizontal: 8,
+  },
+  progressSegments: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 0,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 0,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  progressSegmentFirst: {
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+  },
+  progressSegmentLast: {
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+  },
+  progressSegmentFill: {
+    height: '100%',
+    width: '0%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 0,
+  },
+  progressSegmentFillActive: {
+    width: '100%',
+    backgroundColor: '#FF6B35',
+  },
+  progressSegmentFillFirst: {
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+  },
+  progressSegmentFillLast: {
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+  },
+  progressDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    position: 'absolute',
+    top: -4,
+    left: '50%',
+    transform: [{ translateX: -8 }],
+    zIndex: 2,
+  },
+  progressDotActive: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  progressSections: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 0,
+  },
+  progressSectionLabelContainer: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  progressSectionLabel: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  progressSectionLabelActive: {
+    color: '#FF6B35',
+    fontWeight: '600',
+  },
   keyboardView: {
     flex: 1,
   },
@@ -1919,6 +2409,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     flex: 1,
+    marginBottom: 8,
   },
   importButton: {
     flexDirection: 'row',
@@ -2258,8 +2749,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: 'white',
-    zIndex: 99998,
-    elevation: 49,
+    zIndex: 999998,
+    elevation: 999,
   },
   dropdownButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -2312,7 +2803,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 100,
+    elevation: 1000,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -2402,13 +2893,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     backgroundColor: 'white',
-    zIndex: 99998,
-    elevation: 49,
   },
   unitDropdownText: {
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  unitContainer: {
+    position: 'relative',
+    zIndex: 999999,
   },
   unitDropdownList: {
     position: 'absolute',
@@ -2420,23 +2913,50 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     marginTop: 4,
-    maxHeight: 150,
-    zIndex: 99999,
+    maxHeight: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 50,
+    elevation: 1000,
+    zIndex: 999999,
   },
-  unitDropdownItem: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+  unitDropdownScroll: {
+    maxHeight: 300,
+  },
+  unitCategoryGroup: {
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  unitDropdownItemText: {
+  unitCategoryLabel: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    textTransform: 'uppercase',
+  },
+  unitDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  unitDropdownItemSelected: {
+    backgroundColor: '#FFF3E0',
+  },
+  unitDropdownItemText: {
+    fontSize: 14,
     color: '#333',
+    flex: 1,
+  },
+  unitDropdownItemTextSelected: {
+    color: '#FF6B35',
+    fontWeight: '600',
   },
   addIngredientButton: {
     backgroundColor: '#FF6B35',

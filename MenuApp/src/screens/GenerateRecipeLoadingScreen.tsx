@@ -9,6 +9,7 @@ import {
   StatusBar,
   Platform,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -128,6 +129,9 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const autoScrollEnabledRef = useRef(true);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Rotate animation for loading circle
   useEffect(() => {
@@ -142,42 +146,59 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
     return () => rotateAnimation.stop();
   }, [rotateAnim]);
 
-  // Cycle through feature introductions
+  // Auto-scroll through feature introductions
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Fade out
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 0.9,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Change feature
-        setCurrentFeatureIndex((prev) => (prev + 1) % FEATURE_INTRODUCTIONS.length);
-        // Fade in
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
-    }, 3000); // Change every 3 seconds
+    const scrollToNext = () => {
+      if (!autoScrollEnabledRef.current || !scrollViewRef.current) {
+        return;
+      }
 
-    return () => clearInterval(interval);
-  }, [fadeAnim, scaleAnim]);
+      const nextIndex = (currentFeatureIndex + 1) % FEATURE_INTRODUCTIONS.length;
+      const cardWidth = SCREEN_WIDTH - 80;
+      
+      scrollViewRef.current.scrollTo({
+        x: nextIndex * cardWidth,
+        animated: true,
+      });
+      
+      setCurrentFeatureIndex(nextIndex);
+    };
+
+    // Auto-scroll every 3 seconds
+    const interval = setInterval(() => {
+      if (autoScrollEnabledRef.current) {
+        scrollToNext();
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [currentFeatureIndex]);
+
+  // Handle manual scroll
+  const handleScroll = (event: any) => {
+    const cardWidth = SCREEN_WIDTH - 80;
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / cardWidth);
+    
+    if (newIndex !== currentFeatureIndex && newIndex >= 0 && newIndex < FEATURE_INTRODUCTIONS.length) {
+      setCurrentFeatureIndex(newIndex);
+      // Temporarily disable auto-scroll when user manually scrolls
+      autoScrollEnabledRef.current = false;
+      
+      // Re-enable auto-scroll after 5 seconds of no manual scrolling
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        autoScrollEnabledRef.current = true;
+      }, 5000);
+    }
+  };
 
   // Generate a unique key from params to identify this specific generation request
   const currentGenerationKey = React.useMemo(() => {
@@ -353,22 +374,35 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
         <Text style={styles.title}>Generating Your Recipes</Text>
         <Text style={styles.subtitle}>This may take 30-40 seconds...</Text>
 
-        {/* Feature Introduction Card */}
-        <Animated.View
-          style={[
-            styles.featureCard,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }],
-            },
-          ]}
+        {/* Feature Introduction Cards - Scrollable */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.cardsScrollView}
+          contentContainerStyle={styles.cardsScrollContent}
+          snapToInterval={SCREEN_WIDTH - 80}
+          decelerationRate="fast"
         >
-          <View style={styles.featureIconContainer}>
-            <Ionicons name={currentFeature.icon as any} size={48} color="#d96709" />
-          </View>
-          <Text style={styles.featureTitle}>{currentFeature.title}</Text>
-          <Text style={styles.featureDescription}>{currentFeature.description}</Text>
-        </Animated.View>
+          {FEATURE_INTRODUCTIONS.map((feature, index) => (
+            <View
+              key={index}
+              style={[
+                styles.featureCard,
+                { width: SCREEN_WIDTH - 80 },
+              ]}
+            >
+              <View style={styles.featureIconContainer}>
+                <Ionicons name={feature.icon as any} size={48} color="#d96709" />
+              </View>
+              <Text style={styles.featureTitle}>{feature.title}</Text>
+              <Text style={styles.featureDescription}>{feature.description}</Text>
+            </View>
+          ))}
+        </ScrollView>
 
         {/* Progress Indicators */}
         <View style={styles.progressContainer}>
@@ -453,18 +487,23 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     textAlign: 'center',
   },
+  cardsScrollView: {
+    marginBottom: 24,
+  },
+  cardsScrollContent: {
+    paddingHorizontal: 0,
+  },
   featureCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
-    width: SCREEN_WIDTH - 80,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-    marginBottom: 24,
+    marginRight: 0,
     minHeight: 200,
     justifyContent: 'center',
   },

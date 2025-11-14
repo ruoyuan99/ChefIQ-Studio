@@ -291,7 +291,43 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               console.log('Failed to sync activities to user_points:', insertError.message);
             } else {
               console.log(`✅ Synced ${activitiesToSync.length} activities to database`);
+              
+              // 验证数据已成功保存到数据库后，清除所有 AsyncStorage 中的积分数据
+              setTimeout(async () => {
+                try {
+                  const { count } = await supabase
+                    .from('user_points')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', user.id);
+
+                  // 如果数据库中有数据，说明同步成功，清除所有本地 AsyncStorage 中的积分数据
+                  if (count !== null && count > 0) {
+                    await AsyncStorage.removeItem('userPoints');
+                    console.log('✅ Cleared all userPoints from AsyncStorage after successful sync');
+                  }
+                } catch (error) {
+                  console.error('Error verifying sync and clearing AsyncStorage:', error);
+                }
+              }, 1000); // 延迟 1 秒确保数据库已更新
             }
+          } else {
+            // 如果所有活动都已同步（activitiesToSync.length === 0），验证后清除所有 AsyncStorage
+            setTimeout(async () => {
+              try {
+                const { count } = await supabase
+                  .from('user_points')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('user_id', user.id);
+
+                // 如果数据库中有数据，清除所有本地 AsyncStorage 中的积分数据
+                if (count !== null && count > 0) {
+                  await AsyncStorage.removeItem('userPoints');
+                  console.log('✅ Cleared all userPoints from AsyncStorage (all activities already synced)');
+                }
+              } catch (error) {
+                console.error('Error verifying sync and clearing AsyncStorage:', error);
+              }
+            }, 1000);
           }
         } catch (error) {
           console.error('Failed to sync points to Supabase:', error);

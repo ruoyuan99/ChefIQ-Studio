@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 24) + 12,
+    paddingTop: Platform.OS === 'ios' ? 20 : (StatusBar.currentHeight || 24) + 8,
     paddingBottom: 12,
   },
   headerTitle: {

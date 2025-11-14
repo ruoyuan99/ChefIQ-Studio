@@ -97,6 +97,22 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             
             if (result.success) {
               console.log('✅ 自动同步完成:', result.message);
+              
+              // 验证数据已成功同步到数据库后，清除所有同类的历史数据
+              setTimeout(async () => {
+                try {
+                  // 验证菜谱数据已在数据库中
+                  const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
+                  
+                  // 如果数据库中有菜谱数据，说明同步成功，清除所有本地 AsyncStorage 中的菜谱数据（包括历史数据）
+                  if (cloudRecipes && cloudRecipes.length > 0) {
+                    await AsyncStorage.removeItem('recipes');
+                    console.log('✅ Cleared all recipes from AsyncStorage after successful sync (including historical data)');
+                  }
+                } catch (error) {
+                  console.error('Error verifying sync and clearing AsyncStorage:', error);
+                }
+              }, 2000); // 延迟 2 秒确保数据库已更新
             } else {
               console.log('⚠️ 自动同步失败:', result.message);
             }
@@ -222,10 +238,16 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
               console.log('☁️ 同步后从云端加载菜谱:', cloudRecipes.length);
               dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
+              
+              // 验证数据已成功保存到数据库后，清除所有 AsyncStorage 中的菜谱数据
+              if (cloudRecipes && cloudRecipes.length > 0) {
+                await AsyncStorage.removeItem('recipes');
+                console.log('✅ Cleared all recipes from AsyncStorage after successful sync');
+              }
             } catch (e) {
               console.error('❌ 同步后加载云端菜谱失败:', e);
             }
-          }, 500); // 延迟500ms确保数据库已更新
+          }, 1000); // 延迟1秒确保数据库已更新
         })
         .catch(error => {
           console.error('❌ 同步到Supabase失败:', error);

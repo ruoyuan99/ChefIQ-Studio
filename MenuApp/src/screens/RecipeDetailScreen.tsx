@@ -473,9 +473,11 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
               <Text style={styles.authorName}>
                 {recipe.authorName || (isUserCreated ? (authUser?.name || (authUser?.email ? authUser.email.split('@')[0] : 'You')) : 'Chef iQ Community')}
               </Text>
-              {!isUserCreated && recipe.authorBio && (
+              {isUserCreated && authUser?.bio ? (
+                <Text style={styles.authorBio}>{authUser.bio}</Text>
+              ) : !isUserCreated && recipe.authorBio ? (
                 <Text style={styles.authorBio}>{recipe.authorBio}</Text>
-              )}
+              ) : null}
             </View>
           </View>
         </View>

@@ -1,17 +1,30 @@
-import React, { useEffect } from 'react';
-import { View, Image, StyleSheet, StatusBar, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Image, StyleSheet, StatusBar, Dimensions, Animated } from 'react-native';
 
 interface SplashScreenProps {
   navigation: any;
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace('Login');
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [navigation]);
+    // Start fade out animation after 1 second
+    const fadeOutTimer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        // Navigate after fade out completes - no animation
+        navigation.replace('Login');
+      });
+    }, 1000);
+
+    return () => {
+      clearTimeout(fadeOutTimer);
+    };
+  }, [navigation, fadeAnim]);
 
   const screenWidth = Dimensions.get('window').width;
   const screenHeight = Dimensions.get('window').height;
@@ -25,13 +38,13 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   const logoHeight = Math.round(logoWidth / aspect);
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <StatusBar barStyle="light-content" backgroundColor="#d96709" />
       <Image
         source={require('../../assets/AppLogo.png')}
         style={{ width: logoWidth, height: logoHeight, resizeMode: 'contain' }}
       />
-    </View>
+    </Animated.View>
   );
 };
 

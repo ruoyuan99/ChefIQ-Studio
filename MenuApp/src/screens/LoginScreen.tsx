@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Platform,
   Image,
   Dimensions,
+  Animated,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +26,26 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { signIn, loading } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Start fade out animation after 1.5 seconds
+    const fadeOutTimer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        // Hide splash overlay after fade out completes
+        setShowSplash(false);
+      });
+    }, 1500);
+
+    return () => {
+      clearTimeout(fadeOutTimer);
+    };
+  }, [fadeAnim]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -40,6 +62,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       Alert.alert('Login Failed', result.message);
     }
   };
+
+  const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
+  const aspect = 260 / 64; // width / height
+  const widthCap = Math.round(screenWidth * 2.0);
+  const heightCap = Math.round(screenHeight * 2.0);
+  const widthFromHeightCap = Math.round(heightCap * aspect);
+  const idealWidth = Math.min(widthCap, widthFromHeightCap);
+  const logoWidth = Math.max(120, idealWidth);
+  const logoHeight = Math.round(logoWidth / aspect);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -123,6 +155,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           {/* Registration entry hidden for competition build */}
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Splash Screen Overlay */}
+      {showSplash && (
+        <Animated.View style={[styles.splashOverlay, { opacity: fadeAnim }]}>
+          <StatusBar barStyle="light-content" backgroundColor="#d96709" />
+          <Image
+            source={require('../../assets/AppLogo.png')}
+            style={{ width: logoWidth, height: logoHeight, resizeMode: 'contain' }}
+          />
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };
@@ -264,6 +307,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 2,
+  },
+  splashOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#d96709',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
   },
 });
 

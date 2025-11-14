@@ -74,6 +74,83 @@ export class AutoSyncService {
       // Mark sync as complete
       await this.markSyncComplete();
 
+      // 验证所有数据已成功同步后，清除所有同类的历史数据
+      try {
+        // 验证菜谱数据
+        const { count: recipesCount } = await supabase
+          .from('recipes')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        
+        // 验证收藏数据
+        const { count: favoritesCount } = await supabase
+          .from('favorites')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        
+        // 验证积分数据
+        const { count: pointsCount } = await supabase
+          .from('user_points')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        // 如果数据库中有数据，清除所有同类的 AsyncStorage 历史数据
+        const clearedItems: string[] = [];
+        
+        if (recipesCount !== null && recipesCount > 0) {
+          // 清除所有菜谱数据（包括历史数据）
+          await AsyncStorage.removeItem('recipes');
+          clearedItems.push('recipes');
+          console.log('✅ Cleared all recipes from AsyncStorage (including historical data)');
+        }
+        
+        if (favoritesCount !== null && favoritesCount > 0) {
+          // 清除所有收藏数据（包括历史数据）
+          await AsyncStorage.removeItem('favorites');
+          clearedItems.push('favorites');
+          console.log('✅ Cleared all favorites from AsyncStorage (including historical data)');
+        }
+        
+        if (pointsCount !== null && pointsCount > 0) {
+          // 清除所有积分数据（包括历史数据）
+          await AsyncStorage.removeItem('userPoints');
+          clearedItems.push('userPoints');
+          console.log('✅ Cleared all userPoints from AsyncStorage (including historical data)');
+        }
+
+        // 清除其他可能的数据
+        const { count: commentsCount } = await supabase
+          .from('comments')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        
+        if (commentsCount !== null && commentsCount > 0) {
+          // 清除所有评论数据（包括历史数据）
+          await AsyncStorage.removeItem('comments');
+          clearedItems.push('comments');
+          console.log('✅ Cleared all comments from AsyncStorage (including historical data)');
+        }
+
+        // 清除社交统计数据（如果存在）
+        const { count: socialStatsCount } = await supabase
+          .from('social_stats')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        
+        if (socialStatsCount !== null && socialStatsCount > 0) {
+          await AsyncStorage.removeItem('socialStats');
+          clearedItems.push('socialStats');
+          console.log('✅ Cleared all socialStats from AsyncStorage (including historical data)');
+        }
+
+        if (clearedItems.length > 0) {
+          console.log(`✅ Cleared all historical data for ${clearedItems.length} items from AsyncStorage: ${clearedItems.join(', ')}`);
+        }
+      } catch (error) {
+        console.error('Error clearing AsyncStorage after sync:', error);
+        // 即使清除失败，也继续返回成功（因为数据已同步到数据库）
+      }
+
       console.log('✅ Automatic sync completed!');
       return { 
         success: true, 
