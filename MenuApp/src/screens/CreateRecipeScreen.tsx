@@ -13,6 +13,8 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  FlatList,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -107,8 +109,6 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
 
   const [newTag, setNewTag] = useState('');
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
-  const [showCookingTimeDropdown, setShowCookingTimeDropdown] = useState(false);
-  const [showServingsDropdown, setShowServingsDropdown] = useState(false);
   const [showCookwareDropdown, setShowCookwareDropdown] = useState(false);
   const [ingredients, setIngredients] = useState<any[]>(existingRecipe?.ingredients || []);
   const [newIngredient, setNewIngredient] = useState({
@@ -300,22 +300,22 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
     'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese'
   ];
 
-const cookingTimeOptions = [
-    'Under 15 minutes', '15-30 minutes', '30-45 minutes', '45-60 minutes',
-    '1-2 hours', '2-4 hours', '4+ hours', 'Overnight'
+  const popularIngredients = [
+    'Flour', 'Sugar', 'Salt', 'Pepper', 'Butter',
+    'Eggs', 'Milk', 'Olive Oil', 'Garlic', 'Onion',
+    'Tomato', 'Chicken', 'Rice', 'Pasta', 'Cheese', 'Potato'
   ];
 
-  const servingsOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
   const cookwareOptions = [
     'Stovetop – Pan or Pot',
     'Air Fryer',
     'Oven',
-    'Pizza Oven',
     'Grill',
     'Slow Cooker',
     'Pressure Cooker',
-    'Wok'
+    'Wok',
+    'Other'
   ];
 
   const UNIT_OPTIONS = [
@@ -517,15 +517,19 @@ const commonIngredientTags = [
     setShowTagSuggestions(false);
   };
 
-  const selectCookingTime = (time: string) => {
-    setRecipeData({ ...recipeData, cookingTime: time });
-    setShowCookingTimeDropdown(false);
+  const handleCookingTimeChange = (text: string) => {
+    // Only allow numeric input
+    const numericValue = text.replace(/[^0-9]/g, '');
+    
+    // Limit to maximum 999
+    if (numericValue !== '' && parseInt(numericValue, 10) > 999) {
+      setRecipeData({ ...recipeData, cookingTime: '999' });
+      return;
+    }
+    
+    setRecipeData({ ...recipeData, cookingTime: numericValue });
   };
 
-  const selectServings = (servings: string) => {
-    setRecipeData({ ...recipeData, servings: servings });
-    setShowServingsDropdown(false);
-  };
 
   const addIngredient = () => {
     if (newIngredient.name.trim() && newIngredient.amount.trim() && newIngredient.unit) {
@@ -815,8 +819,6 @@ const handleIngredientTagPress = (ingredientName: string) => {
   // Close all dropdowns when clicking outside
   const closeAllDropdowns = () => {
     setShowCookwareDropdown(false);
-    setShowCookingTimeDropdown(false);
-    setShowServingsDropdown(false);
     setShowUnitDropdown(false);
   };
 
@@ -1289,7 +1291,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
   );
 
   // Check if any dropdown is open
-  const isAnyDropdownOpen = showCookwareDropdown || showCookingTimeDropdown || showServingsDropdown || showUnitDropdown;
+  const isAnyDropdownOpen = showCookwareDropdown || showUnitDropdown;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1298,6 +1300,12 @@ const handleIngredientTagPress = (ingredientName: string) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 50}
       >
+        {/* Overlay to close dropdowns when clicking outside */}
+        {isAnyDropdownOpen && Platform.OS === 'ios' && (
+          <TouchableWithoutFeedback onPress={closeAllDropdowns}>
+            <View style={styles.dropdownOverlay} />
+          </TouchableWithoutFeedback>
+        )}
         {/* Progress Bar - Fixed at top below header */}
         <View style={styles.progressBarContainer}>
           {/* Progress Bar with Dots - 4 equal segments */}
@@ -1436,9 +1444,18 @@ const handleIngredientTagPress = (ingredientName: string) => {
         <ScrollView 
           ref={scrollViewRef}
           contentContainerStyle={styles.scrollContent}
+          style={styles.scrollView}
+          nestedScrollEnabled={Platform.OS === 'android'}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          onScrollBeginDrag={closeAllDropdowns}
+          scrollEnabled={!isAnyDropdownOpen}
+          scrollEventThrottle={16}
+          onScrollBeginDrag={(evt) => {
+            // Only close dropdowns if scrolling the main ScrollView, not the dropdown ScrollView
+            if (!isAnyDropdownOpen) {
+              closeAllDropdowns();
+            }
+          }}
         >
         {/* Recipe Photo Section */}
         <View 
@@ -1580,40 +1597,38 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 const secondRow = filteredTags.slice(Math.ceil(filteredTags.length / 2));
                 
                 return (
-                  <View style={styles.tagSuggestionsRows}>
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false} 
-                      style={styles.tagSuggestionsRow}
-                      contentContainerStyle={styles.tagSuggestionsRowContent}
-                    >
-                      {firstRow.map((tag, index) => (
-                        <TouchableOpacity
-                          key={`first-${index}`}
-                          style={styles.suggestionTag}
-                          onPress={() => selectTag(tag)}
-                        >
-                          <Text style={styles.suggestionTagText}>{tag}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false} 
-                      style={styles.tagSuggestionsRow}
-                      contentContainerStyle={styles.tagSuggestionsRowContent}
-                    >
-                      {secondRow.map((tag, index) => (
-                        <TouchableOpacity
-                          key={`second-${index}`}
-                          style={styles.suggestionTag}
-                          onPress={() => selectTag(tag)}
-                        >
-                          <Text style={styles.suggestionTagText}>{tag}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    style={styles.tagSuggestionsScroll}
+                    contentContainerStyle={styles.tagSuggestionsContent}
+                    nestedScrollEnabled={Platform.OS === 'android'}
+                  >
+                    <View style={styles.tagSuggestionsRows}>
+                      <View style={styles.tagSuggestionsRow}>
+                        {firstRow.map((tag, index) => (
+                          <TouchableOpacity
+                            key={`first-${index}`}
+                            style={styles.suggestionTag}
+                            onPress={() => selectTag(tag)}
+                          >
+                            <Text style={styles.suggestionTagText}>{tag}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <View style={styles.tagSuggestionsRow}>
+                        {secondRow.map((tag, index) => (
+                          <TouchableOpacity
+                            key={`second-${index}`}
+                            style={styles.suggestionTag}
+                            onPress={() => selectTag(tag)}
+                          >
+                            <Text style={styles.suggestionTagText}>{tag}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  </ScrollView>
                 );
               })()}
             </View>
@@ -1662,7 +1677,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
           <Text style={styles.sectionTitle}>Cooking Details</Text>
           
           {/* Cookware Selection */}
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, styles.cookwareInputGroup, { overflow: Platform.OS === 'android' ? 'visible' : 'visible' }]} pointerEvents="box-none">
             <Text style={styles.requiredLabel}>
               Main Cookware <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
@@ -1672,7 +1687,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 <Text style={styles.challengeBadgeText}>Chef iQ Challenge</Text>
               </View>
             )}
-            <TouchableOpacity
+            <Pressable
               style={[
                 styles.dropdownButton,
                 fromChallenge && styles.dropdownButtonDisabled
@@ -1685,7 +1700,10 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   }, 100);
                 }
               }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={() => false}
               disabled={fromChallenge}
+              android_ripple={{ color: '#f0f0f0', borderless: false }}
             >
               <Text style={[styles.dropdownText, !recipeData.cookware && styles.placeholderText]}>
                 {recipeData.cookware || ''}
@@ -1704,7 +1722,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   color="#999"
                 />
               )}
-            </TouchableOpacity>
+            </Pressable>
             {fromChallenge && (
               <Text style={styles.challengeNote}>
                 Cookware is locked to "Chef iQ Mini Oven" for challenge participation
@@ -1712,133 +1730,109 @@ const handleIngredientTagPress = (ingredientName: string) => {
             )}
             {showCookwareDropdown && (
               <View 
-                style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
+                style={[
+                  styles.dropdownList, 
+                  styles.cookwareDropdownList, 
+                  { 
+                    position: 'absolute', 
+                    top: 60, 
+                    left: 0, 
+                    right: 0, 
+                    zIndex: 999999999, 
+                    elevation: Platform.OS === 'android' ? 999999999 : 0,
+                    maxHeight: 500
+                  }
+                ]}
               >
-                <ScrollView 
-                  nestedScrollEnabled={Platform.OS === 'android'}
-                  showsVerticalScrollIndicator={true}
-                  scrollEnabled={true}
-                  bounces={false}
-                  style={{ maxHeight: 200 }}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {cookwareOptions.map((cookware) => (
-                    <TouchableOpacity
-                      key={cookware}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setRecipeData((prev: any) => ({ ...prev, cookware }));
-                        setShowCookwareDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>{cookware}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {Platform.OS === 'android' ? (
+                  <ScrollView
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                    scrollEnabled={true}
+                    bounces={false}
+                    style={{ maxHeight: 500 }}
+                    contentContainerStyle={{ flexGrow: 0 }}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {cookwareOptions.map((cookware) => (
+                      <TouchableOpacity
+                        key={cookware}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setRecipeData((prev: any) => ({ ...prev, cookware }));
+                          setShowCookwareDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownItemText}>{cookware}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  ) : (
+                  <ScrollView 
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                    scrollEnabled={true}
+                    bounces={false}
+                    style={{ maxHeight: 500 }}
+                    contentContainerStyle={{ paddingBottom: 0 }}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {cookwareOptions.map((cookware) => (
+                      <TouchableOpacity
+                        key={cookware}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setRecipeData((prev: any) => ({ ...prev, cookware }));
+                          setShowCookwareDropdown(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownItemText}>{cookware}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
             )}
           </View>
           
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+          <View style={[styles.row, { overflow: Platform.OS === 'android' ? 'visible' : 'visible' }]}>
+            <View style={[styles.inputGroup, styles.cookingTimeInputGroup, { flex: 1, marginRight: 8, overflow: Platform.OS === 'android' ? 'visible' : 'visible' }]}>
               <Text style={styles.requiredLabel}>
-                Cooking Time <Text style={styles.requiredAsterisk}>*</Text>
+                Cooking Time (minutes) <Text style={styles.requiredAsterisk}>*</Text>
               </Text>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => {
-                  setShowCookingTimeDropdown(!showCookingTimeDropdown);
+              <TextInput
+                style={styles.servingsInput}
+                value={recipeData.cookingTime || ''}
+                onChangeText={handleCookingTimeChange}
+                keyboardType="numeric"
+                onFocus={() => {
                   setTimeout(() => {
                     scrollToSectionPosition('cookingDetails', 120);
                   }, 100);
                 }}
-              >
-                <Text style={[styles.dropdownText, !recipeData.cookingTime && styles.placeholderText]}>
-                  {recipeData.cookingTime || ''}
-                </Text>
-                <Ionicons
-                  name={showCookingTimeDropdown ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color="#666"
-                />
-              </TouchableOpacity>
-              {showCookingTimeDropdown && (
-                <View 
-                  style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
-                >
-                  <ScrollView 
-                    nestedScrollEnabled={Platform.OS === 'android'}
-                    showsVerticalScrollIndicator={true}
-                    scrollEnabled={true}
-                    bounces={false}
-                    style={{ maxHeight: 200 }}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {cookingTimeOptions.map((option, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.dropdownItem}
-                        onPress={() => selectCookingTime(option)}
-                      >
-                        <Text style={styles.dropdownItemText}>{option}</Text>
-                        {recipeData.cookingTime === option && (
-                          <Ionicons name="checkmark" size={20} color="#d96709" />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+              />
             </View>
             <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
               <Text style={styles.requiredLabel}>
                 Servings <Text style={styles.requiredAsterisk}>*</Text>
+                {'\n'}
+                <Text>(People)</Text>
               </Text>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => {
-                  setShowServingsDropdown(!showServingsDropdown);
+              <TextInput
+                style={styles.servingsInput}
+                value={recipeData.servings || ''}
+                onChangeText={(text) => {
+                  // Only allow numeric input
+                  const numericValue = text.replace(/[^0-9]/g, '');
+                  setRecipeData({ ...recipeData, servings: numericValue });
+                }}
+                keyboardType="numeric"
+                onFocus={() => {
                   setTimeout(() => {
                     scrollToSectionPosition('cookingDetails', 120);
                   }, 100);
                 }}
-              >
-                <Text style={[styles.dropdownText, !recipeData.servings && styles.placeholderText]}>
-                  {recipeData.servings || ''}
-                </Text>
-                <Ionicons
-                  name={showServingsDropdown ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color="#666"
-                />
-              </TouchableOpacity>
-              {showServingsDropdown && (
-                <View 
-                  style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
-                >
-                  <ScrollView 
-                    nestedScrollEnabled={Platform.OS === 'android'}
-                    showsVerticalScrollIndicator={true}
-                    scrollEnabled={true}
-                    bounces={false}
-                    style={{ maxHeight: 200 }}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {servingsOptions.map((option, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.dropdownItem}
-                        onPress={() => selectServings(option)}
-                      >
-                        <Text style={styles.dropdownItemText}>{option}</Text>
-                        {recipeData.servings === option && (
-                          <Ionicons name="checkmark" size={20} color="#d96709" />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+              />
             </View>
           </View>
         </View>
@@ -1889,8 +1883,8 @@ const handleIngredientTagPress = (ingredientName: string) => {
               </View>
               <View style={[styles.ingredientField, { flex: 1.5 }]}>
                 <Text style={styles.ingredientLabel}>Unit</Text>
-                <View style={styles.unitContainer}>
-                  <TouchableOpacity
+                <View style={styles.unitContainer} pointerEvents="box-none">
+                  <Pressable
                     style={styles.unitDropdownButton}
                     onPress={() => {
                       setShowUnitDropdown(!showUnitDropdown);
@@ -1898,6 +1892,9 @@ const handleIngredientTagPress = (ingredientName: string) => {
                         scrollToSectionPosition('ingredients', 120);
                       }, 100);
                     }}
+                    onStartShouldSetResponder={() => true}
+                    onMoveShouldSetResponder={() => false}
+                    android_ripple={{ color: '#f0f0f0', borderless: false }}
                   >
                     <Text style={[styles.unitDropdownText, !newIngredient.unit && styles.placeholderText]}>
                       {newIngredient.unit 
@@ -1909,56 +1906,75 @@ const handleIngredientTagPress = (ingredientName: string) => {
                       size={20}
                       color="#666"
                     />
-                  </TouchableOpacity>
+                  </Pressable>
                   {showUnitDropdown && (
                     <View 
-                      style={styles.unitDropdownList}
+                      style={[styles.dropdownList, styles.unitDropdownList, { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 99999999, elevation: Platform.OS === 'android' ? 99999999 : 0, maxHeight: 300 }]}
                     >
-                      <ScrollView 
-                        style={styles.unitDropdownScroll}
-                        nestedScrollEnabled={Platform.OS === 'android'}
-                        showsVerticalScrollIndicator={true}
-                        scrollEnabled={true}
-                        bounces={false}
-                        keyboardShouldPersistTaps="handled"
-                      >
-                        {Object.entries(
-                          UNIT_OPTIONS.reduce((acc, unit) => {
-                            if (!acc[unit.category]) {
-                              acc[unit.category] = [];
-                            }
-                            acc[unit.category].push(unit);
-                            return acc;
-                          }, {} as Record<string, typeof UNIT_OPTIONS>)
-                        ).map(([category, units]) => (
-                          <View key={category} style={styles.unitCategoryGroup}>
-                            <Text style={styles.unitCategoryLabel}>{category}</Text>
-                            {units.map((unit) => (
-                              <TouchableOpacity
-                                key={unit.value}
-                                style={[
-                                  styles.unitDropdownItem,
-                                  newIngredient.unit === unit.value && styles.unitDropdownItemSelected
-                                ]}
-                                onPress={() => selectUnit(unit.value)}
-                              >
-                                <Text style={[
-                                  styles.unitDropdownItemText,
-                                  newIngredient.unit === unit.value && styles.unitDropdownItemTextSelected
-                                ]}>
-                                  {unit.label}
-                                </Text>
-                                {newIngredient.unit === unit.value && (
-                                  <Ionicons name="checkmark" size={20} color="#FF6B35" />
-                                )}
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        ))}
-                      </ScrollView>
+                      {Platform.OS === 'android' ? (
+                        <ScrollView
+                          nestedScrollEnabled={true}
+                          showsVerticalScrollIndicator={true}
+                          scrollEnabled={true}
+                          bounces={false}
+                          style={{ maxHeight: 300 }}
+                          contentContainerStyle={{ flexGrow: 0 }}
+                          keyboardShouldPersistTaps="handled"
+                        >
+                          {UNIT_OPTIONS.map((unit) => (
+                            <TouchableOpacity
+                              key={unit.value}
+                              style={styles.dropdownItem}
+                              onPress={() => selectUnit(unit.value)}
+                            >
+                              <Text style={styles.unitDropdownItemText}>{unit.label}</Text>
+                              {newIngredient.unit === unit.value && (
+                                <Ionicons name="checkmark" size={20} color="#d96709" />
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      ) : (
+                        <ScrollView 
+                          nestedScrollEnabled={true}
+                          showsVerticalScrollIndicator={true}
+                          scrollEnabled={true}
+                          bounces={false}
+                          style={{ maxHeight: 300 }}
+                          contentContainerStyle={{ paddingBottom: 0 }}
+                          keyboardShouldPersistTaps="handled"
+                        >
+                          {UNIT_OPTIONS.map((unit) => (
+                            <TouchableOpacity
+                              key={unit.value}
+                              style={styles.dropdownItem}
+                              onPress={() => selectUnit(unit.value)}
+                            >
+                              <Text style={styles.unitDropdownItemText}>{unit.label}</Text>
+                              {newIngredient.unit === unit.value && (
+                                <Ionicons name="checkmark" size={20} color="#d96709" />
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      )}
                     </View>
                   )}
                 </View>
+              </View>
+            </View>
+            <View style={styles.ingredientSuggestions}>
+              <Text style={styles.ingredientSuggestionsTitle}>Popular:</Text>
+              <View style={styles.ingredientSuggestionsGrid}>
+                {popularIngredients.map((ingredient, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.ingredientSuggestionChip}
+                    onPress={() => setNewIngredient({ ...newIngredient, name: ingredient })}
+                  >
+                    <Text style={styles.ingredientSuggestionChipText}>{ingredient}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
             <TouchableOpacity 
@@ -2229,6 +2245,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+    overflow: 'visible',
   },
   progressBarContainer: {
     backgroundColor: 'white',
@@ -2329,6 +2346,11 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+    overflow: 'visible',
+  },
+  scrollView: {
+    flex: 1,
+    overflow: 'visible',
   },
   scrollContent: {
     padding: 20,
@@ -2391,7 +2413,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    zIndex: 4000,
+    zIndex: 99999,
+    overflow: 'visible',
   },
   ingredientsSection: {
     backgroundColor: 'white',
@@ -2404,6 +2427,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     zIndex: 5000,
+    overflow: 'visible',
   },
   instructionsSection: {
     backgroundColor: 'white',
@@ -2416,6 +2440,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     zIndex: 6000,
+    overflow: 'visible',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -2427,7 +2452,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    flex: 1,
     marginBottom: 8,
   },
   importButton: {
@@ -2532,6 +2556,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputGroup: {
+    position: 'relative',
+    zIndex: 999999,
+    overflow: 'visible',
     marginBottom: 16,
   },
   label: {
@@ -2555,7 +2582,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     backgroundColor: 'white',
   },
   textArea: {
@@ -2569,6 +2596,9 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    position: 'relative',
+    zIndex: 999999,
+    overflow: 'visible',
   },
   categoryContainer: {
     flexDirection: 'row',
@@ -2680,7 +2710,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     backgroundColor: 'white',
     marginRight: 8,
   },
@@ -2732,14 +2762,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
-  tagSuggestionsRows: {
+  tagSuggestionsScroll: {
     marginTop: 8,
   },
-  tagSuggestionsRow: {
-    marginBottom: 8,
-  },
-  tagSuggestionsRowContent: {
+  tagSuggestionsContent: {
     paddingRight: 8,
+  },
+  tagSuggestionsRows: {
+    flexDirection: 'column',
+  },
+  tagSuggestionsRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
   },
   suggestionsTitle: {
     fontSize: 14,
@@ -2769,7 +2803,22 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: 'white',
     zIndex: 999998,
-    elevation: 999,
+    elevation: Platform.OS === 'android' ? 999 : 0,
+  },
+  servingsInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    backgroundColor: 'white',
+    color: '#333',
+  },
+  cookingTimeHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   dropdownButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -2799,7 +2848,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   dropdownText: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#333',
     flex: 1,
   },
@@ -2813,8 +2862,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 999998,
-    elevation: 999,
+    elevation: Platform.OS === 'android' ? 999998 : 0,
     backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
   },
   dropdownList: {
     position: 'absolute',
@@ -2826,13 +2876,107 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     marginTop: 4,
-    maxHeight: 200,
-    zIndex: 999999,
+    maxHeight: 500,
+    zIndex: 99999999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 1000,
+    elevation: Platform.OS === 'android' ? 99999999 : 0,
+  },
+  cookwareInputGroup: {
+    zIndex: 999999999,
+    elevation: Platform.OS === 'android' ? 999999999 : 0,
+  },
+  cookingTimeInputGroup: {
+    zIndex: 99999999,
+    elevation: Platform.OS === 'android' ? 99999999 : 0,
+  },
+  servingsInputGroup: {
+    zIndex: 99999999,
+    elevation: Platform.OS === 'android' ? 99999999 : 0,
+  },
+  cookwareTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    zIndex: 1,
+  },
+  cookwareTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cookwareTagSelected: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FF6B35',
+    borderWidth: 2,
+  },
+  cookwareTagDisabled: {
+    opacity: 0.5,
+  },
+  cookwareTagPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
+  },
+  cookwareTagText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  cookwareTagTextSelected: {
+    color: '#FF6B35',
+    fontWeight: '600',
+  },
+  cookwareTagTextDisabled: {
+    color: '#999',
+  },
+  selectedCookwareContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  selectedCookwareLabel: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  selectedCookwareTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+  },
+  selectedCookwareText: {
+    fontSize: 13,
+    color: '#FF6B35',
+    fontWeight: '600',
+  },
+  cookwareDropdownList: {
+    zIndex: 999999999,
+    elevation: Platform.OS === 'android' ? 999999999 : 0,
+  },
+  cookingTimeDropdownList: {
+    zIndex: 99999999,
+    elevation: Platform.OS === 'android' ? 99999999 : 0,
+  },
+  servingsDropdownList: {
+    zIndex: 99999999,
+    elevation: Platform.OS === 'android' ? 99999999 : 0,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -2844,19 +2988,22 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   dropdownItemText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#333',
     flex: 1,
   },
   ingredientForm: {
     marginBottom: 16,
+    overflow: 'visible',
   },
   ingredientRow: {
     flexDirection: 'row',
     marginBottom: 12,
+    overflow: 'visible',
   },
   ingredientField: {
     marginBottom: 8,
+    overflow: 'visible',
   },
   ingredientLabel: {
     fontSize: 12,
@@ -2901,6 +3048,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginRight: 8,
+    marginBottom: 8,
   },
   ingredientSuggestionChipActive: {
     backgroundColor: '#d96709',
@@ -2913,6 +3061,21 @@ const styles = StyleSheet.create({
   ingredientSuggestionChipTextActive: {
     color: '#fff',
   },
+  ingredientSuggestions: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  ingredientSuggestionsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  ingredientSuggestionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
   unitDropdownButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2924,41 +3087,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   unitDropdownText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#333',
     flex: 1,
   },
   unitContainer: {
     position: 'relative',
-    zIndex: 999999,
   },
   unitDropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 1000,
-    zIndex: 999999,
-  },
-  unitDropdownScroll: {
-    maxHeight: 300,
+    zIndex: 99999999,
+    elevation: Platform.OS === 'android' ? 99999999 : 0,
   },
   unitCategoryGroup: {
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   unitCategoryLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: '#666',
     paddingHorizontal: 12,
@@ -2979,7 +3124,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF3E0',
   },
   unitDropdownItemText: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#333',
     flex: 1,
   },
@@ -3063,13 +3208,14 @@ const styles = StyleSheet.create({
     borderColor: '#FF6B35',
     borderRadius: 8,
     padding: 16,
-    fontSize: 16,
+    fontSize: 14,
     backgroundColor: 'white',
     color: '#333',
   },
   instructionTextArea: {
     minHeight: 100,
     textAlignVertical: 'top',
+    fontSize: 14,
   },
   instructionImageSection: {
     marginBottom: 16,

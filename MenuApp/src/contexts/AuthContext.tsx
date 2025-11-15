@@ -39,6 +39,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
+  const isInitializing = useRef(true);
+  const loadingUserProfile = useRef(false);
 
   useEffect(() => {
     // Get initial session
@@ -47,13 +49,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Listen for authentication state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔐 Auth state changed:', event, session?.user?.id);
+        
+        // Skip if we're still initializing (getInitialSession will handle it)
+        // This prevents duplicate loading during app startup
+        if (isInitializing.current) {
+          console.log('⏭️ Skipping auth state change during initialization');
+          return;
+        }
+        
+        // Prevent duplicate loading if already loading
+        if (loadingUserProfile.current) {
+          console.log('⏭️ Skipping duplicate loadUserProfile call');
+          return;
+        }
+        
         if (session?.user) {
-          await loadUserProfile(session.user);
+          loadingUserProfile.current = true;
+          try {
+            await loadUserProfile(session.user);
+          } finally {
+            loadingUserProfile.current = false;
+            setLoading(false);
+          }
         } else {
           setUser(null);
           await AsyncStorage.removeItem('user');
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -125,11 +148,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await loadUserProfile(session.user);
+        loadingUserProfile.current = true;
+        try {
+          await loadUserProfile(session.user);
+        } finally {
+          loadingUserProfile.current = false;
+        }
       }
     } catch (error) {
       console.error('获取初始会话失败:', error);
     } finally {
+      isInitializing.current = false;
       setLoading(false);
     }
   };
@@ -317,6 +346,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signIn = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
       setLoading(true);
+      loadingUserProfile.current = true;
       
       // Normal Supabase login
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -325,16 +355,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       if (error) {
+        loadingUserProfile.current = false;
         return { success: false, message: error.message };
       }
 
       if (data.user) {
-        await loadUserProfile(data.user);
-        return { success: true, message: 'Login successful!' };
+        // Load user profile and wait for it to complete
+        try {
+          await loadUserProfile(data.user);
+          // Wait a bit to ensure state is updated
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return { success: true, message: 'Login successful!' };
+        } catch (profileError) {
+          console.error('Failed to load user profile:', profileError);
+          return { success: false, message: 'Login successful but failed to load profile' };
+        } finally {
+          loadingUserProfile.current = false;
+        }
       }
 
+      loadingUserProfile.current = false;
       return { success: false, message: 'Login failed' };
     } catch (error) {
+      loadingUserProfile.current = false;
       return { success: false, message: `Login failed: ${error}` };
     } finally {
       setLoading(false);

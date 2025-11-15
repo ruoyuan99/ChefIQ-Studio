@@ -142,7 +142,6 @@ const cookwareOptions = [
   'Stovetop – Pan or Pot',
   'Air Fryer',
   'Oven',
-  'Pizza Oven',
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',
@@ -3043,7 +3042,11 @@ RULES:
    - AVOID generic terms: "Supper", "Feast", "Showcase", "Dish", "Meal"
 5. DESCRIPTIONS: "Perfect for: ..." + what makes it special (flavor, texture, occasion)
 6. RESPECT ALL USER CONSTRAINTS: cookware, time, servings, cuisine, dietary restrictions
-   - COOKWARE CONSTRAINT IS CRITICAL: Use ONLY the specified cookware "${cookware}" - NEVER mention other cookware types
+   - COOKWARE CONSTRAINT IS CRITICAL: 
+     * You MUST use EXACTLY "${cookware}" as the cookware value
+     * Valid cookware options are: ${cookwareOptions.join(', ')}
+     * You CANNOT use any cookware not in this list - NO custom cookware allowed
+     * NEVER mention other cookware types in title, description, or instructions
 7. Use each input ingredient at least once across 3 recipes
 8. SPECIFIC quantities (US units), prep notes in parentheses, substitutions, serving suggestions
 9. DETAILED INSTRUCTIONS: Clear steps with specific times, temperatures, and techniques
@@ -3131,25 +3134,51 @@ RULES:
     // Prepare all recipes first (without YouTube data)
     const preparedRecipes = [];
     for (let i = 0; i < generatedRecipes.length; i += 1) {
+      // Validate and normalize cookware - must be from predefined options
+      let validatedCookware = cookware; // Start with user-specified cookware
+      
+      // If AI generated a different cookware, check if it's in the allowed list
+      const aiGeneratedCookware = generatedRecipes[i].cookware;
+      if (aiGeneratedCookware && aiGeneratedCookware !== cookware) {
+        // Check if AI-generated cookware matches any predefined option (case-insensitive)
+        const matchingOption = cookwareOptions.find(
+          option => option.toLowerCase().trim() === aiGeneratedCookware.toLowerCase().trim()
+        );
+        if (matchingOption) {
+          validatedCookware = matchingOption; // Use the exact predefined option
+        } else {
+          // AI generated cookware is not in the list, use user-specified cookware
+          validatedCookware = cookware;
+          console.log(`⚠️  AI generated cookware "${aiGeneratedCookware}" is not in predefined options, using user-specified: "${cookware}"`);
+        }
+      }
+      
+      // Ensure cookware is in the predefined list
+      if (!cookwareOptions.includes(validatedCookware)) {
+        console.warn(`⚠️  Cookware "${validatedCookware}" not in predefined options, defaulting to first option`);
+        validatedCookware = cookwareOptions[0];
+      }
+      
       const generatedRecipe = {
         ...generatedRecipes[i],
-        // Force user requirements to be satisfied
-        cookware: cookware, // Always use user-specified cookware
+        // Force user requirements to be satisfied - always use validated cookware from predefined options
+        cookware: validatedCookware,
       };
       
       // Sanitize cookware references in title, description, and instructions
+      // Use validatedCookware to ensure consistency
       if (generatedRecipe.title) {
-        generatedRecipe.title = sanitizeCookwareReferences(generatedRecipe.title, cookware);
+        generatedRecipe.title = sanitizeCookwareReferences(generatedRecipe.title, validatedCookware);
       }
       if (generatedRecipe.description) {
-        generatedRecipe.description = sanitizeCookwareReferences(generatedRecipe.description, cookware);
+        generatedRecipe.description = sanitizeCookwareReferences(generatedRecipe.description, validatedCookware);
       }
       if (Array.isArray(generatedRecipe.instructions)) {
         generatedRecipe.instructions = generatedRecipe.instructions.map(inst => ({
           ...inst,
           description: sanitizeCookwareReferences(
             typeof inst === 'string' ? inst : (inst.description || inst.step || ''),
-            cookware
+            validatedCookware
           )
         }));
       }
@@ -3233,6 +3262,28 @@ RULES:
           }
         });
       }
+
+      // Limit tags to maximum 3
+      // Priority: user-specified tags (cookware, cuisine, cookingTime, dietaryRestrictions) first
+      const userSpecifiedTags = [];
+      if (cookware) userSpecifiedTags.push(cookware);
+      if (cuisine && cuisine !== 'None') userSpecifiedTags.push(cuisine);
+      if (cookingTime) userSpecifiedTags.push(cookingTime);
+      if (dietaryRestrictions && dietaryRestrictions.length > 0) {
+        userSpecifiedTags.push(...dietaryRestrictions);
+      }
+      
+      // Get AI-generated tags (excluding user-specified ones)
+      const aiGeneratedTags = generatedRecipe.tags.filter(tag => !userSpecifiedTags.includes(tag));
+      
+      // Combine: user-specified tags first, then AI-generated tags (up to 3 total)
+      const maxTags = 3;
+      const finalTags = [
+        ...userSpecifiedTags.slice(0, maxTags),
+        ...aiGeneratedTags.slice(0, Math.max(0, maxTags - userSpecifiedTags.length))
+      ].slice(0, maxTags);
+      
+      generatedRecipe.tags = finalTags;
 
       if (!generatedRecipe.title) {
         console.warn(`⚠️  Skipping recipe option ${i + 1} due to missing title`, generatedRecipe);

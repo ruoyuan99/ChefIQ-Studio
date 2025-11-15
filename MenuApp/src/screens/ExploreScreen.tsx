@@ -31,7 +31,6 @@ interface FilterState {
   servings: string | null;
   cookware: string | null;
   selectedTags: string[];
-  category: string | null;
 }
 
 // Main cookware options
@@ -39,7 +38,6 @@ const COOKWARE_OPTIONS = [
   'Stovetop – Pan or Pot',
   'Air Fryer',
   'Oven',
-  'Pizza Oven',
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',
@@ -65,7 +63,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     servings: null,
     cookware: null,
     selectedTags: [],
-    category: null,
   });
 
   // 合并用户创建的公开菜谱和示例菜谱
@@ -98,20 +95,15 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const availableOptions = useMemo(() => {
     const cookwareSet = new Set<string>();
     const tagsSet = new Set<string>();
-    const categoriesSet = new Set<string>();
     
     allPublicRecipes.forEach(recipe => {
       if (recipe.cookware) cookwareSet.add(recipe.cookware);
       recipe.tags?.forEach(tag => tagsSet.add(tag));
-      recipe.items?.forEach(item => {
-        if (item.category) categoriesSet.add(item.category);
-      });
     });
     
     return {
       cookware: Array.from(cookwareSet).sort(),
       tags: Array.from(tagsSet).sort(),
-      categories: Array.from(categoriesSet).sort(),
     };
   }, [allPublicRecipes]);
 
@@ -178,14 +170,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         if (!hasMatchingTag) return false;
       }
       
-      // 类别筛选
-      if (filters.category) {
-        const hasMatchingCategory = recipe.items?.some((item: any) => 
-          item.category === filters.category
-        );
-        if (!hasMatchingCategory) return false;
-      }
-      
       return true;
     });
 
@@ -247,13 +231,12 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       servings: null,
       cookware: null,
       selectedTags: [],
-      category: null,
     });
   };
 
   // 检查是否有活动的筛选
   const hasActiveFilters = filters.cookingTime || filters.servings || filters.cookware || 
-    filters.selectedTags.length > 0 || filters.category;
+    filters.selectedTags.length > 0;
 
   // 切换标签选择
   const toggleTag = (tag: string) => {
@@ -379,7 +362,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               {hasActiveFilters && (
                 <View style={styles.filterBadge}>
                   <Text style={styles.filterBadgeText}>
-                    {[filters.cookingTime, filters.servings, filters.cookware, filters.category].filter(Boolean).length + filters.selectedTags.length}
+                    {[filters.cookingTime, filters.servings, filters.cookware].filter(Boolean).length + filters.selectedTags.length}
                   </Text>
                 </View>
               )}
@@ -492,34 +475,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               </View>
             </View>
 
-            {/* 类别筛选 */}
-            {availableOptions.categories.length > 0 && (
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Category</Text>
-                <View style={styles.filterOptions}>
-                  {availableOptions.categories.map((category) => (
-                    <TouchableOpacity
-                      key={category}
-                      style={[
-                        styles.filterOption,
-                        filters.category === category && styles.filterOptionActive,
-                      ]}
-                      onPress={() => setFilters(prev => ({
-                        ...prev,
-                        category: prev.category === category ? null : category,
-                      }))}
-                    >
-                      <Text style={[
-                        styles.filterOptionText,
-                        filters.category === category && styles.filterOptionTextActive,
-                      ]}>
-                        {category}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
 
             {/* 标签筛选 */}
             {availableOptions.tags.length > 0 && (

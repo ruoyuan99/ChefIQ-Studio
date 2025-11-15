@@ -52,7 +52,6 @@ const COOKWARE_OPTIONS = [
   'Stovetop – Pan or Pot',
   'Air Fryer',
   'Oven',
-  'Pizza Oven',
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',

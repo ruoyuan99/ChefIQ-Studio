@@ -396,7 +396,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
               ]}
             >
               <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon as any} size={48} color="#d96709" />
+                <Ionicons name={feature.icon as any} size={32} color="#d96709" />
               </View>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -495,39 +495,39 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 3,
     marginRight: 0,
-    minHeight: 200,
+    minHeight: 140,
     justifyContent: 'center',
   },
   featureIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#fff5f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   featureTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   featureDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   progressContainer: {
     flexDirection: 'row',

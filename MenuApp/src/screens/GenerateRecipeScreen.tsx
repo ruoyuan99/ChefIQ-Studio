@@ -53,7 +53,6 @@ const COOKWARE_OPTIONS = [
   'Stovetop – Pan or Pot',
   'Air Fryer',
   'Oven',
-  'Pizza Oven',
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',
@@ -72,6 +71,7 @@ const QUICK_INGREDIENTS = [
   'Bell Pepper',
   'Potato',
 ] as const;
+
 
 const GenerateRecipeScreen: React.FC<GenerateRecipeScreenProps> = ({ navigation }) => {
   const [ingredientInput, setIngredientInput] = useState('');
@@ -174,6 +174,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+
         {/* Ingredients Input */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ingredients *</Text>

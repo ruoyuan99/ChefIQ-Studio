@@ -216,14 +216,14 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
       </View>
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={styles.aiGeneratedSection}>
+          <View style={styles.aiGeneratedSectionHeader}>
             <Ionicons name="sparkles" size={24} color="#d96709" />
             <Text style={styles.sectionTitle}>AI Generated Recipes</Text>
           </View>
           
           {effectiveOptions.length > 1 && (
-            <Text style={styles.sectionSubtitle}>Swipe horizontally to preview different AI recipes</Text>
+            <Text style={styles.aiGeneratedSectionSubtitle}>Swipe horizontally to preview different AI recipes</Text>
           )}
         </View>
 
@@ -257,10 +257,11 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
               return (
                 <View key={`recipe-card-${index}`} style={styles.recipeCardContainer}>
                   <View style={styles.recipeCard}>
-                    <View style={styles.recipeCardHeader}>
-                      <Text style={styles.recipeCardTitle}>{recipe.title}</Text>
-                      <Text style={styles.recipeCardDescription} numberOfLines={3}>{recipe.description}</Text>
-              </View>
+                    <View style={styles.recipeCardContent}>
+                      <View style={styles.recipeCardHeader}>
+                        <Text style={styles.recipeCardTitle}>{recipe.title}</Text>
+                        <Text style={styles.recipeCardDescription} numberOfLines={3}>{recipe.description}</Text>
+                      </View>
 
                     {metaItems.length > 0 && (
               <View style={styles.recipeMeta}>
@@ -293,8 +294,9 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                 <Ionicons name="create-outline" size={20} color="#fff" />
                 <Text style={styles.useRecipeButtonText}>Use This Recipe</Text>
               </TouchableOpacity>
-            </View>
-          </View>
+                    </View>
+                  </View>
+                </View>
               );
             })}
         </ScrollView>
@@ -320,9 +322,6 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
               <Ionicons name="logo-youtube" size={24} color="#FF0000" />
               <Text style={styles.sectionTitle}>Recipes from Youtube</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>
-              We've selected videos perfect for cooking with {generatedRecipe.cookware || 'your cookware'}. Choose one to follow along or open YouTube for more.
-            </Text>
             
             {displayYoutubeVideos.length > 0 ? (
               <>
@@ -495,7 +494,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 24),
+    paddingTop: Platform.OS === 'ios' ? 52 : ((StatusBar.currentHeight || 24) + 8), // Increased padding for more distance from top
     paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: 'white',
@@ -535,10 +534,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  // Special styling for AI Generated Recipes section to make it more compact
+  aiGeneratedSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    paddingBottom: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  // Compact header for AI Generated Recipes section
+  aiGeneratedSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
@@ -550,6 +568,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 16,
+    marginLeft: 32,
+  },
+  // Compact subtitle for AI Generated Recipes section
+  aiGeneratedSectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8, // Reduced from 16 to 8 for more compact layout
     marginLeft: 32,
   },
   // Generated Recipe Preview
@@ -617,7 +642,7 @@ const styles = StyleSheet.create({
   youtubeThumbnailContainer: {
     position: 'relative',
     width: '100%',
-    height: 200,
+    height: 150,
     backgroundColor: '#ddd',
   },
   youtubeThumbnail: {
@@ -644,13 +669,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   youtubeVideoInfo: {
-    padding: 16,
-    paddingTop: 12,
+    padding: 12,
+    paddingTop: 10,
   },
   youtubeDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 18,
     textAlign: 'left',
   },
   youtubeSearchButton: Buttons.primary.container,
@@ -728,7 +753,8 @@ const styles = StyleSheet.create({
   horizontalScrollView: {
     marginLeft: -20,
     marginRight: -20,
-    marginBottom: 16,
+    marginBottom: 8, // Reduced from 16 to 8 for more compact layout
+    overflow: 'visible', // Allow shadow to be visible
   },
   horizontalScrollViewContent: {
     paddingHorizontal: 0,
@@ -738,18 +764,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: CARD_HORIZONTAL_PADDING,
+    paddingVertical: Platform.OS === 'android' ? 0 : 8, // iOS needs padding for shadow, Android uses elevation
+    position: 'relative',
+    overflow: 'visible', // Allow shadow to be visible
   },
   recipeCard: {
     backgroundColor: '#fff',
     borderRadius: 16, // Increased from 12 to 16 for more rounded corners
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 }, // Increased shadow offset for more depth
-    shadowOpacity: 0.12, // Slightly increased shadow opacity
-    shadowRadius: 8, // Increased shadow radius for softer shadow
-    elevation: 4, // Increased elevation for Android
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 }, // Increased shadow offset for more depth
+      shadowOpacity: 0.2, // Increased shadow opacity for better visibility
+      shadowRadius: 12, // Increased shadow radius for softer, more visible shadow
+      overflow: 'visible', // iOS needs overflow visible for shadow to show
+    } : {
+      // Use same shadow as YouTube cards on Android
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      overflow: 'hidden', // Android can use hidden for content clipping
+    }),
     width: CARD_WIDTH,
     alignSelf: 'center',
+  },
+  recipeCardContent: {
+    borderRadius: 16, // Match parent borderRadius
+    overflow: 'hidden', // Clip content inside while allowing parent shadow to show
   },
   recipeCardHeader: {
     paddingHorizontal: CARD_INNER_PADDING,
@@ -826,8 +868,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 4, // Reduced from 12 to 4 to decrease distance from recipe cards
+    marginBottom: 20, // Increased from 8 to 20 to increase distance to YouTube section
     paddingHorizontal: 20,
   },
   pageIndicator: {
@@ -863,10 +905,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   youtubeVideoTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
   },
 });
 

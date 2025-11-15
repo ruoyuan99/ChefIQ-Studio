@@ -21,7 +21,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of recipes.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select recipe images.",
-        "NSMicrophoneUsageDescription": "This app needs access to your microphone for voice instructions."
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone for voice instructions.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

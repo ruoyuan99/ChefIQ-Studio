@@ -9,8 +9,8 @@ import {
   Alert,
   StatusBar,
   Platform,
-  TouchableWithoutFeedback,
 } from 'react-native';
+import { Dropdown } from 'react-native-element-dropdown';
 import { Ionicons } from '@expo/vector-icons';
 import { useGroceries } from '../contexts/GroceriesContext';
 
@@ -49,9 +49,15 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
   const [newItemCategory, setNewItemCategory] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showUnitDropdown, setShowUnitDropdown] = useState(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [isNewCategory, setIsNewCategory] = useState(false);
+
+  // Prepare unit options for dropdown (format: {label, value})
+  const unitDropdownData = useMemo(() => {
+    return UNIT_OPTIONS.map(unit => ({
+      label: unit.label,
+      value: unit.value,
+    }));
+  }, []);
 
   // Get all categories (recipe titles) with their items
   const categories = useMemo(() => {
@@ -74,6 +80,17 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
   const availableCategories = useMemo(() => {
     return Array.from(new Set(state.items.map(item => item.recipeTitle))).sort();
   }, [state.items]);
+
+  // Prepare category options for dropdown (format: {label, value})
+  const categoryDropdownData = useMemo(() => {
+    const data = [
+      { label: 'Create New Category', value: '__NEW__' },
+    ];
+    availableCategories.forEach(category => {
+      data.push({ label: category, value: category });
+    });
+    return data;
+  }, [availableCategories]);
 
   // Initialize all categories as expanded
   React.useEffect(() => {
@@ -109,20 +126,11 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
       setNewItemCategory('');
       setIsNewCategory(false);
       setShowAddForm(false);
-      setShowUnitDropdown(false);
-      setShowCategoryDropdown(false);
     } else {
       Alert.alert('Error', 'Please enter an item name');
     }
   };
 
-  const closeAllDropdowns = () => {
-    setShowUnitDropdown(false);
-    setShowCategoryDropdown(false);
-  };
-
-  // Check if any dropdown is open
-  const isAnyDropdownOpen = showUnitDropdown || showCategoryDropdown;
 
   const handleRemoveCategory = (categoryTitle: string) => {
     Alert.alert(
@@ -291,175 +299,100 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
                 keyboardType="numeric"
               />
               <View style={styles.unitContainer}>
-                <TouchableOpacity
+                <Dropdown
                   style={[styles.textInput, styles.unitInput, styles.unitDropdown]}
-                  onPress={() => {
-                    setShowUnitDropdown(!showUnitDropdown);
-                    setShowCategoryDropdown(false);
+                  placeholderStyle={styles.placeholderText}
+                  selectedTextStyle={styles.dropdownSelectedText}
+                  containerStyle={styles.dropdownContainer}
+                  data={unitDropdownData}
+                  maxHeight={300}
+                  labelField="label"
+                  valueField="value"
+                  placeholder="Unit"
+                  value={newItemUnit}
+                  onChange={(item) => {
+                    setNewItemUnit(item.value);
                   }}
-                >
-                  <Text style={[!newItemUnit && styles.placeholderText]}>
-                    {newItemUnit 
-                      ? UNIT_OPTIONS.find(u => u.value === newItemUnit)?.label || newItemUnit
-                      : 'Unit'}
-                  </Text>
-                  <Ionicons
-                    name={showUnitDropdown ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-                {showUnitDropdown && (
-                  <View 
-                    style={styles.unitDropdownList}
-                  >
-                    <ScrollView 
-                      style={styles.unitDropdownScroll}
-                      nestedScrollEnabled={Platform.OS === 'android'}
-                      showsVerticalScrollIndicator={true}
-                      scrollEnabled={true}
-                      bounces={false}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      {Object.entries(
-                        UNIT_OPTIONS.reduce((acc, unit) => {
-                          if (!acc[unit.category]) {
-                            acc[unit.category] = [];
-                          }
-                          acc[unit.category].push(unit);
-                          return acc;
-                        }, {} as Record<string, typeof UNIT_OPTIONS>)
-                      ).map(([category, units]) => (
-                        <View key={category} style={styles.unitCategoryGroup}>
-                          <Text style={styles.unitCategoryLabel}>{category}</Text>
-                          {units.map((unit) => (
-                            <TouchableOpacity
-                              key={unit.value}
-                              style={[
-                                styles.unitDropdownItem,
-                                newItemUnit === unit.value && styles.unitDropdownItemSelected
-                              ]}
-                              onPress={() => {
-                                setNewItemUnit(unit.value);
-                                setShowUnitDropdown(false);
-                              }}
-                            >
-                              <Text style={[
-                                styles.unitDropdownItemText,
-                                newItemUnit === unit.value && styles.unitDropdownItemTextSelected
-                              ]}>
-                                {unit.label}
-                              </Text>
-                              {newItemUnit === unit.value && (
-                                <Ionicons name="checkmark" size={20} color="#FF6B35" />
-                              )}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
+                  renderLeftIcon={() => (
+                    <Ionicons name="scale-outline" size={20} color="#666" style={{ marginRight: 8 }} />
+                  )}
+                  renderItem={(item, selected) => (
+                    <View style={[
+                      styles.dropdownItem,
+                      selected && styles.dropdownItemSelected
+                    ]}>
+                      <Text style={[
+                        styles.dropdownItemText,
+                        selected && styles.dropdownItemTextSelected
+                      ]}>
+                        {item.label}
+                      </Text>
+                      {selected && (
+                        <Ionicons name="checkmark" size={20} color="#FF6B35" />
+                      )}
+                    </View>
+                  )}
+                />
               </View>
             </View>
             <View style={styles.categoryRow}>
               <View style={styles.categoryContainer}>
-                <TouchableOpacity
+                <Dropdown
                   style={[styles.textInput, styles.categoryDropdown]}
-                  onPress={() => {
-                    setShowCategoryDropdown(!showCategoryDropdown);
-                    setShowUnitDropdown(false);
+                  placeholderStyle={styles.placeholderText}
+                  selectedTextStyle={styles.dropdownSelectedText}
+                  containerStyle={styles.dropdownContainer}
+                  data={categoryDropdownData}
+                  maxHeight={300}
+                  labelField="label"
+                  valueField="value"
+                  placeholder="Category (optional)"
+                  value={isNewCategory ? '__NEW__' : (newItemCategory || null)}
+                  onChange={(item) => {
+                    if (item.value === '__NEW__') {
+                      setIsNewCategory(true);
+                      setNewItemCategory('');
+                    } else {
+                      setIsNewCategory(false);
+                      setNewItemCategory(item.value);
+                    }
                   }}
-                >
-                  <Text style={[!newItemCategory && styles.placeholderText]}>
-                    {newItemCategory || 'Category (optional)'}
-                  </Text>
-                  <Ionicons
-                    name={showCategoryDropdown ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-                {showCategoryDropdown && (
-                  <View 
-                    style={styles.categoryDropdownList}
-                  >
-                    <ScrollView 
-                      style={styles.categoryDropdownScroll}
-                      nestedScrollEnabled={Platform.OS === 'android'}
-                      showsVerticalScrollIndicator={true}
-                      scrollEnabled={true}
-                      bounces={false}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      <TouchableOpacity
-                        style={[
-                          styles.categoryDropdownItem,
-                          isNewCategory && styles.categoryDropdownItemSelected
-                        ]}
-                        onPress={() => {
-                          setIsNewCategory(true);
-                          setNewItemCategory('');
-                          setShowCategoryDropdown(false);
-                        }}
-                      >
+                  renderLeftIcon={() => (
+                    <Ionicons name="folder-outline" size={20} color="#666" style={{ marginRight: 8 }} />
+                  )}
+                  renderItem={(item, selected) => (
+                    <View style={[
+                      styles.dropdownItem,
+                      selected && styles.dropdownItemSelected
+                    ]}>
+                      {item.value === '__NEW__' && (
                         <Ionicons name="add-circle-outline" size={18} color="#FF6B35" style={{ marginRight: 8 }} />
-                        <Text style={[
-                          styles.categoryDropdownItemText,
-                          isNewCategory && styles.categoryDropdownItemTextSelected
-                        ]}>
-                          Create New Category
-                        </Text>
-                        {isNewCategory && (
-                          <Ionicons name="checkmark" size={20} color="#FF6B35" />
-                        )}
-                      </TouchableOpacity>
-                      {availableCategories.length > 0 && (
-                        <>
-                          <View style={styles.categoryDivider} />
-                          <Text style={styles.categorySectionLabel}>Existing Categories</Text>
-                          {availableCategories.map((category) => (
-                            <TouchableOpacity
-                              key={category}
-                              style={[
-                                styles.categoryDropdownItem,
-                                newItemCategory === category && !isNewCategory && styles.categoryDropdownItemSelected
-                              ]}
-                              onPress={() => {
-                                setNewItemCategory(category);
-                                setIsNewCategory(false);
-                                setShowCategoryDropdown(false);
-                              }}
-                            >
-                              <Text style={[
-                                styles.categoryDropdownItemText,
-                                newItemCategory === category && !isNewCategory && styles.categoryDropdownItemTextSelected
-                              ]}>
-                                {category}
-                              </Text>
-                              {newItemCategory === category && !isNewCategory && (
-                                <Ionicons name="checkmark" size={20} color="#FF6B35" />
-                              )}
-                            </TouchableOpacity>
-                          ))}
-                        </>
                       )}
-                    </ScrollView>
-                  </View>
+                      <Text style={[
+                        styles.dropdownItemText,
+                        selected && styles.dropdownItemTextSelected
+                      ]}>
+                        {item.label}
+                      </Text>
+                      {selected && (
+                        <Ionicons name="checkmark" size={20} color="#FF6B35" />
+                      )}
+                    </View>
+                  )}
+                />
+                {isNewCategory && (
+                  <TextInput
+                    style={[styles.textInput, styles.newCategoryInput]}
+                    placeholder="Enter new category name"
+                    placeholderTextColor="#999"
+                    value={newItemCategory}
+                    onChangeText={(text) => {
+                      setNewItemCategory(text);
+                      setIsNewCategory(true);
+                    }}
+                  />
                 )}
               </View>
-              {isNewCategory && (
-                <TextInput
-                  style={[styles.textInput, styles.newCategoryInput]}
-                  placeholder="Enter new category name"
-                  placeholderTextColor="#999"
-                  value={newItemCategory}
-                  onChangeText={(text) => {
-                    setNewItemCategory(text);
-                    setIsNewCategory(true);
-                  }}
-                />
-              )}
             </View>
             <View style={styles.addFormActions}>
               <TouchableOpacity
@@ -471,8 +404,6 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
                   setNewItemUnit('');
                   setNewItemCategory('');
                   setIsNewCategory(false);
-                  setShowUnitDropdown(false);
-                  setShowCategoryDropdown(false);
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -510,6 +441,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+    overflow: 'visible',
   },
   header: {
     backgroundColor: 'white',
@@ -531,6 +463,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    zIndex: 9999,
+    elevation: Platform.OS === 'android' ? 9999 : 0,
   },
   scrollView: {
     flex: 1,
@@ -556,6 +490,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
     padding: 12,
+    zIndex: 9999,
+    elevation: Platform.OS === 'android' ? 9999 : 0,
+    overflow: 'visible',
   },
   textInput: {
     borderWidth: 1,
@@ -578,7 +515,12 @@ const styles = StyleSheet.create({
   unitContainer: {
     flex: 1,
     position: 'relative',
-    zIndex: 1000,
+    zIndex: 99999,
+    elevation: Platform.OS === 'android' ? 99999 : 0,
+  },
+  dropdownContainer: {
+    zIndex: 999999,
+    elevation: Platform.OS === 'android' ? 999999 : 0,
   },
   unitInput: {
     flex: 1,
@@ -592,50 +534,11 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#999',
   },
-  dropdownOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999998,
-    elevation: 999,
+  dropdownSelectedText: {
+    fontSize: 14,
+    color: '#333',
   },
-  unitDropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 300,
-    zIndex: 999999,
-    elevation: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  unitDropdownScroll: {
-    maxHeight: 300,
-  },
-  unitCategoryGroup: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  unitCategoryLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f8f9fa',
-    textTransform: 'uppercase',
-  },
-  unitDropdownItem: {
+  dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -644,15 +547,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  unitDropdownItemSelected: {
+  dropdownItemSelected: {
     backgroundColor: '#FFF3E0',
   },
-  unitDropdownItemText: {
+  dropdownItemText: {
     fontSize: 14,
     color: '#333',
     flex: 1,
   },
-  unitDropdownItemTextSelected: {
+  dropdownItemTextSelected: {
     color: '#FF6B35',
     fontWeight: '600',
   },
@@ -661,67 +564,13 @@ const styles = StyleSheet.create({
   },
   categoryContainer: {
     position: 'relative',
-    zIndex: 999,
+    zIndex: 99999,
+    elevation: Platform.OS === 'android' ? 99999 : 0,
   },
   categoryDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  categoryDropdownList: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 250,
-    zIndex: 999999,
-    elevation: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  categoryDropdownScroll: {
-    maxHeight: 250,
-  },
-  categoryDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  categoryDropdownItemSelected: {
-    backgroundColor: '#FFF3E0',
-  },
-  categoryDropdownItemText: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-  },
-  categoryDropdownItemTextSelected: {
-    color: '#FF6B35',
-    fontWeight: '600',
-  },
-  categoryDivider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 4,
-  },
-  categorySectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f8f9fa',
   },
   newCategoryInput: {
     marginTop: 8,

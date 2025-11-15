@@ -441,7 +441,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
                 styles.triedButtonText,
                 isTried(recipe.id) && styles.triedButtonTextActive
               ]}>
-                {isTried(recipe.id) ? "Tried it!" : "Try it!"}
+                Tried it!
               </Text>
             </TouchableOpacity>
           <Text style={styles.triedCount}>
