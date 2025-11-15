@@ -161,7 +161,10 @@ const ScanRecipeModal: React.FC<ScanRecipeModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content}>
+          <ScrollView 
+            style={styles.content}
+            nestedScrollEnabled={true}
+          >
             <Text style={styles.label}>Select Recipe Image</Text>
             
             {selectedImage ? (

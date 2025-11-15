@@ -1288,6 +1288,9 @@ const handleIngredientTagPress = (ingredientName: string) => {
     </View>
   );
 
+  // Check if any dropdown is open
+  const isAnyDropdownOpen = showCookwareDropdown || showCookingTimeDropdown || showServingsDropdown || showUnitDropdown;
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
@@ -1436,10 +1439,6 @@ const handleIngredientTagPress = (ingredientName: string) => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={closeAllDropdowns}
-          onStartShouldSetResponder={() => {
-            closeAllDropdowns();
-            return false;
-          }}
         >
         {/* Recipe Photo Section */}
         <View 
@@ -1714,9 +1713,15 @@ const handleIngredientTagPress = (ingredientName: string) => {
             {showCookwareDropdown && (
               <View 
                 style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
-                onStartShouldSetResponder={() => true}
               >
-                <ScrollView showsVerticalScrollIndicator={true}>
+                <ScrollView 
+                  nestedScrollEnabled={Platform.OS === 'android'}
+                  showsVerticalScrollIndicator={true}
+                  scrollEnabled={true}
+                  bounces={false}
+                  style={{ maxHeight: 200 }}
+                  keyboardShouldPersistTaps="handled"
+                >
                   {cookwareOptions.map((cookware) => (
                     <TouchableOpacity
                       key={cookware}
@@ -1760,9 +1765,15 @@ const handleIngredientTagPress = (ingredientName: string) => {
               {showCookingTimeDropdown && (
                 <View 
                   style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
-                  onStartShouldSetResponder={() => true}
                 >
-                  <ScrollView showsVerticalScrollIndicator={true}>
+                  <ScrollView 
+                    nestedScrollEnabled={Platform.OS === 'android'}
+                    showsVerticalScrollIndicator={true}
+                    scrollEnabled={true}
+                    bounces={false}
+                    style={{ maxHeight: 200 }}
+                    keyboardShouldPersistTaps="handled"
+                  >
                     {cookingTimeOptions.map((option, index) => (
                       <TouchableOpacity
                         key={index}
@@ -1804,9 +1815,15 @@ const handleIngredientTagPress = (ingredientName: string) => {
               {showServingsDropdown && (
                 <View 
                   style={[styles.dropdownList, { position: 'absolute', top: 60, left: 0, right: 0, zIndex: 999999, elevation: 1000, maxHeight: 200 }]}
-                  onStartShouldSetResponder={() => true}
                 >
-                  <ScrollView showsVerticalScrollIndicator={true}>
+                  <ScrollView 
+                    nestedScrollEnabled={Platform.OS === 'android'}
+                    showsVerticalScrollIndicator={true}
+                    scrollEnabled={true}
+                    bounces={false}
+                    style={{ maxHeight: 200 }}
+                    keyboardShouldPersistTaps="handled"
+                  >
                     {servingsOptions.map((option, index) => (
                       <TouchableOpacity
                         key={index}
@@ -1845,7 +1862,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 <Text style={styles.ingredientLabel}>Name</Text>
                 <TextInput
                   style={styles.ingredientInput}
-                  placeholder="e.g., flour, salt, butter"
+                  placeholder="e.g., flour"
                   value={newIngredient.name}
                   onChangeText={text => setNewIngredient({ ...newIngredient, name: text })}
                   onFocus={() => {
@@ -1896,12 +1913,14 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   {showUnitDropdown && (
                     <View 
                       style={styles.unitDropdownList}
-                      onStartShouldSetResponder={() => true}
                     >
                       <ScrollView 
                         style={styles.unitDropdownScroll}
-                        nestedScrollEnabled={true}
+                        nestedScrollEnabled={Platform.OS === 'android'}
                         showsVerticalScrollIndicator={true}
+                        scrollEnabled={true}
+                        bounces={false}
+                        keyboardShouldPersistTaps="handled"
                       >
                         {Object.entries(
                           UNIT_OPTIONS.reduce((acc, unit) => {
@@ -2786,6 +2805,16 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: '#999',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999998,
+    elevation: 999,
+    backgroundColor: 'transparent',
   },
   dropdownList: {
     position: 'absolute',

@@ -156,26 +156,46 @@ export class RealTimeSyncService {
     }
   }
 
-  // 删除菜谱（及其子表）
+  // 删除菜谱（及其子表）- 基于ID
+  static async deleteRecipeById(recipeId: string): Promise<void> {
+    try {
+      // 直接通过ID删除菜谱（Cascade deletes should handle children if FK is ON DELETE CASCADE）
+      const { error } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', recipeId);
+
+      if (error) throw error;
+
+      console.log(`✅ 菜谱删除已同步: recipeId=${recipeId}`);
+    } catch (err) {
+      console.error('❌ 菜谱删除同步失败:', err);
+    }
+  }
+
+  // 删除菜谱（及其子表）- 基于标题（保留以兼容旧代码，但不推荐使用）
   static async deleteRecipeByTitleForUser(title: string, userId: string): Promise<void> {
     try {
-      const { data: recipe, error } = await supabase
+      // 获取所有匹配的菜谱（可能有多个同名菜谱）
+      const { data: recipes, error } = await supabase
         .from('recipes')
         .select('id')
         .eq('title', title)
-        .eq('user_id', userId)
-        .maybeSingle();
+        .eq('user_id', userId);
 
       if (error) throw error;
-      if (!recipe?.id) return; // nothing to delete
+      if (!recipes || recipes.length === 0) return; // nothing to delete
 
-      // Cascade deletes should handle children if FK is ON DELETE CASCADE.
-      await supabase
+      // 删除所有匹配的菜谱（Cascade deletes should handle children if FK is ON DELETE CASCADE）
+      const recipeIds = recipes.map(r => r.id);
+      const { error: deleteError } = await supabase
         .from('recipes')
         .delete()
-        .eq('id', recipe.id);
+        .in('id', recipeIds);
 
-      console.log('✅ 菜谱删除已同步:', title);
+      if (deleteError) throw deleteError;
+
+      console.log(`✅ 菜谱删除已同步: ${title} (删除了 ${recipes.length} 条记录)`);
     } catch (err) {
       console.error('❌ 菜谱删除同步失败:', err);
     }

@@ -7,9 +7,11 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Buttons, Colors } from '../styles/theme';
+import { Buttons, Colors, getFontWeight } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useSocialStats } from '../contexts/SocialStatsContext';
@@ -118,57 +120,44 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Edit Profile Button - 右上角 */}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Edit profile"
+        style={styles.editProfileButton}
+        onPress={() => navigation.navigate('EditProfile')}
+      >
+        <Ionicons name="create-outline" size={20} color={Colors.primary} />
+      </TouchableOpacity>
+      
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Points Display */}
-        <PointsDisplay onPress={() => navigation.navigate('PointsHistory')} />
-        
-        {/* Chef iQ Challenge Card - Prominent placement at top */}
-        <TouchableOpacity
-          style={styles.challengeCard}
-          onPress={() => navigation.navigate('ChefIQChallenge')}
-          activeOpacity={0.8}
-        >
-          <View style={styles.challengeCardContent}>
-            <View style={styles.challengeIconContainer}>
-              <Ionicons name="trophy" size={32} color="#FFD700" />
-            </View>
-            <View style={styles.challengeTextContainer}>
-              <Text style={styles.challengeTitle}>Chef iQ Challenge</Text>
-              <Text style={styles.challengeDescription}>Test your cooking skills and compete with others!</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
-          </View>
-        </TouchableOpacity>
-        
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              {user?.avatar_url ? (
-                <OptimizedImage
-                  source={user.avatar_url}
-                  style={styles.avatarImage}
-                  contentFit="cover"
-                  showLoader={true}
-                  cachePolicy="memory-disk"
-                  priority="high"
-                />
-              ) : (
-              <Ionicons name="person" size={40} color="#FF6B35" />
-              )}
+          <View style={styles.profileTopRow}>
+            {/* 左侧头像 - 1/3 */}
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                {user?.avatar_url ? (
+                  <OptimizedImage
+                    source={user.avatar_url}
+                    style={styles.avatarImage}
+                    contentFit="cover"
+                    showLoader={true}
+                    cachePolicy="memory-disk"
+                    priority="high"
+                  />
+                ) : (
+                <Ionicons name="person" size={40} color="#FF6B35" />
+                )}
+              </View>
+            </View>
+            
+            {/* 右侧用户名和邮箱 - 2/3 */}
+            <View style={styles.profileInfoContainer}>
+              <Text style={styles.userName}>{user?.name || 'Recipe Chef'}</Text>
+              <Text style={styles.userEmail}>{user?.email || 'chef@recipeapp.com'}</Text>
             </View>
           </View>
-          <Text style={styles.userName}>{user?.name || 'Recipe Chef'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'chef@recipeapp.com'}</Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Edit profile"
-            style={[Buttons.secondary.container, { paddingVertical: 10, paddingHorizontal: 16 }]}
-            onPress={() => navigation.navigate('EditProfile')}
-          >
-            <Ionicons name="create-outline" size={16} color={Colors.primary} />
-            <Text style={Buttons.secondary.text}>Edit Profile</Text>
-          </TouchableOpacity>
           
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
@@ -208,6 +197,29 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             </View>
           </View>
         </View>
+
+        {/* Points Display */}
+        <View style={styles.pointsDisplayWrapper}>
+          <PointsDisplay onPress={() => navigation.navigate('PointsHistory')} />
+        </View>
+        
+        {/* Chef iQ Challenge Card */}
+        <TouchableOpacity
+          style={styles.challengeCard}
+          onPress={() => navigation.navigate('ChefIQChallenge')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.challengeCardContent}>
+            <View style={styles.challengeIconContainer}>
+              <Ionicons name="trophy" size={32} color="#FFD700" />
+            </View>
+            <View style={styles.challengeTextContainer}>
+              <Text style={styles.challengeTitle}>Chef iQ Challenge</Text>
+              <Text style={styles.challengeDescription}>Test your cooking skills and compete with others!</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
+          </View>
+        </TouchableOpacity>
 
         {/* Badges Section */}
         <View style={styles.badgesContainer}>
@@ -251,7 +263,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                     >
                       <Ionicons
                         name={badge.icon as any}
-                        size={24}
+                        size={20}
                         color={isUnlocked ? '#fff' : '#999'}
                       />
                     </View>
@@ -266,7 +278,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                     </Text>
                     {isUnlocked && (
                       <View style={styles.badgeUnlockedIndicator}>
-                        <Ionicons name="checkmark-circle" size={16} color={badge.color} />
+                        <Ionicons name="checkmark-circle" size={14} color={badge.color} />
                       </View>
                     )}
                   </View>
@@ -308,21 +320,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-    paddingBottom: 100, // 增加底部流白空间
+    paddingBottom: Platform.OS === 'ios' ? 100 : 0, // iOS需要安全区域，Android不需要额外padding
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, // Android添加状态栏高度
+  },
+  pointsDisplayWrapper: {
+    marginTop: -8, // 负边距缩短与 Social Stats 的距离
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0, // Android上完全移除空白，iOS保留小间距
+  },
+  editProfileButton: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 8,
+    right: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(218, 104, 9, 0.2)',
   },
   profileHeader: {
     backgroundColor: 'white',
-    alignItems: 'center',
-    paddingVertical: 32,
+    paddingTop: 32,
+    paddingBottom: 16, // 减少底部间距
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  avatarContainer: {
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  avatarContainer: {
+    width: '33.33%', // 左侧1/3
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
     width: 80,
@@ -339,16 +381,21 @@ const styles = StyleSheet.create({
     height: 74,
     borderRadius: 37,
   },
+  profileInfoContainer: {
+    flex: 1, // 右侧2/3
+    paddingLeft: 16,
+    justifyContent: 'center',
+  },
   userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: getFontWeight('bold') as any,
     color: '#333',
     marginBottom: 4,
   },
   userEmail: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    marginBottom: 12,
+    marginBottom: 0, // 移除底部间距，因为不再在头像下方
   },
   editButton: {
     flexDirection: 'row',
@@ -402,7 +449,7 @@ const styles = StyleSheet.create({
   },
   challengeTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: getFontWeight('bold') as any,
     color: '#333',
     marginBottom: 4,
   },
@@ -418,7 +465,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: getFontWeight('600') as any,
     color: '#333',
     marginBottom: 16,
   },
@@ -426,7 +473,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 12, // 减少顶部间距，缩短与 Profile 的距离
     width: '100%',
   },
   statCard: {
@@ -442,7 +489,7 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: getFontWeight('bold') as any,
     color: '#FF6B35',
     marginBottom: 3,
   },
@@ -465,9 +512,9 @@ const styles = StyleSheet.create({
   },
   badgesHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between', // 让标题在左，计数在右
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8, // 减少底部间距，缩短与图标之间的距离
   },
   badgesCount: {
     fontSize: 14,
@@ -479,15 +526,15 @@ const styles = StyleSheet.create({
   },
   badgesScrollContent: {
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 4, // 减少垂直padding
   },
   badgeItemHorizontal: {
-    width: 100,
+    width: 80, // 缩小宽度从100到80
     alignItems: 'center',
-    marginRight: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    marginRight: 8, // 减少卡片间距从12到8
+    paddingVertical: 8, // 减少垂直padding从12到8
+    paddingHorizontal: 6, // 减少水平padding从8到6
+    borderRadius: 10, // 稍微减小圆角
     backgroundColor: '#f8f9fa',
     position: 'relative',
   },
@@ -495,12 +542,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   badgeIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48, // 缩小图标容器从56到48
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 4, // 减少底部间距从8到4
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -508,8 +555,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   badgeName: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11, // 减小字体从12到11
+    fontWeight: getFontWeight('600') as any,
     color: '#333',
     textAlign: 'center',
   },
@@ -518,8 +565,8 @@ const styles = StyleSheet.create({
   },
   badgeUnlockedIndicator: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 2, // 调整位置以适应更小的卡片
+    right: 2,
   },
   menuContainer: {
     backgroundColor: 'white',
@@ -552,7 +599,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: getFontWeight('600') as any,
     color: '#333',
     marginBottom: 4,
   },

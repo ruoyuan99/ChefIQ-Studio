@@ -1,7 +1,9 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { Platform } from 'react-native';
 import { RootStackParamList } from '../types';
+import { getFontWeight } from '../styles/theme';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -44,7 +46,7 @@ const AppNavigator: React.FC = () => {
           },
           headerTintColor: '#333',
           headerTitleStyle: {
-            fontWeight: '600',
+            fontWeight: getFontWeight('600') as any,
           },
         }}
       >

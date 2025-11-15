@@ -9,6 +9,7 @@ import {
   Alert,
   StatusBar,
   Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGroceries } from '../contexts/GroceriesContext';
@@ -114,6 +115,14 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
       Alert.alert('Error', 'Please enter an item name');
     }
   };
+
+  const closeAllDropdowns = () => {
+    setShowUnitDropdown(false);
+    setShowCategoryDropdown(false);
+  };
+
+  // Check if any dropdown is open
+  const isAnyDropdownOpen = showUnitDropdown || showCategoryDropdown;
 
   const handleRemoveCategory = (categoryTitle: string) => {
     Alert.alert(
@@ -301,11 +310,16 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
                   />
                 </TouchableOpacity>
                 {showUnitDropdown && (
-                  <View style={styles.unitDropdownList}>
+                  <View 
+                    style={styles.unitDropdownList}
+                  >
                     <ScrollView 
                       style={styles.unitDropdownScroll}
-                      nestedScrollEnabled={true}
+                      nestedScrollEnabled={Platform.OS === 'android'}
                       showsVerticalScrollIndicator={true}
+                      scrollEnabled={true}
+                      bounces={false}
+                      keyboardShouldPersistTaps="handled"
                     >
                       {Object.entries(
                         UNIT_OPTIONS.reduce((acc, unit) => {
@@ -367,11 +381,16 @@ const GroceriesScreen: React.FC<GroceriesScreenProps> = ({ navigation }) => {
                   />
                 </TouchableOpacity>
                 {showCategoryDropdown && (
-                  <View style={styles.categoryDropdownList}>
+                  <View 
+                    style={styles.categoryDropdownList}
+                  >
                     <ScrollView 
                       style={styles.categoryDropdownScroll}
-                      nestedScrollEnabled={true}
+                      nestedScrollEnabled={Platform.OS === 'android'}
                       showsVerticalScrollIndicator={true}
+                      scrollEnabled={true}
+                      bounces={false}
+                      keyboardShouldPersistTaps="handled"
                     >
                       <TouchableOpacity
                         style={[
@@ -573,6 +592,15 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#999',
   },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999998,
+    elevation: 999,
+  },
   unitDropdownList: {
     position: 'absolute',
     top: '100%',
@@ -584,12 +612,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 4,
     maxHeight: 300,
+    zIndex: 999999,
+    elevation: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1001,
   },
   unitDropdownScroll: {
     maxHeight: 300,
@@ -651,12 +679,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 4,
     maxHeight: 250,
+    zIndex: 999999,
+    elevation: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1000,
   },
   categoryDropdownScroll: {
     maxHeight: 250,

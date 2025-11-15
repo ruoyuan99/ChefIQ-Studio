@@ -180,7 +180,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="Enter ingredient (e.g., chicken, tomato, onion)"
+              placeholder="Add ingredient"
               value={ingredientInput}
               onChangeText={setIngredientInput}
               onSubmitEditing={handleAddIngredient}

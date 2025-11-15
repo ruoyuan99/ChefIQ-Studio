@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#DA6809',
     borderRadius: 0,
-    paddingVertical: 20,
+    paddingVertical: 18, // 适中的垂直padding
     paddingHorizontal: 24,
     overflow: 'hidden',
   },
@@ -389,43 +389,43 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   circleOuter: {
-    marginTop: 16,
+    marginTop: 14, // 适中的顶部间距
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 230,
+    minHeight: 215, // 适中的最小高度
   },
   // Layered glow rings (no extra deps)
   circleGlowOuter: {
     position: 'absolute',
-    width: 210,
-    height: 210,
-    borderRadius: 105,
+    width: 200, // 适中的尺寸
+    height: 200,
+    borderRadius: 100,
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
   circleGlowMid: {
     position: 'absolute',
-    width: 190,
-    height: 190,
-    borderRadius: 95,
+    width: 185, // 适中的尺寸
+    height: 185,
+    borderRadius: 92.5,
     backgroundColor: 'rgba(255,255,255,0.24)',
   },
   circleGlowInner: {
     position: 'absolute',
-    width: 170,
+    width: 170, // 适中的尺寸
     height: 170,
     borderRadius: 85,
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   circleInner: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 155, // 适中的尺寸
+    height: 155,
+    borderRadius: 77.5,
     backgroundColor: 'rgba(255,255,255,0.22)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 14, // 适中的内部padding
   },
   bubble: {
     position: 'absolute',
@@ -493,24 +493,24 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
   },
   circlePoints: {
-    marginTop: 6,
-    fontSize: 30,
+    marginTop: 5, // 适中的顶部间距
+    fontSize: 29, // 适中的字体大小
     fontWeight: '700',
     color: '#FFFFFF',
   },
   circleLevel: {
-    marginTop: 10,
+    marginTop: 8, // 适中的顶部间距
     fontSize: 11,
     color: 'rgba(255,255,255,0.95)',
     fontWeight: '700',
   },
   footerRow: {
-    marginTop: 20,
+    marginTop: 18, // 适中的顶部间距
   },
   progressLabel: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.95)',
-    marginBottom: 8,
+    marginBottom: 7, // 适中的底部间距
   },
   progressBar: {
     height: 6,

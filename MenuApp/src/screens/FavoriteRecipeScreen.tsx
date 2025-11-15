@@ -8,9 +8,12 @@ import {
   SafeAreaView,
   Modal,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { getFontWeight } from '../styles/theme';
 import { useLike } from '../contexts/LikeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useFavorite } from '../contexts/FavoriteContext';
@@ -93,6 +96,23 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
 
   const renderFavoriteCard = (recipe: any) => (
     <View key={recipe.id} style={styles.favoriteCardWrapper}>
+      {/* Android上的渐变阴影效果 - 在卡片外部 */}
+      {Platform.OS === 'android' && (
+        <View style={styles.cardShadowContainer}>
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer1]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer2]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer3]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer4]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer5]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer6]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer7]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer8]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer9]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer10]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer11]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer12]} />
+        </View>
+      )}
       <TouchableOpacity
         style={styles.favoriteCard}
         onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
@@ -260,7 +280,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-    paddingBottom: 100, // 增加底部流白空间
+    paddingBottom: Platform.OS === 'ios' ? 100 : 0, // iOS需要安全区域，Android不需要额外padding
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, // Android添加状态栏高度
   },
   header: {
     flexDirection: 'row',
@@ -284,6 +305,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0, // Android上完全移除空白，iOS保留小间距
   },
   // Generate Recipe Card Styles
   generateRecipeCard: {
@@ -317,7 +339,7 @@ const styles = StyleSheet.create({
   },
   generateRecipeTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: getFontWeight('600') as any,
     color: '#333',
     marginBottom: 4,
   },
@@ -342,16 +364,132 @@ const styles = StyleSheet.create({
   },
   favoriteCardWrapper: {
     marginBottom: 16,
-    shadowColor: '#A0A0A0',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 10,
+    position: 'relative',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#A0A0A0',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 14,
+    } : {
+      elevation: 10,
+    }),
   },
   favoriteCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  // Android渐变阴影效果 - 使用多层同心矩形模拟向外扩散的阴影
+  cardShadowContainer: {
+    position: 'absolute',
+    top: -3.5,
+    left: -3.5,
+    right: -3.5,
+    bottom: -3.5,
+    borderRadius: 15.5,
+    zIndex: -1,
+    pointerEvents: 'none',
+  },
+  cardShadowLayer: {
+    position: 'absolute',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 16,
+  },
+  cardShadowLayer1: {
+    top: -0.3,
+    left: -0.3,
+    right: -0.3,
+    bottom: -0.3,
+    borderRadius: 16.3,
+    opacity: 0.07,
+  },
+  cardShadowLayer2: {
+    top: -0.6,
+    left: -0.6,
+    right: -0.6,
+    bottom: -0.6,
+    borderRadius: 16.6,
+    opacity: 0.06125,
+  },
+  cardShadowLayer3: {
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: 17,
+    opacity: 0.0525,
+  },
+  cardShadowLayer4: {
+    top: -1.5,
+    left: -1.5,
+    right: -1.5,
+    bottom: -1.5,
+    borderRadius: 17.5,
+    opacity: 0.04375,
+  },
+  cardShadowLayer5: {
+    top: -1.8,
+    left: -1.8,
+    right: -1.8,
+    bottom: -1.8,
+    borderRadius: 17.8,
+    opacity: 0.035,
+  },
+  cardShadowLayer6: {
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 18,
+    opacity: 0.030625,
+  },
+  cardShadowLayer7: {
+    top: -2.3,
+    left: -2.3,
+    right: -2.3,
+    bottom: -2.3,
+    borderRadius: 18.3,
+    opacity: 0.02625,
+  },
+  cardShadowLayer8: {
+    top: -2.6,
+    left: -2.6,
+    right: -2.6,
+    bottom: -2.6,
+    borderRadius: 18.6,
+    opacity: 0.021875,
+  },
+  cardShadowLayer9: {
+    top: -2.8,
+    left: -2.8,
+    right: -2.8,
+    bottom: -2.8,
+    borderRadius: 18.8,
+    opacity: 0.0175,
+  },
+  cardShadowLayer10: {
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 19,
+    opacity: 0.013125,
+  },
+  cardShadowLayer11: {
+    top: -3.2,
+    left: -3.2,
+    right: -3.2,
+    bottom: -3.2,
+    borderRadius: 19.2,
+    opacity: 0.00875,
+  },
+  cardShadowLayer12: {
+    top: -3.5,
+    left: -3.5,
+    right: -3.5,
+    bottom: -3.5,
+    borderRadius: 19.5,
+    opacity: 0.004375,
   },
   favoriteImage: {
     width: '100%',
@@ -366,7 +504,7 @@ const styles = StyleSheet.create({
   },
   favoriteTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: getFontWeight('600') as any,
     color: '#333',
     marginBottom: 6,
   },

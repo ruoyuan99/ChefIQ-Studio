@@ -298,9 +298,9 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const recipe = state.recipes.find(r => r.id === recipeId);
     dispatch({ type: 'DELETE_RECIPE', payload: recipeId });
 
-    // 同步删除到 Supabase（通过标题+用户ID匹配）
-    if (user && recipe?.title) {
-      RealTimeSyncService.deleteRecipeByTitleForUser(recipe.title, user.id);
+    // 同步删除到 Supabase（基于菜谱ID）
+    if (user && recipeId) {
+      RealTimeSyncService.deleteRecipeById(recipeId);
     }
   };
 

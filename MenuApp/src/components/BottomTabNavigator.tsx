@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface BottomTabNavigatorProps {
@@ -67,6 +67,19 @@ const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ navigation, act
 
   return (
     <View style={styles.container}>
+      {/* Android上的阴影渐变效果 - 使用多个半透明层来模拟渐变 */}
+      {Platform.OS === 'android' && (
+        <View style={styles.shadowGradientContainer}>
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer1]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer2]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer3]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer4]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer5]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer6]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer7]} />
+          <View style={[styles.shadowGradientLayer, styles.shadowLayer8]} />
+        </View>
+      )}
       <View style={styles.tabBar}>
         {tabs.map((tab) => (
           <TouchableOpacity
@@ -139,6 +152,60 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 12,
+  },
+  shadowGradientContainer: {
+    position: 'absolute',
+    top: -12,
+    left: 0,
+    right: 0,
+    height: 12,
+    overflow: 'hidden',
+  },
+  shadowGradientLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#000',
+  },
+  shadowLayer1: {
+    bottom: 0,
+    height: 1.5,
+    opacity: 0.12,
+  },
+  shadowLayer2: {
+    bottom: 1.5,
+    height: 1.5,
+    opacity: 0.10,
+  },
+  shadowLayer3: {
+    bottom: 3,
+    height: 1.5,
+    opacity: 0.08,
+  },
+  shadowLayer4: {
+    bottom: 4.5,
+    height: 1.5,
+    opacity: 0.06,
+  },
+  shadowLayer5: {
+    bottom: 6,
+    height: 1.5,
+    opacity: 0.04,
+  },
+  shadowLayer6: {
+    bottom: 7.5,
+    height: 1.5,
+    opacity: 0.03,
+  },
+  shadowLayer7: {
+    bottom: 9,
+    height: 1.5,
+    opacity: 0.015,
+  },
+  shadowLayer8: {
+    bottom: 10.5,
+    height: 1.5,
+    opacity: 0.005,
   },
   tabBar: {
       flexDirection: 'row',

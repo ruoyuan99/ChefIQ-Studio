@@ -152,14 +152,18 @@ const GenerateRecipeModal: React.FC<GenerateRecipeModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
             {/* Ingredients Input */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Ingredients *</Text>
               <View style={styles.inputRow}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter ingredient (e.g., chicken, tomato, onion)"
+                  placeholder="Add ingredient"
                   value={ingredientInput}
                   onChangeText={setIngredientInput}
                   onSubmitEditing={handleAddIngredient}

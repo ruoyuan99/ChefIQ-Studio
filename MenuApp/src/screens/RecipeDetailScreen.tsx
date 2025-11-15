@@ -833,7 +833,10 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.commentsList}>
+            <ScrollView 
+              style={styles.commentsList}
+              nestedScrollEnabled={true}
+            >
               {getComments(recipe.id).map((comment) => (
                 <View key={comment.id} style={styles.commentItem}>
                   <View style={styles.commentHeader}>

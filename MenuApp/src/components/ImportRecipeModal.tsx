@@ -218,7 +218,10 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content}>
+          <ScrollView 
+            style={styles.content}
+            nestedScrollEnabled={true}
+          >
             <Text style={styles.label}>Recipe URL</Text>
             <TextInput
               style={styles.input}
