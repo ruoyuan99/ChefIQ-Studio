@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Buttons, Colors } from '../styles/theme';
 import { importRecipeFromURL, importRecipeViaBackend, optimizeRecipeViaBackend } from '../services/recipeImportService';
+import { showError } from '../utils/errorHandler';
 
 interface ImportRecipeModalProps {
   visible: boolean;
@@ -31,6 +33,40 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
   const [optimizing, setOptimizing] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [isBlocked, setIsBlocked] = useState(false); // Track if website blocks import
+  const urlInputRef = React.useRef<TextInput>(null);
+  const blurTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Reset all state when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setUrl('');
+      setPreviewData(null);
+      setIsBlocked(false);
+      setLoading(false);
+      setOptimizing(false);
+      // Clear blur timeout
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+        blurTimeoutRef.current = null;
+      }
+    }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, [visible]);
+
+  const handleClose = () => {
+    setUrl('');
+    setPreviewData(null);
+    setIsBlocked(false);
+    setLoading(false);
+    setOptimizing(false);
+    onClose();
+  };
 
   const handleImport = () => {
     if (!previewData) {
@@ -47,11 +83,17 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
       return;
     }
 
-    onImport(previewData);
-    setUrl('');
-    setPreviewData(null);
-    setIsBlocked(false);
-    onClose();
+    // CRITICAL: For direct schema import (not AI), tags should ALWAYS be empty
+    // Force tags to empty array before passing to onImport
+    const recipeToImport = {
+      ...previewData,
+      tags: [], // ALWAYS empty for schema imports - let user define their own tags
+    };
+    
+    console.log(`📋 Direct import (schema) - Forcing tags to empty array: ${JSON.stringify(previewData.tags)} -> []`);
+    
+    onImport(recipeToImport);
+    handleClose();
   };
 
   const handleAIImport = async () => {
@@ -73,10 +115,7 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
     try {
       const optimizedRecipe = await optimizeRecipeViaBackend(previewData);
       onImport(optimizedRecipe);
-      setUrl('');
-      setPreviewData(null);
-      setIsBlocked(false);
-      onClose();
+      handleClose();
     } catch (error: any) {
       console.error('AI optimization error:', error);
       let errorMessage = error.message || 'Failed to optimize recipe with AI.';
@@ -103,14 +142,14 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
           '1. Make sure backend server is running on port 3001\n' +
           '2. Check backend server logs\n\n' +
           `Original error: ${error.message}`;
-        Alert.alert('AI Optimization Failed', errorMessage);
+        showError('AI Optimization Failed', errorMessage);
       } else if (errorMessage.includes('AI optimization is not available')) {
         errorMessage = 
           'AI optimization requires OpenAI API key.\n\n' +
           'Please set OPENAI_API_KEY in the backend .env file to enable AI optimization.';
-        Alert.alert('AI Optimization Failed', errorMessage);
+        showError('AI Optimization Failed', errorMessage);
       } else {
-        Alert.alert('AI Optimization Failed', errorMessage);
+        showError('AI Optimization Failed', errorMessage);
       }
     } finally {
       setOptimizing(false);
@@ -191,11 +230,11 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
           '1. Make sure backend server is running on port 3001\n' +
           '2. Check backend server logs\n\n' +
           `Original error: ${error.message}`;
-        Alert.alert('Preview Failed', errorMessage);
+        showError('Preview Failed', errorMessage);
       } else {
         // Other errors - don't block, just show error
         setIsBlocked(false);
-        Alert.alert('Preview Failed', errorMessage);
+        showError('Preview Failed', errorMessage);
       }
     } finally {
       setLoading(false);
@@ -207,13 +246,13 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Import Recipe from Website</Text>
-            <TouchableOpacity onPress={onClose}>
+            <Text style={styles.title}>Import from Website</Text>
+            <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
@@ -224,8 +263,9 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
           >
             <Text style={styles.label}>Recipe URL</Text>
             <TextInput
+              ref={urlInputRef}
               style={styles.input}
-              placeholder="https://www.recipetineats.com/chicken-chasseur/"
+              placeholder="https://example.com/recipe"
               placeholderTextColor="#999"
               value={url}
               onChangeText={(text) => {
@@ -235,10 +275,42 @@ const ImportRecipeModal: React.FC<ImportRecipeModalProps> = ({
                   setIsBlocked(false);
                   setPreviewData(null);
                 }
+                
+                // Clear any existing timeout
+                if (blurTimeoutRef.current) {
+                  clearTimeout(blurTimeoutRef.current);
+                }
+                
+                // After user stops typing/pasting for 500ms, automatically blur the input
+                // This allows immediate clicking on Preview button after pasting
+                blurTimeoutRef.current = setTimeout(() => {
+                  if (text.trim().length > 0) {
+                    urlInputRef.current?.blur();
+                    Keyboard.dismiss();
+                  }
+                }, 500);
+              }}
+              onBlur={() => {
+                // Clear timeout when input loses focus
+                if (blurTimeoutRef.current) {
+                  clearTimeout(blurTimeoutRef.current);
+                  blurTimeoutRef.current = null;
+                }
+              }}
+              onSubmitEditing={() => {
+                // When user presses return/done, blur and dismiss keyboard
+                urlInputRef.current?.blur();
+                Keyboard.dismiss();
+                // Optionally trigger preview if URL is valid
+                if (url.trim() && !loading && !isBlocked) {
+                  handlePreview();
+                }
               }}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
+              returnKeyType="done"
+              blurOnSubmit={true}
             />
             <Text style={styles.hint}>
               Enter a recipe URL that supports Recipe Schema.org format

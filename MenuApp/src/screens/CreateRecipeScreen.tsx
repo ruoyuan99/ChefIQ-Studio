@@ -219,17 +219,68 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
         title: importedRecipe.title || prev.title,
         description: importedRecipe.description || prev.description,
         imageUri: scannedImageUri || importedRecipe.imageUri || importedRecipe.image_url || prev.imageUri,
-        tags: importedRecipe.tags || prev.tags,
+        // For schema imports (direct import without AI), tags should ALWAYS be empty array
+        // Backend should already return empty tags for schema imports, but we enforce it here as well
+        // For AI imports, limit tags to maximum 3 (even if backend returns more)
+        tags: (() => {
+          const importedTags = importedRecipe.tags;
+          // If tags is empty/undefined/null, use empty array (schema import)
+          if (!importedTags || (Array.isArray(importedTags) && importedTags.length === 0)) {
+            return []; // Empty array for schema imports
+          }
+          // If tags exist, it might be from AI import
+          // CRITICAL: Limit to maximum 3 tags for AI imports (even if backend returns more)
+          if (Array.isArray(importedTags)) {
+            if (importedTags.length > 3) {
+              const limitedTags = importedTags.slice(0, 3);
+              console.log(`⚠️  Imported recipe has ${importedTags.length} tags, limiting to 3: ${JSON.stringify(limitedTags)}`);
+              return limitedTags;
+            }
+            console.log(`✅ Imported recipe has ${importedTags.length} tags: ${JSON.stringify(importedTags)}`);
+            return importedTags;
+          }
+          return [];
+        })(),
         // Allow empty strings for draft saving - only update if imported value exists
+        // When importing from schema (without AI), cookingTime should be a number (minutes)
+        // Convert to pure numeric string (e.g., 30 -> "30", not "30 minutes")
         cookingTime: importedRecipe.cookingTime !== undefined && importedRecipe.cookingTime !== null 
-          ? (typeof importedRecipe.cookingTime === 'string' ? importedRecipe.cookingTime : String(importedRecipe.cookingTime || ''))
+          ? (typeof importedRecipe.cookingTime === 'number' 
+              ? String(importedRecipe.cookingTime) 
+              : (typeof importedRecipe.cookingTime === 'string' 
+                  ? importedRecipe.cookingTime.replace(/[^0-9]/g, '') // Remove non-numeric characters
+                  : String(importedRecipe.cookingTime || '').replace(/[^0-9]/g, '')))
           : prev.cookingTime,
-        // Handle servings - convert array to string if needed (backend should already convert, but handle edge cases)
-        servings: importedRecipe.servings !== undefined && importedRecipe.servings !== null 
-          ? (Array.isArray(importedRecipe.servings) 
-              ? importedRecipe.servings.join(', ') 
-              : (typeof importedRecipe.servings === 'string' ? importedRecipe.servings : String(importedRecipe.servings || '')))
-          : prev.servings,
+        // When importing from schema (without AI), servings should be a number (people)
+        // If servings is 0, undefined, null, or > 20, leave it empty (parsing error)
+        servings: (() => {
+          const servingsValue = importedRecipe.servings;
+          // Check if servings is invalid (null, undefined, 0, or > 20)
+          if (servingsValue === undefined || servingsValue === null || servingsValue === 0) {
+            return prev.servings; // Keep previous value (empty)
+          }
+          // If it's a number > 20, treat as parsing error
+          if (typeof servingsValue === 'number' && servingsValue > 20) {
+            console.log(`⚠️  Servings ${servingsValue} > 20, treating as parsing error, leaving empty`);
+            return prev.servings; // Keep previous value (empty)
+          }
+          // Convert valid servings to string
+          if (typeof servingsValue === 'number') {
+            return String(servingsValue);
+          } else if (Array.isArray(servingsValue)) {
+            return String(servingsValue[0] || '').replace(/[^0-9]/g, '');
+          } else if (typeof servingsValue === 'string') {
+            const numericValue = servingsValue.replace(/[^0-9]/g, '');
+            const num = parseInt(numericValue, 10);
+            // If parsed number > 20, treat as parsing error
+            if (!isNaN(num) && num > 20) {
+              console.log(`⚠️  Servings string "${servingsValue}" parsed to ${num} > 20, treating as parsing error, leaving empty`);
+              return prev.servings; // Keep previous value (empty)
+            }
+            return numericValue;
+          }
+          return prev.servings; // Keep previous value (empty)
+        })(),
         cookware: fromChallenge 
           ? 'Chef iQ Mini Oven' 
           : (importedRecipe.cookware !== undefined && importedRecipe.cookware !== null 
@@ -428,9 +479,65 @@ const commonIngredientTags = [
       title: importedRecipe.title || prev.title,
       description: importedRecipe.description || prev.description,
       imageUri: importedRecipe.imageUri || importedRecipe.image_url || prev.imageUri,
-      tags: importedRecipe.tags || prev.tags,
-      cookingTime: importedRecipe.cookingTime || prev.cookingTime,
-      servings: importedRecipe.servings || prev.servings,
+      // For schema imports (direct import without AI), tags should ALWAYS be empty array
+      // Backend should already return empty tags for schema imports, but we enforce it here as well
+      // For AI imports, limit tags to maximum 3 (even if backend returns more)
+      tags: (() => {
+        const importedTags = importedRecipe.tags;
+        // If tags is empty/undefined/null, use empty array (schema import)
+        if (!importedTags || (Array.isArray(importedTags) && importedTags.length === 0)) {
+          return []; // Empty array for schema imports
+        }
+        // If tags exist, it might be from AI import
+        // CRITICAL: Limit to maximum 3 tags for AI imports (even if backend returns more)
+        if (Array.isArray(importedTags)) {
+          if (importedTags.length > 3) {
+            const limitedTags = importedTags.slice(0, 3);
+            console.log(`⚠️  Imported recipe has ${importedTags.length} tags, limiting to 3: ${JSON.stringify(limitedTags)}`);
+            return limitedTags;
+          }
+          console.log(`✅ Imported recipe has ${importedTags.length} tags: ${JSON.stringify(importedTags)}`);
+          return importedTags;
+        }
+        return [];
+      })(),
+      // When importing from schema (without AI), convert numbers to pure numeric strings
+      cookingTime: importedRecipe.cookingTime !== undefined && importedRecipe.cookingTime !== null
+        ? (typeof importedRecipe.cookingTime === 'number' 
+            ? String(importedRecipe.cookingTime) 
+            : (typeof importedRecipe.cookingTime === 'string' 
+                ? importedRecipe.cookingTime.replace(/[^0-9]/g, '')
+                : String(importedRecipe.cookingTime || '').replace(/[^0-9]/g, '')))
+        : prev.cookingTime,
+      // If servings is 0, undefined, null, or > 20, leave it empty (parsing error)
+      servings: (() => {
+        const servingsValue = importedRecipe.servings;
+        // Check if servings is invalid (null, undefined, 0, or > 20)
+        if (servingsValue === undefined || servingsValue === null || servingsValue === 0) {
+          return prev.servings; // Keep previous value (empty)
+        }
+        // If it's a number > 20, treat as parsing error
+        if (typeof servingsValue === 'number' && servingsValue > 20) {
+          console.log(`⚠️  Servings ${servingsValue} > 20, treating as parsing error, leaving empty`);
+          return prev.servings; // Keep previous value (empty)
+        }
+        // Convert valid servings to string
+        if (typeof servingsValue === 'number') {
+          return String(servingsValue);
+        } else if (Array.isArray(servingsValue)) {
+          return String(servingsValue[0] || '').replace(/[^0-9]/g, '');
+        } else if (typeof servingsValue === 'string') {
+          const numericValue = servingsValue.replace(/[^0-9]/g, '');
+          const num = parseInt(numericValue, 10);
+          // If parsed number > 20, treat as parsing error
+          if (!isNaN(num) && num > 20) {
+            console.log(`⚠️  Servings string "${servingsValue}" parsed to ${num} > 20, treating as parsing error, leaving empty`);
+            return prev.servings; // Keep previous value (empty)
+          }
+          return numericValue;
+        }
+        return prev.servings; // Keep previous value (empty)
+      })(),
       cookware: importedRecipe.cookware || prev.cookware,
     }));
 
@@ -917,6 +1024,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
     }
 
     // 4. Validate servings (handle case where it might be an array)
+    // Servings must be between 1 and 20 (People)
     let servingsValue = '';
     if (Array.isArray(currentRecipeData.servings)) {
       servingsValue = currentRecipeData.servings.join(', ').trim();
@@ -927,6 +1035,17 @@ const handleIngredientTagPress = (ingredientName: string) => {
     }
     if (!servingsValue) {
       missingFields.push('Servings');
+    } else {
+      // Check if servings is within valid range (1-20)
+      const servingsNum = parseInt(servingsValue, 10);
+      if (isNaN(servingsNum) || servingsNum < 1 || servingsNum > 20) {
+        Alert.alert(
+          'Invalid Servings',
+          'Servings must be a number between 1 and 20 (People). Please enter a valid number.',
+          [{ text: 'OK' }]
+        );
+        return false;
+      }
     }
 
     // 5. Validate at least one ingredient
@@ -1822,9 +1941,11 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 style={styles.servingsInput}
                 value={recipeData.servings || ''}
                 onChangeText={(text) => {
-                  // Only allow numeric input
+                  // Only allow numeric input, maximum 20 (People)
                   const numericValue = text.replace(/[^0-9]/g, '');
-                  setRecipeData({ ...recipeData, servings: numericValue });
+                  // Limit to maximum 20
+                  const limitedValue = numericValue === '' ? '' : String(Math.min(20, parseInt(numericValue, 10) || 0));
+                  setRecipeData({ ...recipeData, servings: limitedValue });
                 }}
                 keyboardType="numeric"
                 onFocus={() => {

@@ -19,8 +19,8 @@ interface ImportedRecipe {
     step: number;
     description: string;
   }>;
-  cookingTime?: string;
-  servings?: string;
+  cookingTime?: number; // Changed to number (minutes) instead of string
+  servings?: number; // Changed to number (people) instead of string
   tags?: string[];
 }
 
@@ -196,15 +196,51 @@ function parseSchemaOrgRecipe(data: any, baseUrl: string): ImportedRecipe {
     }
   }
 
+  // Parse cooking time - returns number (minutes) instead of string
+  const cookingTime = parseDuration(recipe.totalTime || recipe.cookTime || recipe.prepTime);
+
+  // Parse servings - extract number directly, return as integer
+  let servings: number | undefined;
+  let rawServings = recipe.recipeYield || recipe.yield || '';
+  
+  if (typeof rawServings === 'object' && (rawServings as any).value) {
+    rawServings = (rawServings as any).value;
+  }
+  
+  if (typeof rawServings === 'number') {
+    // If number > 20, it's likely a parsing error, return undefined (let user fill in)
+    if (rawServings > 20) {
+      servings = undefined;
+    } else {
+      servings = Math.max(1, Math.min(20, Math.round(rawServings)));
+    }
+  } else if (typeof rawServings === 'string' && rawServings.trim() !== '') {
+    // Extract number from string like "4 servings", "serves 4", "6-8 servings"
+    const numberMatch = rawServings.match(/(\d+)/);
+    if (numberMatch) {
+      const extractedNumber = parseInt(numberMatch[1], 10);
+      // If extracted number > 20, it's likely a parsing error, return undefined
+      if (extractedNumber > 20) {
+        servings = undefined;
+      } else {
+        servings = Math.max(1, Math.min(20, extractedNumber));
+      }
+    }
+  }
+
+  // Do not parse tags/keywords when importing directly from Schema.org
+  // Tags should be empty array for schema-based imports - let user define their own tags
+  const tags: string[] = [];
+
   return {
     title: recipe.name || recipe.headline || '',
     description: recipe.description || recipe.about || '',
     imageUrl,
     ingredients,
     instructions,
-    cookingTime: parseDuration(recipe.totalTime || recipe.cookTime || recipe.prepTime),
-    servings: recipe.recipeYield || recipe.yield || '',
-    tags: parseKeywords(recipe.keywords || recipe.recipeCategory),
+    cookingTime,
+    servings,
+    tags,
   };
 }
 
@@ -301,21 +337,57 @@ function parseInstructions(instructions: any[]): Array<{ step: number; descripti
 
 /**
  * Parse duration string like "PT30M" (ISO 8601) or "30 minutes"
+ * Returns number of minutes (integer) instead of string
  */
-function parseDuration(duration: string | undefined): string | undefined {
+function parseDuration(duration: string | number | undefined): number | undefined {
   if (!duration) return undefined;
   
-  // Handle ISO 8601 format (PT30M, PT1H30M)
-  if (duration.startsWith('PT')) {
-    const hours = duration.match(/(\d+)H/);
-    const minutes = duration.match(/(\d+)M/);
-    const parts: string[] = [];
-    if (hours) parts.push(`${hours[1]} hour${hours[1] !== '1' ? 's' : ''}`);
-    if (minutes) parts.push(`${minutes[1]} minute${minutes[1] !== '1' ? 's' : ''}`);
-    return parts.join(' ') || undefined;
+  // If it's already a number, return it (clamp between 1-999)
+  if (typeof duration === 'number') {
+    return Math.max(1, Math.min(999, Math.round(duration)));
   }
   
-  return duration;
+  // Handle ISO 8601 format (PT30M, PT1H30M)
+  if (typeof duration === 'string' && duration.startsWith('PT')) {
+    const hours = duration.match(/(\d+)H/);
+    const minutes = duration.match(/(\d+)M/);
+    let totalMinutes = 0;
+    
+    if (hours) totalMinutes += parseInt(hours[1], 10) * 60;
+    if (minutes) totalMinutes += parseInt(minutes[1], 10);
+    
+    return totalMinutes || undefined;
+  }
+  
+  // Try to extract number from string like "30 minutes", "1 hour 30 minutes", etc.
+  if (typeof duration === 'string') {
+    const timeStr = duration.toLowerCase().trim();
+    let totalMinutes = 0;
+    
+    // Match hours: "1 hour", "2 hours", "1h", "2hr"
+    const hourMatches = timeStr.match(/(\d+)\s*(?:hour|hours|hr|h)\b/);
+    if (hourMatches) {
+      totalMinutes += parseInt(hourMatches[1], 10) * 60;
+    }
+    
+    // Match minutes: "30 minutes", "45 min", "30m"
+    const minuteMatches = timeStr.match(/(\d+)\s*(?:minute|minutes|min|m)\b/);
+    if (minuteMatches) {
+      totalMinutes += parseInt(minuteMatches[1], 10);
+    }
+    
+    // If no hours/minutes pattern found, try to extract just a number
+    if (totalMinutes === 0) {
+      const numberMatch = timeStr.match(/(\d+)/);
+      if (numberMatch) {
+        totalMinutes = parseInt(numberMatch[1], 10);
+      }
+    }
+    
+    return totalMinutes > 0 ? Math.max(1, Math.min(999, totalMinutes)) : undefined;
+  }
+  
+  return undefined;
 }
 
 /**
@@ -351,23 +423,80 @@ function transformAPIResponse(data: any): ImportedRecipe {
     ingredients: parseIngredients(data.ingredients || data.recipeIngredient || []),
     instructions: parseInstructions(data.instructions || data.recipeInstructions || []),
     cookingTime: parseDuration(data.totalTime || data.cookTime),
-    servings: data.servings || data.recipeYield || '',
-    tags: parseKeywords(data.tags || data.keywords),
+    servings: (() => {
+      // Parse servings - extract number directly, return as integer
+      let rawServings = data.servings || data.recipeYield || '';
+      
+      if (typeof rawServings === 'object' && (rawServings as any).value) {
+        rawServings = (rawServings as any).value;
+      }
+      
+      if (typeof rawServings === 'number') {
+        // If number > 20, it's likely a parsing error, return undefined (let user fill in)
+        if (rawServings > 20) {
+          return undefined;
+        } else {
+          return Math.max(1, Math.min(20, Math.round(rawServings)));
+        }
+      } else if (typeof rawServings === 'string' && rawServings.trim() !== '') {
+        const numberMatch = rawServings.match(/(\d+)/);
+        if (numberMatch) {
+          const extractedNumber = parseInt(numberMatch[1], 10);
+          // If extracted number > 20, it's likely a parsing error, return undefined
+          if (extractedNumber > 20) {
+            return undefined;
+          } else {
+            return Math.max(1, Math.min(20, extractedNumber));
+          }
+        }
+      }
+      return undefined;
+    })(),
+    // Do not parse tags/keywords when importing directly from Schema.org/Microdata
+    // Tags should be empty array - let user define their own tags
+    tags: [],
   };
 }
 
 /**
  * Transform backend response to Recipe format
  * Backend now returns complete Recipe schema, so we just need to ensure Date objects are properly handled
+ * IMPORTANT: For schema imports, backend should return empty tags array - we verify this here
  */
 function transformBackendResponse(data: any): any {
   // Backend now returns complete Recipe schema with all fields
   // Just ensure Date strings are converted to Date objects
-  return {
+  const transformed = {
     ...data,
     createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
     updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
   };
+  
+  // CRITICAL: For "Import from Website" (schema imports), tags should ALWAYS be empty
+  // Backend should return empty tags for schema imports, but we enforce it here as a safety measure
+  // We check if tags is empty/undefined - if so, it's likely a schema import, keep it empty
+  // If tags exist, it might be from AI import, but we can't distinguish here
+  // However, since user specifically said schema imports should have NO tags,
+  // we'll be conservative: if tags is empty/undefined, keep empty. If tags exist, log warning.
+  if (!Array.isArray(transformed.tags)) {
+    console.log(`⚠️  Tags is not an array: ${JSON.stringify(transformed.tags)}, forcing to empty array`);
+    transformed.tags = [];
+  } else if (transformed.tags.length > 0) {
+    // Tags exist - log for debugging, but keep them (might be AI import)
+    // However, if this is a schema import, backend should have returned empty tags
+    console.log(`⚠️  Backend returned non-empty tags: ${JSON.stringify(transformed.tags)}`);
+    console.log(`   If this is a schema import, tags should be empty. Please check backend logs.`);
+    
+    // CRITICAL: For AI imports, limit tags to maximum 3 (even if backend returns more)
+    // This ensures consistency even if production backend hasn't been updated yet
+    if (transformed.tags.length > 3) {
+      const originalTagCount = transformed.tags.length;
+      transformed.tags = transformed.tags.slice(0, 3);
+      console.log(`⚠️  Backend returned ${originalTagCount} tags, limiting to 3: ${JSON.stringify(transformed.tags)}`);
+    }
+  }
+  
+  return transformed;
 }
 
 /**

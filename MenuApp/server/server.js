@@ -145,7 +145,8 @@ const cookwareOptions = [
   'Grill',
   'Slow Cooker',
   'Pressure Cooker',
-  'Wok'
+  'Wok',
+  'Other'
 ];
 
 /**
@@ -422,8 +423,10 @@ async function storeYouTubeQuery(searchQuery, videos, context = {}) {
  * Generate complete Recipe schema with all required fields
  * This ensures the frontend receives a fully-formed Recipe object
  * that matches the Recipe interface in types/index.ts
+ * @param {object} rawRecipe - Raw recipe data from extraction
+ * @param {boolean} isSchemaImport - If true, recipe was imported from Schema.org (tags should be empty)
  */
-function generateCompleteRecipeSchema(rawRecipe) {
+function generateCompleteRecipeSchema(rawRecipe, isSchemaImport = false) {
   const now = new Date();
   const recipeId = `recipe_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -463,16 +466,84 @@ function generateCompleteRecipeSchema(rawRecipe) {
     // Recipe content
     ingredients: ingredients,
     instructions: instructions,
-    tags: Array.isArray(rawRecipe.tags) ? rawRecipe.tags : [],
+    // For schema imports, tags should ALWAYS be empty (let user define their own)
+    // For AI imports, tags can be populated (maximum 3)
+    tags: (() => {
+      if (isSchemaImport) {
+        // Schema import: ALWAYS empty array, completely ignore any tags from rawRecipe
+        // Even if rawRecipe.tags exists, we must return empty array for schema imports
+        console.log(`📋 Schema import detected - forcing tags to empty array (rawRecipe.tags: ${JSON.stringify(rawRecipe.tags)})`);
+        return []; // ALWAYS return empty array for schema imports
+      }
+      // AI import: use tags from rawRecipe (max 3)
+      // CRITICAL: Always limit to 3 tags, even if rawRecipe has more
+      if (Array.isArray(rawRecipe.tags) && rawRecipe.tags.length > 0) {
+        const limitedTags = rawRecipe.tags.slice(0, 3);
+        if (rawRecipe.tags.length > 3) {
+          console.log(`⚠️  AI import: rawRecipe has ${rawRecipe.tags.length} tags, limiting to 3: ${JSON.stringify(limitedTags)}`);
+        }
+        return limitedTags;
+      }
+      return [];
+    })(),
     
     // Optional fields with defaults
     items: [], // Empty array, user can add menu items if needed
-    cookingTime: rawRecipe.cookingTime || '',
-    // Ensure servings is always a string (handle array case from Schema.org)
-    servings: Array.isArray(rawRecipe.servings) 
-      ? rawRecipe.servings.join(', ') 
-      : (rawRecipe.servings || ''),
-    cookware: rawRecipe.cookware || undefined,
+    // Convert cookingTime to integer (handle string, number, or null)
+    cookingTime: typeof rawRecipe.cookingTime === 'number' 
+      ? Math.max(1, Math.min(999, Math.round(rawRecipe.cookingTime)))
+      : (typeof rawRecipe.cookingTime === 'string' && rawRecipe.cookingTime.trim() !== ''
+          ? Math.max(1, Math.min(999, parseInt(rawRecipe.cookingTime, 10) || 0))
+          : 0), // Default to 0 if invalid (will be validated later)
+    // Convert servings to integer (handle string, number, array, or null)
+    // If servings > 20, it's likely a parsing error, return null (will be empty in frontend)
+    servings: (() => {
+      let servingsValue;
+      
+      if (typeof rawRecipe.servings === 'number') {
+        servingsValue = rawRecipe.servings;
+      } else if (typeof rawRecipe.servings === 'string' && rawRecipe.servings.trim() !== '') {
+        // Extract first number from string like "4 servings" or "88 servings"
+        const numberMatch = rawRecipe.servings.match(/(\d+)/);
+        servingsValue = numberMatch ? parseInt(numberMatch[1], 10) : undefined;
+      } else if (Array.isArray(rawRecipe.servings) && rawRecipe.servings.length > 0) {
+        const firstItem = rawRecipe.servings[0];
+        servingsValue = typeof firstItem === 'number' 
+          ? firstItem 
+          : (typeof firstItem === 'string' ? (parseInt(firstItem, 10) || undefined) : undefined);
+      } else {
+        servingsValue = undefined;
+      }
+      
+      // If servings > 20, it's likely a parsing error (e.g., reading wrong field)
+      // Return null (which will be treated as empty in frontend) so user can fill it in manually
+      if (servingsValue !== undefined && servingsValue !== null) {
+        if (servingsValue > 20) {
+          console.log(`⚠️  Servings value ${servingsValue} > 20, treating as parsing error, returning null`);
+          return null; // Return null for invalid values > 20 (will be empty in frontend)
+        }
+        return Math.max(1, Math.min(20, Math.round(servingsValue)));
+      }
+      
+      return null; // Default to null if invalid (will be empty in frontend)
+    })(),
+    // Validate and normalize cookware - must be from predefined options
+    cookware: (() => {
+      const rawCookware = rawRecipe.cookware;
+      if (!rawCookware) return undefined;
+      
+      // Check if cookware matches any predefined option (case-insensitive)
+      const matchingOption = cookwareOptions.find(
+        option => option.toLowerCase().trim() === String(rawCookware).toLowerCase().trim()
+      );
+      
+      if (matchingOption) {
+        return matchingOption; // Use the exact predefined option
+      } else {
+        console.warn(`⚠️  Cookware "${rawCookware}" is not in predefined options, setting to "Other"`);
+        return 'Other'; // Invalid cookware, set to "Other"
+      }
+    })(),
     
     // Image handling
     imageUri: rawRecipe.imageUrl || null,
@@ -502,12 +573,14 @@ function generateCompleteRecipeSchema(rawRecipe) {
     console.warn('⚠️  Recipe has no instructions - can be saved as draft');
   }
 
-  if (!recipe.cookingTime || recipe.cookingTime.trim() === '') {
-    console.warn('⚠️  Recipe has no cooking time - can be saved as draft');
+  // Validate cookingTime (must be integer between 1 and 999)
+  if (!recipe.cookingTime || typeof recipe.cookingTime !== 'number' || recipe.cookingTime < 1 || recipe.cookingTime > 999) {
+    console.warn('⚠️  Recipe has invalid cooking time - can be saved as draft');
   }
 
-  if (!recipe.servings || recipe.servings.trim() === '') {
-    console.warn('⚠️  Recipe has no servings - can be saved as draft');
+  // Validate servings (must be integer between 1 and 20)
+  if (!recipe.servings || typeof recipe.servings !== 'number' || recipe.servings < 1 || recipe.servings > 20) {
+    console.warn('⚠️  Recipe has invalid servings - can be saved as draft');
   }
 
   return recipe;
@@ -566,20 +639,47 @@ function extractRecipeFromJsonLd(jsonData, baseUrl) {
     }
   }
 
-  // Parse cooking time
+  // Parse cooking time - returns number (minutes) instead of string
   const cookingTime = parseDuration(recipe.totalTime || recipe.cookTime || recipe.prepTime);
 
-  // Parse servings
-  let servings = recipe.recipeYield || recipe.yield || '';
-  if (typeof servings === 'object' && servings.value) {
-    servings = servings.value;
+  // Parse servings - extract number directly, return as integer
+  // If servings > 20, it's likely a parsing error, return undefined (let user fill in)
+  let servings;
+  let rawServings = recipe.recipeYield || recipe.yield || '';
+  
+  if (typeof rawServings === 'object' && rawServings.value) {
+    rawServings = rawServings.value;
   }
-  if (typeof servings === 'number') {
-    servings = `${servings} servings`;
+  
+  if (typeof rawServings === 'number') {
+    // If number is > 20, it's likely a parsing error (e.g., reading wrong field)
+    // Return undefined so user can fill it in manually
+    if (rawServings > 20) {
+      servings = undefined;
+    } else {
+      servings = Math.max(1, Math.min(20, Math.round(rawServings)));
+    }
+  } else if (typeof rawServings === 'string' && rawServings.trim() !== '') {
+    // Extract number from string like "4 servings", "serves 4", "6-8 servings"
+    const numberMatch = rawServings.match(/(\d+)/);
+    if (numberMatch) {
+      const extractedNumber = parseInt(numberMatch[1], 10);
+      // If extracted number > 20, it's likely a parsing error, return undefined
+      if (extractedNumber > 20) {
+        servings = undefined;
+      } else {
+        servings = Math.max(1, Math.min(20, extractedNumber));
+      }
+    } else {
+      servings = undefined;
+    }
+  } else {
+    servings = undefined;
   }
 
-  // Parse tags/keywords
-  const tags = parseKeywords(recipe.keywords || recipe.recipeCategory || recipe.category);
+  // Do not parse tags/keywords when importing directly from Schema.org
+  // Tags should be empty array for schema-based imports - let user define their own tags
+  const tags = [];
 
   return {
     title: recipe.name || recipe.headline || '',
@@ -701,6 +801,7 @@ function parseInstructions(instructions) {
 
 /**
  * Parse duration string like "PT30M" (ISO 8601) or "30 minutes"
+ * Returns number of minutes (integer) instead of string
  */
 function parseDuration(duration) {
   if (!duration) return undefined;
@@ -709,16 +810,48 @@ function parseDuration(duration) {
   if (typeof duration === 'string' && duration.startsWith('PT')) {
     const hours = duration.match(/(\d+)H/);
     const minutes = duration.match(/(\d+)M/);
-    const parts = [];
+    let totalMinutes = 0;
     
-    if (hours) parts.push(`${hours[1]} hour${hours[1] !== '1' ? 's' : ''}`);
-    if (minutes) parts.push(`${minutes[1]} minute${minutes[1] !== '1' ? 's' : ''}`);
+    if (hours) totalMinutes += parseInt(hours[1], 10) * 60;
+    if (minutes) totalMinutes += parseInt(minutes[1], 10);
     
-    return parts.join(' ') || undefined;
+    return totalMinutes || undefined;
   }
   
-  // Return as-is if already formatted
-  return duration.toString();
+  // If it's already a number, return it (clamp between 1-999)
+  if (typeof duration === 'number') {
+    return Math.max(1, Math.min(999, Math.round(duration)));
+  }
+  
+  // Try to extract number from string like "30 minutes", "1 hour 30 minutes", etc.
+  if (typeof duration === 'string') {
+    const timeStr = duration.toLowerCase().trim();
+    let totalMinutes = 0;
+    
+    // Match hours: "1 hour", "2 hours", "1h", "2hr"
+    const hourMatches = timeStr.match(/(\d+)\s*(?:hour|hours|hr|h)\b/);
+    if (hourMatches) {
+      totalMinutes += parseInt(hourMatches[1], 10) * 60;
+    }
+    
+    // Match minutes: "30 minutes", "45 min", "30m"
+    const minuteMatches = timeStr.match(/(\d+)\s*(?:minute|minutes|min|m)\b/);
+    if (minuteMatches) {
+      totalMinutes += parseInt(minuteMatches[1], 10);
+    }
+    
+    // If no hours/minutes pattern found, try to extract just a number
+    if (totalMinutes === 0) {
+      const numberMatch = timeStr.match(/(\d+)/);
+      if (numberMatch) {
+        totalMinutes = parseInt(numberMatch[1], 10);
+      }
+    }
+    
+    return totalMinutes > 0 ? Math.max(1, Math.min(999, totalMinutes)) : undefined;
+  }
+  
+  return undefined;
 }
 
 /**
@@ -771,11 +904,14 @@ function extractRecipeFromHTML(html, url) {
                         $('meta[property="og:description"]').attr('content');
     
     if (title) {
+      // For Microdata imports (schema-based), tags should be empty and servings should be limited
       return {
         title,
         description: description || '',
         ingredients: [],
         instructions: [],
+        tags: [], // Empty tags for schema imports
+        servings: undefined, // Will be set by generateCompleteRecipeSchema
       };
     }
   }
@@ -1857,23 +1993,29 @@ const RECIPE_JSON_SCHEMA = {
       minItems: 1
     },
     cookingTime: {
-      type: "string",
-      description: "Standardized cooking time (e.g., '30 minutes', '1 hour', '1 hour 30 minutes')"
+      type: "integer",
+      description: "Cooking time in minutes as an integer (minimum 1, maximum 999). Convert any time format to total minutes. Examples: '30 minutes' = 30, '1 hour' = 60, '1 hour 30 minutes' = 90",
+      minimum: 1,
+      maximum: 999
     },
     servings: {
-      type: "string",
-      description: "Standardized servings format (e.g., '4 servings', '6-8 servings')"
+      type: "integer",
+      description: "Number of servings as an integer (minimum 1, maximum 20). Extract the number directly. Examples: '4 servings' = 4, '6-8 servings' = 6 (use the lower number), 'serves 4' = 4",
+      minimum: 1,
+      maximum: 20
     },
     tags: {
       type: "array",
       items: {
         type: "string"
       },
-      description: "Relevant tags (cuisine type, meal type, dietary info, etc.)"
+      description: "Relevant tags (cuisine type, meal type, dietary info, etc.) - MAXIMUM 3 tags only",
+      maxItems: 3
     },
     cookware: {
       type: ["string", "null"],
-      description: "Main cookware type (optional, can be null)"
+      description: `Main cookware type (optional, can be null). CRITICAL: You MUST use EXACTLY one of these predefined options: ${cookwareOptions.join(', ')}. Do NOT create custom cookware names. If cookware is mentioned, match it to the closest predefined option. If not specified or unsure, use null.`,
+      enum: [...cookwareOptions, null]
     }
   },
   // Only require essential fields for extraction
@@ -1914,7 +2056,28 @@ Extract ALL ingredients and instructions, even if they are in a list format.
 For ingredients, extract amount as a number and unit separately when possible.
 For instructions, number them sequentially starting from 1.
 Only include information that is clearly a recipe.
-If cooking time or servings are mentioned, include them.`;
+
+IMPORTANT FORMATTING RULES:
+1. cookingTime: Convert to INTEGER in minutes (1-999)
+   - "30 minutes" → 30
+   - "1 hour" → 60
+   - "1 hour 30 minutes" → 90
+   - "45 min" → 45
+   - If range given (e.g., "30-45 minutes"), use the average or lower number
+
+2. servings: Extract INTEGER directly (1-20)
+   - "4 servings" → 4
+   - "6-8 servings" → 6 (use lower number)
+   - "serves 4" → 4
+   - "for 4 people" → 4
+   - If range given, use the lower number
+
+3. tags: Select MAXIMUM 3 most relevant tags only
+
+4. cookware: If mentioned, MUST match one of: ${cookwareOptions.join(', ')}
+   - Do NOT create custom cookware names
+   - Match to closest predefined option
+   - If not specified, use null`;
 
   try {
     console.log('🤖 Using AI to extract recipe information with Structured Outputs...');
@@ -1926,7 +2089,15 @@ If cooking time or servings are mentioned, include them.`;
       messages: [
         {
           role: 'system',
-          content: 'You are a recipe extraction expert. Extract recipe information from web pages following the exact JSON schema provided.'
+          content: `You are a recipe extraction expert. Extract recipe information from web pages following the exact JSON schema provided.
+
+CRITICAL RULES:
+1. cookingTime: Must be an INTEGER in minutes (1-999). Convert any time format to total minutes.
+   - Examples: "30 minutes" = 30, "1 hour" = 60, "1 hour 30 minutes" = 90, "45 min" = 45
+2. servings: Must be an INTEGER (1-20). Extract the number directly from text.
+   - Examples: "4 servings" = 4, "6-8 servings" = 6 (use lower number), "serves 4" = 4, "for 4 people" = 4
+3. tags: MAXIMUM 3 tags only. Select the most relevant tags.
+4. cookware: MUST be one of these predefined options: ${cookwareOptions.join(', ')}. Do NOT create custom names. If cookware is mentioned, match it to the closest predefined option. If not specified, use null.`
         },
         {
           role: 'user',
@@ -1957,6 +2128,46 @@ If cooking time or servings are mentioned, include them.`;
     
     if (!recipeData || !recipeData.title) {
       throw new Error('AI did not extract a valid recipe');
+    }
+
+    // Ensure tags are limited to maximum 3
+    if (recipeData.tags && Array.isArray(recipeData.tags)) {
+      recipeData.tags = recipeData.tags.slice(0, 3);
+    }
+
+    // Validate and normalize cookware - must be from predefined options
+    if (recipeData.cookware) {
+      const matchingOption = cookwareOptions.find(
+        option => option.toLowerCase().trim() === String(recipeData.cookware).toLowerCase().trim()
+      );
+      
+      if (matchingOption) {
+        recipeData.cookware = matchingOption; // Use the exact predefined option
+      } else {
+        // AI generated cookware is not in predefined options, set to "Other"
+        console.warn(`⚠️  AI generated cookware "${recipeData.cookware}" is not in predefined options, setting to "Other"`);
+        recipeData.cookware = 'Other';
+      }
+    }
+
+    // Ensure cookingTime is an integer
+    if (recipeData.cookingTime && typeof recipeData.cookingTime !== 'number') {
+      const parsed = parseInt(recipeData.cookingTime, 10);
+      if (!isNaN(parsed)) {
+        recipeData.cookingTime = Math.max(1, Math.min(999, parsed));
+      } else {
+        recipeData.cookingTime = null;
+      }
+    }
+
+    // Ensure servings is an integer
+    if (recipeData.servings && typeof recipeData.servings !== 'number') {
+      const parsed = parseInt(recipeData.servings, 10);
+      if (!isNaN(parsed)) {
+        recipeData.servings = Math.max(1, Math.min(20, parsed));
+      } else {
+        recipeData.servings = null;
+      }
     }
 
     console.log(`✅ AI extracted recipe: ${recipeData.title} (${recipeData.ingredients?.length || 0} ingredients, ${recipeData.instructions?.length || 0} instructions)`);
@@ -2046,6 +2257,7 @@ app.post('/api/import-recipe', async (req, res) => {
 
     // Step 1: Try Schema.org extraction (free, fast)
     let rawRecipe = extractRecipeFromHTML(response.data, url);
+    let isSchemaImport = false; // Track if recipe was imported from schema (not AI)
 
     // Step 2: If Schema.org failed, try AI extraction (only when needed)
     if (!rawRecipe || !rawRecipe.title) {
@@ -2053,6 +2265,8 @@ app.post('/api/import-recipe', async (req, res) => {
         try {
           console.log('📝 Schema.org extraction failed, trying AI extraction...');
           rawRecipe = await extractRecipeWithAI(response.data, url);
+          // AI extraction - tags are allowed
+          isSchemaImport = false;
         } catch (aiError) {
           console.error('AI extraction error:', aiError.message);
           // Fall through to return error
@@ -2066,10 +2280,33 @@ app.post('/api/import-recipe', async (req, res) => {
           success: false,
         });
       }
+    } else {
+      // Schema.org extraction successful - tags should be empty
+      isSchemaImport = true;
     }
 
     // Step 3: Generate complete Recipe schema with all required fields
-    const finalRecipe = generateCompleteRecipeSchema(rawRecipe);
+    // For schema imports, ensure tags are empty (let user define their own)
+    // IMPORTANT: Force rawRecipe.tags to empty array before passing to generateCompleteRecipeSchema
+    // This ensures no tags leak through even if extractRecipeFromJsonLd somehow returns tags
+    if (isSchemaImport && rawRecipe) {
+      rawRecipe.tags = []; // Force empty tags for schema imports
+      console.log(`📋 Schema import - Forcing rawRecipe.tags to empty array before generateCompleteRecipeSchema`);
+    }
+    
+    const finalRecipe = generateCompleteRecipeSchema(rawRecipe, isSchemaImport);
+
+    // Debug: Log servings and tags for schema imports
+    if (isSchemaImport) {
+      console.log(`📋 Schema import - Servings: ${finalRecipe.servings}, Tags: ${JSON.stringify(finalRecipe.tags)}`);
+      // CRITICAL: tags must be empty for schema imports - force it if not
+      if (!Array.isArray(finalRecipe.tags) || finalRecipe.tags.length > 0) {
+        console.error(`❌ ERROR: Tags should be empty for schema import but got: ${JSON.stringify(finalRecipe.tags)}`);
+        console.error(`   Forcing tags to empty array...`);
+        finalRecipe.tags = []; // Force fix - CRITICAL for schema imports
+      }
+      console.log(`✅ Schema import verified - Tags: ${JSON.stringify(finalRecipe.tags)}`);
+    }
 
     console.log(`✅ Successfully extracted recipe: ${finalRecipe.title}`);
     
@@ -2168,13 +2405,29 @@ app.post('/api/optimize-recipe', async (req, res) => {
             additionalProperties: false
           }
         },
-        cookingTime: { type: 'string' },
-        servings: { type: 'string' },
+        cookingTime: { 
+          type: 'integer',
+          description: 'Cooking time in minutes (integer, minimum 1, maximum 999)',
+          minimum: 1,
+          maximum: 999
+        },
+        servings: { 
+          type: 'integer',
+          description: 'Number of servings (integer, minimum 1, maximum 20)',
+          minimum: 1,
+          maximum: 20
+        },
         tags: {
           type: 'array',
-          items: { type: 'string' }
+          items: { type: 'string' },
+          description: 'Relevant tags (cuisine type, meal type, dietary info, etc.) - maximum 3 tags',
+          maxItems: 3
         },
-        cookware: { type: ['string', 'null'] }
+        cookware: { 
+          type: ['string', 'null'],
+          description: `Main cookware type (optional, can be null). CRITICAL: You MUST use EXACTLY one of these predefined options: ${cookwareOptions.join(', ')}. Do NOT create custom cookware names. If the recipe doesn't specify cookware or you're unsure, use null.`,
+          enum: [...cookwareOptions, null]
+        }
       },
       required: ['title', 'description', 'ingredients', 'instructions', 'cookingTime', 'servings', 'tags', 'cookware'],
       additionalProperties: false
@@ -2211,8 +2464,15 @@ ${(recipe.instructions || []).map((inst, i) =>
             '3. Standardizing ingredient names and amounts (convert to consistent units)\n' +
             '4. Improving instruction clarity and step-by-step flow\n' +
             '5. Adding relevant tags if missing\n' +
-            '6. Ensuring cooking time and servings are accurate\n' +
-            '7. Suggesting appropriate cookware if missing\n\n' +
+            '6. Ensuring cooking time and servings are accurate (cookingTime: integer in minutes 1-999, servings: integer 1-20)\n' +
+            `7. Cookware (CRITICAL RULE):\n` +
+            `   - You MUST use EXACTLY one of these predefined options: ${cookwareOptions.join(', ')}\n` +
+            `   - Do NOT create custom cookware names or variations\n` +
+            `   - Do NOT use synonyms or alternative names\n` +
+            `   - If the recipe specifies cookware, match it to the closest predefined option\n` +
+            `   - If cookware is not specified or you're unsure, use null\n` +
+            `   - Valid examples: "Oven", "Air Fryer", "Stovetop – Pan or Pot", "Other", or null\n` +
+            `   - Invalid examples: "stove", "frying pan", "baking oven", "microwave" (these should map to predefined options)\n\n` +
             'Keep the recipe authentic and maintain its original character while making it more professional and user-friendly.'
         },
         {
@@ -2245,8 +2505,51 @@ ${(recipe.instructions || []).map((inst, i) =>
 
     console.log(`✅ AI optimized recipe: ${optimizedRecipe.title}`);
 
+    // CRITICAL: Ensure tags are limited to maximum 3 before generating complete schema
+    // This must be done BEFORE calling generateCompleteRecipeSchema
+    if (optimizedRecipe.tags && Array.isArray(optimizedRecipe.tags)) {
+      const originalTagCount = optimizedRecipe.tags.length;
+      optimizedRecipe.tags = optimizedRecipe.tags.slice(0, 3);
+      if (originalTagCount > 3) {
+        console.log(`⚠️  AI returned ${originalTagCount} tags, limiting to 3: ${JSON.stringify(optimizedRecipe.tags)}`);
+      }
+    } else if (!optimizedRecipe.tags) {
+      optimizedRecipe.tags = []; // Ensure it's an array
+    }
+
+    // Validate and normalize cookware - must be from predefined options
+    if (optimizedRecipe.cookware) {
+      // Check if cookware matches any predefined option (case-insensitive)
+      const matchingOption = cookwareOptions.find(
+        option => option.toLowerCase().trim() === String(optimizedRecipe.cookware).toLowerCase().trim()
+      );
+      
+      if (matchingOption) {
+        optimizedRecipe.cookware = matchingOption; // Use the exact predefined option
+      } else {
+        // AI generated cookware is not in predefined options, set to "Other"
+        console.warn(`⚠️  AI generated cookware "${optimizedRecipe.cookware}" is not in predefined options, setting to "Other"`);
+        optimizedRecipe.cookware = 'Other';
+      }
+    }
+
     // Generate complete Recipe schema with optimized data
-    const finalRecipe = generateCompleteRecipeSchema(optimizedRecipe);
+    // Pass isSchemaImport = false for AI imports (tags are allowed, but max 3)
+    const finalRecipe = generateCompleteRecipeSchema(optimizedRecipe, false);
+
+    // CRITICAL: Double-check tags are limited to 3 after generateCompleteRecipeSchema
+    // This is a safety measure in case generateCompleteRecipeSchema doesn't limit properly
+    if (finalRecipe.tags && Array.isArray(finalRecipe.tags)) {
+      const tagCount = finalRecipe.tags.length;
+      if (tagCount > 3) {
+        console.warn(`⚠️  Final recipe has ${tagCount} tags, limiting to 3: ${JSON.stringify(finalRecipe.tags)}`);
+        finalRecipe.tags = finalRecipe.tags.slice(0, 3);
+      }
+    } else {
+      finalRecipe.tags = []; // Ensure it's an array
+    }
+
+    console.log(`📋 AI import - Final tags (max 3): ${JSON.stringify(finalRecipe.tags)}`);
 
     // Preserve the original image from the preview recipe
     // AI optimization should only affect text content, not images
@@ -2332,13 +2635,29 @@ app.post('/api/scan-recipe', async (req, res) => {
             additionalProperties: false
           }
         },
-        cookingTime: { type: ['string', 'null'] }, // Allow null for optional fields
-        servings: { type: ['string', 'null'] },
+        cookingTime: { 
+          type: ['integer', 'null'],
+          description: 'Cooking time in minutes (integer, minimum 1, maximum 999, or null if not visible)',
+          minimum: 1,
+          maximum: 999
+        },
+        servings: { 
+          type: ['integer', 'null'],
+          description: 'Number of servings (integer, minimum 1, maximum 20, or null if not visible)',
+          minimum: 1,
+          maximum: 20
+        },
         tags: {
           type: 'array',
-          items: { type: 'string' }
+          items: { type: 'string' },
+          description: 'Relevant tags (cuisine type, meal type, dietary info, etc.) - maximum 3 tags',
+          maxItems: 3
         },
-        cookware: { type: ['string', 'null'] }
+        cookware: { 
+          type: ['string', 'null'],
+          description: `Main cookware type (optional, can be null). Must be one of: ${cookwareOptions.join(', ')}`,
+          enum: [...cookwareOptions, null]
+        }
       },
       required: ['title', 'description', 'ingredients', 'instructions', 'cookingTime', 'servings', 'tags', 'cookware'],
       additionalProperties: false
@@ -2355,10 +2674,10 @@ app.post('/api/scan-recipe', async (req, res) => {
             '2. Description or summary\n' +
             '3. Ingredients list with amounts and units\n' +
             '4. Step-by-step instructions\n' +
-            '5. Cooking time (if visible)\n' +
-            '6. Servings (if visible)\n' +
-            '7. Tags or categories (if visible)\n' +
-            '8. Cookware needed (if visible)\n\n' +
+            '5. Cooking time (if visible) - as integer in minutes (1-999)\n' +
+            '6. Servings (if visible) - as integer (1-20)\n' +
+            '7. Tags or categories (if visible) - maximum 3 tags\n' +
+            `8. Cookware needed (if visible) - must be one of: ${cookwareOptions.join(', ')}\n\n` +
             'Extract as much information as possible from the image. If some information is not visible, you can leave those fields empty or make reasonable inferences based on the recipe type.\n\n' +
             'For ingredients, standardize units (cup, tbsp, tsp, oz, lb, g, ml, etc.).\n' +
             'For instructions, break them down into clear, numbered steps.\n' +
@@ -2486,9 +2805,15 @@ app.post('/api/import-recipe-text', async (req, res) => {
         servings: { type: ['string', 'null'] },
         tags: {
           type: 'array',
-          items: { type: 'string' }
+          items: { type: 'string' },
+          description: 'Relevant tags (cuisine type, meal type, dietary info, etc.) - maximum 3 tags',
+          maxItems: 3
         },
-        cookware: { type: ['string', 'null'] }
+        cookware: { 
+          type: ['string', 'null'],
+          description: `Main cookware type (optional, can be null). Must be one of: ${cookwareOptions.join(', ')}`,
+          enum: [...cookwareOptions, null]
+        }
       },
       required: ['title', 'description', 'ingredients', 'instructions', 'cookingTime', 'servings', 'tags', 'cookware'],
       additionalProperties: false
@@ -2505,10 +2830,10 @@ app.post('/api/import-recipe-text', async (req, res) => {
             '2. Description or summary\n' +
             '3. Ingredients list with amounts and units\n' +
             '4. Step-by-step instructions\n' +
-            '5. Cooking time (if mentioned)\n' +
-            '6. Servings (if mentioned)\n' +
-            '7. Tags or categories (if mentioned)\n' +
-            '8. Cookware needed (if mentioned)\n\n' +
+            '5. Cooking time (if mentioned) - as integer in minutes (1-999)\n' +
+            '6. Servings (if mentioned) - as integer (1-20)\n' +
+            '7. Tags or categories (if mentioned) - maximum 3 tags\n' +
+            `8. Cookware needed (if mentioned) - must be one of: ${cookwareOptions.join(', ')}\n\n` +
             'Extract as much information as possible from the text. If some information is not mentioned, you can leave those fields empty or make reasonable inferences based on the recipe type.\n\n' +
             'For ingredients, standardize units (cup, tbsp, tsp, oz, lb, g, ml, etc.).\n' +
             'For instructions, break them down into clear, numbered steps.\n' +
@@ -2876,9 +3201,15 @@ app.post('/api/generate-recipe-from-ingredients', async (req, res) => {
         servings: { type: ['string', 'null'] },
         tags: {
           type: 'array',
-          items: { type: 'string' }
+          items: { type: 'string' },
+          description: 'Relevant tags (cuisine type, meal type, dietary info, etc.) - maximum 3 tags',
+          maxItems: 3
         },
-        cookware: { type: ['string', 'null'] }
+        cookware: { 
+          type: ['string', 'null'],
+          description: `Main cookware type (optional, can be null). Must be one of: ${cookwareOptions.join(', ')}`,
+          enum: [...cookwareOptions, null]
+        }
       },
       required: ['title', 'description', 'ingredients', 'instructions', 'cookingTime', 'servings', 'tags', 'cookware'],
             additionalProperties: false
@@ -3000,10 +3331,13 @@ RECIPE STRUCTURE:
    - Each step should be clear, actionable, and realistic
 
 5. COOKING TIME: ${cookingTime ? `${cookingTime} category` : 'Appropriate for recipe'}
+   - Return as INTEGER in minutes (minimum 1, maximum 999)
    - Include both active and passive cooking time
-   - Be specific: "25 minutes", "1 hour", "6-7 hours on Low"
+   - Examples: 25 (for 25 minutes), 60 (for 1 hour), 420 (for 7 hours)
 
 6. SERVINGS: ${servings ? servings : 'Realistic serving sizes'}
+   - Return as INTEGER (minimum 1, maximum 99)
+   - Examples: 4 (for 4 servings), 6 (for 6 servings)
 
 7. COOKWARE: "${cookware}" (REQUIRED for all recipes)
    - CRITICAL: You MUST use ONLY "${cookware}" for ALL recipes
@@ -3012,7 +3346,7 @@ RECIPE STRUCTURE:
    - Recipe titles should reflect the cookware when appropriate (e.g., "Air Fryer Crispy Chicken")
    - Descriptions and instructions must ONLY reference "${cookware}", never other cookware types
 
-8. TAGS: Cookware, cuisine type, meal type, dietary notes, cooking method
+8. TAGS: Maximum 3 tags (cookware, cuisine type, meal type, dietary notes, cooking method)
 
 CRITICAL REMINDERS:
 - REALISTIC, PRACTICAL recipes only (real cooking techniques, timing, methods)
