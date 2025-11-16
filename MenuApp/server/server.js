@@ -2750,7 +2750,7 @@ app.post('/api/scan-recipe', async (req, res) => {
     // Log token usage
     logCompletionUsage('scan-recipe', completion, {
       recipeTitle: extractedRecipe?.title,
-      imageSize: `${Math.round(imageBase64.length / 1024)}KB`,
+      imageSize: `${Math.round(base64Image.length / 1024)}KB`,
     });
     
     if (!extractedRecipe || !extractedRecipe.title) {
