@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { scanRecipeFromImage } from '../services/recipeImportService';
+import { showError } from '../utils/errorHandler';
 
 interface ScanRecipeModalProps {
   visible: boolean;
@@ -61,7 +62,7 @@ const ScanRecipeModal: React.FC<ScanRecipeModalProps> = ({
               }
             } catch (error: any) {
               console.error('Error picking image:', error);
-              Alert.alert('Error', 'Failed to pick image. Please try again.');
+              showError('Error', 'Failed to pick image. Please try again.');
             }
           },
         },
@@ -88,7 +89,7 @@ const ScanRecipeModal: React.FC<ScanRecipeModalProps> = ({
               }
             } catch (error: any) {
               console.error('Error taking photo:', error);
-              Alert.alert('Error', 'Failed to take photo. Please try again.');
+              showError('Error', 'Failed to take photo. Please try again.');
             }
           },
         },

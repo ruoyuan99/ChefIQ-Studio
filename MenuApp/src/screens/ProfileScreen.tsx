@@ -118,21 +118,27 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     },
   ];
 
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Edit Profile Button - 右上角 */}
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Edit profile"
-        style={styles.editProfileButton}
-        onPress={() => navigation.navigate('EditProfile')}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
       >
-        <Ionicons name="create-outline" size={20} color={Colors.primary} />
-      </TouchableOpacity>
-      
-      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
+          {/* Edit Profile Button - 在 profile header 内 */}
+          <View style={styles.profileHeaderTop}>
+            <View style={styles.profileHeaderSpacer} />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              style={styles.editProfileButton}
+              onPress={() => navigation.navigate('EditProfile')}
+            >
+              <Ionicons name="create-outline" size={20} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+          
           <View style={styles.profileTopRow}>
             {/* 左侧头像 - 1/3 */}
             <View style={styles.avatarContainer}>
@@ -329,32 +335,32 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: Platform.OS === 'ios' ? 20 : 0, // Android上完全移除空白，iOS保留小间距
   },
+  profileHeader: {
+    backgroundColor: 'white',
+    paddingTop: 8,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  profileHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
+  profileHeaderSpacer: {
+    flex: 1,
+  },
   editProfileButton: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 8,
-    right: 16,
-    zIndex: 10,
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
     borderWidth: 1,
     borderColor: 'rgba(218, 104, 9, 0.2)',
-  },
-  profileHeader: {
-    backgroundColor: 'white',
-    paddingTop: 32,
-    paddingBottom: 16, // 减少底部间距
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   profileTopRow: {
     flexDirection: 'row',

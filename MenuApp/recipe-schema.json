@@ -103,6 +103,50 @@
       },
       "required": ["id", "name", "color"],
       "additionalProperties": false
+    },
+    "YouTubeVideo": {
+      "type": "object",
+      "properties": {
+        "videoId": {
+          "type": "string",
+          "description": "YouTube video ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the YouTube video"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the YouTube video"
+        },
+        "thumbnail": {
+          "type": "string",
+          "description": "Thumbnail URL of the YouTube video"
+        },
+        "channelTitle": {
+          "type": "string",
+          "description": "Channel title of the YouTube video"
+        },
+        "publishedAt": {
+          "type": "string",
+          "description": "Publication date of the YouTube video"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL of the YouTube video"
+        },
+        "embedUrl": {
+          "type": "string",
+          "description": "Embed URL of the YouTube video"
+        },
+        "cookingTimeCategory": {
+          "type": "string",
+          "enum": ["Quick", "Medium", "Long"],
+          "description": "Cooking time category: Quick (<30min), Medium (30-60min), Long (>60min)"
+        }
+      },
+      "required": ["videoId", "title", "url", "embedUrl"],
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -158,31 +202,31 @@
       }
     },
     "cookingTime": {
-      "type": "string",
-      "description": "Cooking time for the recipe",
-      "enum": [
-        "Under 15 minutes",
-        "15-30 minutes",
-        "30-45 minutes",
-        "45-60 minutes",
-        "1-2 hours",
-        "2-4 hours",
-        "4+ hours",
-        "Overnight"
-      ]
+      "type": "integer",
+      "description": "Cooking time for the recipe in minutes",
+      "minimum": 1,
+      "maximum": 999
     },
     "servings": {
-      "type": "string",
+      "type": "integer",
       "description": "Number of servings",
-      "enum": [
-        "1 serving",
-        "2 servings",
-        "3-4 servings",
-        "4-6 servings",
-        "6-8 servings",
-        "8-10 servings",
-        "10+ servings"
-      ]
+      "minimum": 1,
+      "maximum": 99
+    },
+    "cookware": {
+      "type": "string",
+      "description": "Main cookware type used for the recipe (e.g., 'Chef iQ Mini Oven')"
+    },
+    "youtubeVideos": {
+      "type": "array",
+      "description": "List of YouTube video recommendations for the recipe",
+      "items": {
+        "$ref": "#/definitions/YouTubeVideo"
+      }
+    },
+    "youtubeSearchUrl": {
+      "type": "string",
+      "description": "YouTube search URL for the recipe"
     },
     "ingredients": {
       "type": "array",
@@ -202,7 +246,6 @@
   "required": [
     "id",
     "title",
-    "description",
     "items",
     "createdAt",
     "updatedAt",
@@ -235,8 +278,23 @@
       "shareCode": "ABC123",
       "imageUri": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ...",
       "tags": ["Healthy", "Quick & Easy", "Mediterranean"],
-      "cookingTime": "30-45 minutes",
-      "servings": "4-6 servings",
+      "cookingTime": 45,
+      "servings": 4,
+      "cookware": "Chef iQ Mini Oven",
+      "youtubeVideos": [
+        {
+          "videoId": "dQw4w9WgXcQ",
+          "title": "How to Make Chicken Pasta Salad",
+          "description": "Learn how to make this delicious chicken pasta salad",
+          "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg",
+          "channelTitle": "Cooking Channel",
+          "publishedAt": "2024-01-01T00:00:00Z",
+          "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          "embedUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+          "cookingTimeCategory": "Medium"
+        }
+      ],
+      "youtubeSearchUrl": "https://www.youtube.com/results?search_query=chicken+pasta+salad",
       "ingredients": [
         {
           "id": "ing_1",

@@ -932,6 +932,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
   useEffect(() => {
     navigation.setOptions({
       title: isEditing ? 'Edit Recipe' : 'Create New Recipe',
+      headerTitleAlign: Platform.OS === 'android' ? 'center' : 'left', // Center title on Android
       headerRight: () => (
         <TouchableOpacity
           style={styles.saveButton}

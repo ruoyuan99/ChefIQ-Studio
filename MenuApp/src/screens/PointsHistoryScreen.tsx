@@ -8,16 +8,18 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePoints, PointsActivity } from '../contexts/PointsContext';
+import { showError } from '../utils/errorHandler';
 
 interface PointsHistoryScreenProps {
   navigation: any;
 }
 
 const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation }) => {
-  const { state, getPointsHistory } = usePoints();
+  const { state, getPointsHistory, clearAllPointsActivities } = usePoints();
   const history = getPointsHistory();
   
   // Force refresh when state changes
@@ -69,6 +71,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       share_recipe: 'share-social',
       complete_profile: 'person',
       add_comment: 'chatbubble',
+      daily_checkin: 'calendar',
     };
     return icons[type] || 'star';
   };
@@ -82,6 +85,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       share_recipe: '#9C27B0',
       complete_profile: '#FF9800',
       add_comment: '#00BCD4',
+      daily_checkin: '#FF6B35',
     };
     return colors[type] || '#666';
   };
@@ -95,6 +99,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       share_recipe: 'Shared Recipe',
       complete_profile: 'Completed Profile',
       add_comment: 'Added Comment',
+      daily_checkin: 'Daily Check-in',
     };
     return labels[type] || type;
   };
@@ -104,6 +109,41 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       hour: 'numeric',
       minute: '2-digit',
     });
+  };
+
+  const handleClearAllHistory = () => {
+    if (history.length === 0) {
+      Alert.alert('No History', 'There is no points history to delete.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete All Points History',
+      'Are you sure you want to delete all points history? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await clearAllPointsActivities();
+              if (result.success) {
+                Alert.alert('Success', 'All points history has been deleted.');
+              } else {
+                showError('Error', result.message || 'Failed to delete points history.');
+              }
+            } catch (error) {
+              console.error('Error clearing points history:', error);
+              showError('Error', 'Failed to delete points history. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -119,7 +159,17 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Points History</Text>
-        <View style={styles.headerRight} />
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleClearAllHistory}
+          disabled={history.length === 0}
+        >
+          <Ionicons 
+            name="trash-outline" 
+            size={24} 
+            color={history.length === 0 ? "#ccc" : "#FF6B35"} 
+          />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -233,6 +283,12 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
+  },
+  deleteButton: {
+    padding: 8,
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,

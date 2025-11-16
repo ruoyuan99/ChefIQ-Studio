@@ -740,6 +740,15 @@ export const generateRecipeFromIngredients = async (
     if (Array.isArray(data.recipeOptions) && data.recipeOptions.length > 0) {
       const recipeOptions: RecipeOption[] = data.recipeOptions.map((option: any, index: number) => {
         const recipe = transformBackendResponse(option.recipe);
+        
+        // CRITICAL: Double-check tags are limited to max 3 for generate from ingredients
+        // transformBackendResponse should already limit tags, but we enforce it here as well
+        if (recipe.tags && Array.isArray(recipe.tags) && recipe.tags.length > 3) {
+          const originalTagCount = recipe.tags.length;
+          recipe.tags = recipe.tags.slice(0, 3);
+          console.log(`⚠️  Generate from ingredients: Recipe option ${index + 1} has ${originalTagCount} tags, limiting to 3: ${JSON.stringify(recipe.tags)}`);
+        }
+        
         const { videos, searchUrl } = normalizeYoutubeData(option.youtubeVideos, recipe.title);
 
         const recipeWithMedia = {

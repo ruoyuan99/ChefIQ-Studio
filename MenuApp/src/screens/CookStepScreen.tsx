@@ -74,7 +74,7 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
     if (recipe?.servings) {
       const servings = parseFloat(recipe.servings);
       if (!isNaN(servings) && servings > 0) {
-        setServingSize(Math.min(99, Math.max(1, servings)));
+        setServingSize(Math.min(20, Math.max(1, servings)));
       }
     }
   }, [recipe]);
@@ -805,14 +805,14 @@ const CookStepScreen: React.FC<CookStepScreenProps> = ({ navigation, route }) =>
                       <Text style={styles.servingValue}>{Number(servingSize)}</Text>
                       
                       <TouchableOpacity
-                        style={[styles.servingButton, servingSize >= 99 && styles.servingButtonDisabled]}
+                        style={[styles.servingButton, servingSize >= 20 && styles.servingButtonDisabled]}
                         onPress={() => {
-                          const newSize = Math.min(99, Number(servingSize) + 1);
+                          const newSize = Math.min(20, Number(servingSize) + 1);
                           setServingSize(newSize);
                         }}
-                        disabled={servingSize >= 99}
+                        disabled={servingSize >= 20}
                       >
-                        <Ionicons name="add" size={16} color={servingSize >= 99 ? "#ccc" : "#FF6B35"} />
+                        <Ionicons name="add" size={16} color={servingSize >= 20 ? "#ccc" : "#FF6B35"} />
                       </TouchableOpacity>
                     </View>
                   </View>

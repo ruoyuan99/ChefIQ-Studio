@@ -3612,12 +3612,21 @@ RULES:
       
       // Combine: user-specified tags first, then AI-generated tags (up to 3 total)
       const maxTags = 3;
-      const finalTags = [
-        ...userSpecifiedTags.slice(0, maxTags),
-        ...aiGeneratedTags.slice(0, Math.max(0, maxTags - userSpecifiedTags.length))
-      ].slice(0, maxTags);
+      // CRITICAL: Limit userSpecifiedTags to maxTags first, then add AI tags
+      const limitedUserTags = userSpecifiedTags.slice(0, maxTags);
+      const remainingSlots = maxTags - limitedUserTags.length;
+      const limitedAiTags = aiGeneratedTags.slice(0, Math.max(0, remainingSlots));
+      const finalTags = [...limitedUserTags, ...limitedAiTags].slice(0, maxTags);
       
-      generatedRecipe.tags = finalTags;
+      // Double-check: ensure final tags never exceed 3
+      if (finalTags.length > maxTags) {
+        console.warn(`⚠️  Generated recipe has ${finalTags.length} tags, limiting to ${maxTags}: ${JSON.stringify(finalTags)}`);
+        generatedRecipe.tags = finalTags.slice(0, maxTags);
+      } else {
+        generatedRecipe.tags = finalTags;
+      }
+      
+      console.log(`📋 Generate from ingredients - Final tags (max 3): ${JSON.stringify(generatedRecipe.tags)}`);
 
       if (!generatedRecipe.title) {
         console.warn(`⚠️  Skipping recipe option ${i + 1} due to missing title`, generatedRecipe);

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
 import { uploadAvatarImage } from '../services/storageService';
+import { showError } from '../utils/errorHandler';
 import { supabase } from '../config/supabase';
 
 interface EditProfileScreenProps {
@@ -77,7 +78,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      showError('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -100,7 +101,7 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
       }
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      showError('Error', 'Failed to take photo. Please try again.');
     }
   };
 
@@ -157,11 +158,11 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
           },
         ]);
       } else {
-        Alert.alert('Error', result.message || 'Failed to update profile. Please try again.');
+        showError('Error', result.message || 'Failed to update profile. Please try again.');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      showError('Error', 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
       setUploading(false);

@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { generateRecipeFromIngredients } from '../services/recipeImportService';
 import { RecipeOption, CookingTimeCategory } from '../types';
+import { showError } from '../utils/errorHandler';
 
 interface GenerateRecipeLoadingScreenProps {
   navigation: any;
@@ -114,7 +115,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
       if (!route?.params || !ingredients || ingredients.length === 0 || !cookware) {
         console.error('❌ GenerateRecipeLoadingScreen: Missing required params');
         hasValidated.current = true;
-        Alert.alert('Error', 'Missing required information. Please try again.');
+        showError('Error', 'Missing required information. Please try again.');
         navigation.goBack();
       } else {
         hasValidated.current = true;
@@ -393,10 +394,11 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
               style={[
                 styles.featureCard,
                 { width: SCREEN_WIDTH - 80 },
+                Platform.OS === 'android' && { backgroundColor: '#fafafa' },
               ]}
             >
               <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon as any} size={32} color="#d96709" />
+                <Ionicons name={feature.icon as any} size={36} color="#d96709" />
               </View>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -495,39 +497,50 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 24,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: Platform.OS === 'ios' ? 0.12 : 0,
+    shadowRadius: Platform.OS === 'ios' ? 12 : 0,
+    elevation: Platform.OS === 'android' ? 8 : 3,
     marginRight: 0,
-    minHeight: 140,
+    minHeight: 160,
     justifyContent: 'center',
+    borderWidth: Platform.OS === 'android' ? 1 : 0,
+    borderColor: Platform.OS === 'android' ? '#f0f0f0' : 'transparent',
   },
   featureIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#fff5f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: '#d96709',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: Platform.OS === 'ios' ? 0.15 : 0,
+    shadowRadius: Platform.OS === 'ios' ? 4 : 0,
+    elevation: Platform.OS === 'android' ? 3 : 0,
+    borderWidth: Platform.OS === 'android' ? 1 : 0,
+    borderColor: Platform.OS === 'android' ? '#ffe8de' : 'transparent',
   },
   featureTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   featureDescription: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
+    paddingHorizontal: 8,
   },
   progressContainer: {
     flexDirection: 'row',

@@ -12,6 +12,29 @@ jest.mock('expo-image', () => ({
   Image: 'Image',
 }));
 
+// Mock @expo/vector-icons to prevent expo-font issues
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: 'Ionicons',
+  MaterialIcons: 'MaterialIcons',
+  FontAwesome: 'FontAwesome',
+  AntDesign: 'AntDesign',
+  Entypo: 'Entypo',
+  Feather: 'Feather',
+  FontAwesome5: 'FontAwesome5',
+  Foundation: 'Foundation',
+  MaterialCommunityIcons: 'MaterialCommunityIcons',
+  Octicons: 'Octicons',
+  SimpleLineIcons: 'SimpleLineIcons',
+  Zocial: 'Zocial',
+}));
+
+// Mock expo-font to prevent ES module issues
+jest.mock('expo-font', () => ({
+  loadAsync: jest.fn(() => Promise.resolve()),
+  isLoaded: jest.fn(() => true),
+  useFonts: jest.fn(() => [true, null]),
+}));
+
 jest.mock('expo-image-manipulator', () => ({
   manipulateAsync: jest.fn(),
   SaveFormat: {

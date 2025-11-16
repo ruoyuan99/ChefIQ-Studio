@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useFavorite } from '../contexts/FavoriteContext';
+import { showError } from '../utils/errorHandler';
 import { useGroceries } from '../contexts/GroceriesContext';
 import { useLike } from '../contexts/LikeContext';
 import { useTried } from '../contexts/TriedContext';
@@ -231,7 +232,22 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           <Text style={styles.errorText}>Recipe not found</Text>
           <TouchableOpacity
             style={styles.backButtonError}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (route.params?.returnTo === 'RecipeList') {
+                // If coming from CreateRecipe after publish, reset navigation to RecipeList
+                navigation.reset({
+                  index: 1, // Navigate to RecipeList (second route in stack)
+                  routes: [
+                    { name: 'Home' },
+                    { name: 'RecipeList' }
+                  ],
+                });
+              } else if (route.params?.returnTo) {
+                navigation.navigate(route.params.returnTo as any);
+              } else {
+                navigation.goBack();
+              }
+            }}
           >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -356,7 +372,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         Alert.alert('Comment Added', 'Your comment has been added successfully!');
       } catch (error) {
         console.error('Error adding comment:', error);
-        Alert.alert('Error', 'Failed to add comment. Please try again.');
+        showError('Error', 'Failed to add comment. Please try again.');
       }
     } else {
       Alert.alert('Empty Comment', 'Please enter a comment before submitting.');
@@ -385,9 +401,21 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            if (route.params?.returnTo) {
+            if (route.params?.returnTo === 'RecipeList') {
+              // If coming from CreateRecipe after publish, reset navigation to RecipeList
+              // This removes CreateRecipe from the navigation stack
+              navigation.reset({
+                index: 1, // Navigate to RecipeList (second route in stack)
+                routes: [
+                  { name: 'Home' },
+                  { name: 'RecipeList' }
+                ],
+              });
+            } else if (route.params?.returnTo) {
+              // Other returnTo targets - navigate normally
               navigation.navigate(route.params.returnTo as any);
             } else {
+              // Default behavior - go back
               navigation.goBack();
             }
           }}
@@ -554,19 +582,19 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
                   <TouchableOpacity 
                     style={[
                       styles.servingsButton,
-                      currentServings >= 99 && styles.servingsButtonDisabled
+                      currentServings >= 20 && styles.servingsButtonDisabled
                     ]}
                     onPress={() => {
-                      if (currentServings < 99) {
+                      if (currentServings < 20) {
                         setCurrentServings(currentServings + 1);
                       }
                     }}
-                    disabled={currentServings >= 99}
+                    disabled={currentServings >= 20}
                   >
                       <Ionicons 
                         name="add" 
                         size={16} 
-                        color={currentServings >= 99 ? "#ccc" : "#FF6B35"} 
+                        color={currentServings >= 20 ? "#ccc" : "#FF6B35"} 
                       />
                   </TouchableOpacity>
                 </View>

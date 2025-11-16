@@ -351,6 +351,44 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const addPoints = async (type: keyof typeof POINTS_RULES, description: string, recipeId?: string) => {
     const points = POINTS_RULES[type];
+    
+    // 如果是 daily_checkin，先检查数据库中今天是否已经签到过
+    if (type === 'daily_checkin' && user?.id) {
+      try {
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
+        
+        // 检查数据库中今天是否已经有 daily_checkin 记录
+        const { data: existingCheckin, error: checkError } = await supabase
+          .from('user_points')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('activity_type', 'daily_checkin')
+          .gte('created_at', todayStart.toISOString())
+          .lt('created_at', todayEnd.toISOString())
+          .limit(1);
+
+        if (checkError) {
+          console.error('Error checking existing daily check-in:', checkError);
+          throw new Error('Failed to check existing check-in');
+        }
+
+        if (existingCheckin && existingCheckin.length > 0) {
+          // 今天已经签到过了，不允许重复签到
+          throw new Error('You have already checked in today.');
+        }
+      } catch (error) {
+        // 如果是重复签到错误，直接抛出
+        if (error instanceof Error && error.message === 'You have already checked in today.') {
+          throw error;
+        }
+        // 其他错误也抛出
+        throw error;
+      }
+    }
+
     const activity: PointsActivity = {
       id: Date.now().toString(),
       type,
@@ -359,7 +397,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       timestamp: new Date(),
       recipeId,
     };
-    // 先更新本地状态
+    // 更新本地状态
     dispatch({ type: 'ADD_POINTS', payload: activity });
 
     // 立即同步到 Supabase（如果用户已登录）
@@ -529,20 +567,18 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.log('User error:', userError);
 
           let totalPoints = userData?.total_points || 0;
-          const activities: PointsActivity[] = [];
+          let activities: PointsActivity[] = [];
 
           if (pointsHistory && pointsHistory.length > 0) {
             console.warn('⚠️ Warning: Points history still exists after clearing!');
-            pointsHistory.forEach((point: any) => {
-              activities.push({
-                id: point.id,
-                type: point.activity_type as any,
-                points: point.points,
-                description: point.description || '',
-                timestamp: new Date(point.created_at),
-                recipeId: point.recipe_id,
-              });
-            });
+            activities = pointsHistory.map((point: any) => ({
+              id: point.id,
+              type: point.activity_type as any,
+              points: point.points,
+              description: point.description || '',
+              timestamp: new Date(point.created_at),
+              recipeId: point.recipe_id,
+            }));
             totalPoints = activities.reduce((sum, activity) => sum + activity.points, 0);
           } else {
             console.log('✅ Confirmed: No points history in database');

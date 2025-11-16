@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '../config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -38,7 +37,6 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const appState = useRef(AppState.currentState);
   const isInitializing = useRef(true);
   const loadingUserProfile = useRef(false);
 
@@ -82,67 +80,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  // Listen for app state changes to auto sign out when app goes to background
-  useEffect(() => {
-    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (
-        appState.current.match(/active|foreground/) &&
-        nextAppState.match(/inactive|background/)
-      ) {
-        // App is going to background or being closed
-        console.log('📱 App going to background, signing out...');
-        if (user) {
-          try {
-            setLoading(true);
-            const currentUser = user;
-            await supabase.auth.signOut();
-            setUser(null);
-            await AsyncStorage.removeItem('user');
-            
-            // Clear old login session data
-            if (currentUser?.id) {
-              try {
-                const keys = await AsyncStorage.getAllKeys();
-                // Remove session-based keys
-                const loginSessionKey = `loginSession_${currentUser.id}`;
-                const sessionId = await AsyncStorage.getItem(loginSessionKey);
-                
-                const keysToRemove: string[] = [loginSessionKey];
-                if (sessionId) {
-                  keysToRemove.push(`modalShown_${sessionId}`);
-                }
-                
-                // Also remove any old modalShown_session_ keys (legacy format)
-                const oldSessionKeys = keys.filter(key => 
-                  key.startsWith(`modalShown_session_`) && key.includes(currentUser.id)
-                );
-                keysToRemove.push(...oldSessionKeys);
-                
-                if (keysToRemove.length > 0) {
-                  await AsyncStorage.multiRemove(keysToRemove);
-                }
-              } catch (error) {
-                // Ignore cleanup errors
-                console.log('Cleanup old session keys:', error);
-              }
-            }
-          } catch (error) {
-            console.error('Auto sign out failed:', error);
-          } finally {
-            setLoading(false);
-          }
-        }
-      }
-      appState.current = nextAppState;
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    return () => {
-      subscription.remove();
-    };
-  }, [user]);
 
   const getInitialSession = async () => {
     try {

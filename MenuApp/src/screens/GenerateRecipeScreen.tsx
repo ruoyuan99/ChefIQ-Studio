@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { showError } from '../utils/errorHandler';
 
 interface GenerateRecipeScreenProps {
   navigation: any;
@@ -145,7 +146,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
       console.log('✅ Navigation triggered successfully');
     } catch (error) {
       console.error('❌ Navigation error:', error);
-      Alert.alert('Error', 'Failed to navigate to loading screen. Please try again.');
+      showError('Error', 'Failed to navigate to loading screen. Please try again.');
     }
   };
 

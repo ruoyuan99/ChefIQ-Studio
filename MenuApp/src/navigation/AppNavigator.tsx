@@ -102,6 +102,7 @@ const AppNavigator: React.FC = () => {
           options={{
             title: 'Create New Recipe',
             headerBackTitle: 'Back',
+            headerTitleAlign: Platform.OS === 'android' ? 'center' : 'left', // Center title on Android
           }}
         />
         <Stack.Screen
@@ -110,6 +111,7 @@ const AppNavigator: React.FC = () => {
           options={{
             title: 'Edit Recipe',
             headerBackTitle: 'Back',
+            headerTitleAlign: Platform.OS === 'android' ? 'center' : 'left', // Center title on Android
           }}
         />
         <Stack.Screen

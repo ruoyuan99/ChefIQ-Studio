@@ -5,13 +5,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePoints } from '../contexts/PointsContext';
 import { useBadges } from '../contexts/BadgeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { showError } from '../utils/errorHandler';
 
 const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
   const { state, getLevelInfo, addPoints, getPointsHistory } = usePoints();
   const { checkBadgeUnlock, getBadgeById } = useBadges();
   const { user } = useAuth();
   const { level, pointsToNextLevel, totalPoints } = getLevelInfo();
-  const history = getPointsHistory();
+  // 使用 useMemo 确保 history 能正确响应 state.activities 的变化
+  const history = useMemo(() => getPointsHistory(), [state.activities]);
   // 获取今天的日期键（格式：YYYY-M-D），使用 state 确保跨天时更新
   const [todayKey, setTodayKey] = useState(() => {
     const d = new Date();
@@ -46,32 +48,17 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
   const likedToday = useMemo(() => isTodayActivity('like_recipe'), [history, todayKey]);
   const triedToday = useMemo(() => isTodayActivity('try_recipe'), [history, todayKey]);
   
-  // 检查今天是否已经登录过（基于日期），只有今天已登录且未签到才能激活
+  // 根据数据库 points 信息判断当天是否已签到
+  // checkinActive = true 表示已签到（激活状态，不可点击）
+  // checkinActive = false 表示未签到（未激活状态，可点击）
   const [checkinActive, setCheckinActive] = useState<boolean>(false);
   
   useEffect(() => {
-    const checkDailyLogin = async () => {
-      if (!user?.id) {
-        setCheckinActive(checkedInToday);
-        return;
-      }
-
-      try {
-        const lastLoginDateKey = `lastLoginDate_${user.id}`;
-        const lastLoginDate = await AsyncStorage.getItem(lastLoginDateKey);
-        const todayLoggedIn = lastLoginDate === todayKey;
-        
-        // 只有今天已经登录过且还没有签到，才能激活签到
-        // 如果已经签到过，则禁用
-        setCheckinActive(checkedInToday || !todayLoggedIn);
-      } catch (error) {
-        console.error('Error checking daily login:', error);
-        setCheckinActive(checkedInToday);
-      }
-    };
-
-    checkDailyLogin();
-  }, [user?.id, todayKey, checkedInToday]);
+    // 根据 points history 判断今天是否已签到
+    // 如果 checkedInToday 为 true，说明今天已经签到过，按钮应该是激活状态（不可点击）
+    // 如果 checkedInToday 为 false，说明今天还没签到，按钮应该是未激活状态（可点击）
+    setCheckinActive(checkedInToday);
+  }, [checkedInToday, history, todayKey]);
 
   const getLevelTitle = (level: number): string => {
     const titles: { [key: number]: string } = {
@@ -263,37 +250,32 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
             style={styles.bubbleContent}
             disabled={checkinActive}
             onPress={async () => {
-              if (checkinActive) return;
+              // 如果已经激活（已签到），不允许再次点击
+              if (checkinActive) {
+                Alert.alert('Already Checked In', 'You have already checked in today.');
+                return;
+              }
               
-              // 检查今天是否已经登录过
+              // 检查是否已经登录
               if (!user?.id) {
                 Alert.alert('Login Required', 'Please log in to check in.');
                 return;
               }
 
-              try {
-                const lastLoginDateKey = `lastLoginDate_${user.id}`;
-                const lastLoginDate = await AsyncStorage.getItem(lastLoginDateKey);
-                
-                // 只有今天已经登录过才能签到
-                if (lastLoginDate !== todayKey) {
-                  Alert.alert(
-                    'Check-in Not Available',
-                    'Daily check-in is only available on your first login of the day.'
-                  );
-                  return;
-                }
-
-                // 检查是否已经签到过
-                if (checkedInToday) {
-                  Alert.alert('Already Checked In', 'You have already checked in today.');
-                  setCheckinActive(true);
-                  return;
-                }
-
-                await addPoints('daily_checkin', 'Daily Check-in');
+              // 再次检查是否已经签到过（防止重复点击）
+              if (checkedInToday) {
                 setCheckinActive(true);
-                // Check for badge unlocks
+                Alert.alert('Already Checked In', 'You have already checked in today.');
+                return;
+              }
+
+              try {
+                // 执行签到，添加积分
+                await addPoints('daily_checkin', 'Daily Check-in');
+                // 更新按钮状态为已激活（已签到）
+                setCheckinActive(true);
+                
+                // 检查徽章解锁
                 const unlocked = await checkBadgeUnlock('first_checkin');
                 if (unlocked) {
                   const badge = getBadgeById('first_checkin');
@@ -305,12 +287,18 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
                     );
                   }
                 }
-                // Check for streak badges
+                // 检查连续签到徽章
                 await checkBadgeUnlock('checkin_streak_7');
                 await checkBadgeUnlock('checkin_streak_30');
               } catch (e) {
                 console.error('Error during check-in:', e);
-                Alert.alert('Error', 'Failed to check in. Please try again.');
+                // 如果是重复签到错误，显示特定消息
+                if (e instanceof Error && e.message === 'You have already checked in today.') {
+                  Alert.alert('Already Checked In', 'You have already checked in today.');
+                  setCheckinActive(true);
+                } else {
+                  showError('Error', 'Failed to check in. Please try again.');
+                }
               }
             }}
           >

@@ -28,7 +28,6 @@ interface ExploreScreenProps {
 
 interface FilterState {
   cookingTime: string | null;
-  servings: string | null;
   cookware: string | null;
   selectedTags: string[];
 }
@@ -60,7 +59,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   
   const [filters, setFilters] = useState<FilterState>({
     cookingTime: null,
-    servings: null,
     cookware: null,
     selectedTags: [],
   });
@@ -124,23 +122,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     }
   };
 
-  // 份量筛选函数
-  const matchesServings = (recipe: any): boolean => {
-    if (!filters.servings) return true;
-    const servingsStr = recipe.servings || '';
-    
-    switch (filters.servings) {
-      case '1-2':
-        return servingsStr.includes('1') || servingsStr.includes('2');
-      case '3-4':
-        return servingsStr.includes('3') || servingsStr.includes('4');
-      case '5+':
-        return servingsStr.includes('5') || servingsStr.includes('6') || servingsStr.includes('+');
-      default:
-        return true;
-    }
-  };
-
   // 应用所有筛选和排序
   const filteredRecipes = useMemo(() => {
     let filtered = allPublicRecipes.filter(recipe => {
@@ -155,9 +136,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       
       // 烹饪时间筛选
       if (!matchesCookingTime(recipe)) return false;
-      
-      // 份量筛选
-      if (!matchesServings(recipe)) return false;
       
       // 厨具筛选
       if (filters.cookware && recipe.cookware !== filters.cookware) return false;
@@ -228,14 +206,13 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const clearFilters = () => {
     setFilters({
       cookingTime: null,
-      servings: null,
       cookware: null,
       selectedTags: [],
     });
   };
 
   // 检查是否有活动的筛选
-  const hasActiveFilters = filters.cookingTime || filters.servings || filters.cookware || 
+  const hasActiveFilters = filters.cookingTime || filters.cookware || 
     filters.selectedTags.length > 0;
 
   // 切换标签选择
@@ -362,7 +339,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               {hasActiveFilters && (
                 <View style={styles.filterBadge}>
                   <Text style={styles.filterBadgeText}>
-                    {[filters.cookingTime, filters.servings, filters.cookware].filter(Boolean).length + filters.selectedTags.length}
+                    {[filters.cookingTime, filters.cookware].filter(Boolean).length + filters.selectedTags.length}
                   </Text>
                 </View>
               )}
@@ -415,33 +392,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
                       filters.cookingTime === time && styles.filterOptionTextActive,
                     ]}>
                       {time === 'quick' ? '< 30 min' : time === 'medium' ? '30-60 min' : '> 60 min'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* 份量筛选 */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Servings</Text>
-              <View style={styles.filterOptions}>
-                {['1-2', '3-4', '5+'].map((serving) => (
-                  <TouchableOpacity
-                    key={serving}
-                    style={[
-                      styles.filterOption,
-                      filters.servings === serving && styles.filterOptionActive,
-                    ]}
-                    onPress={() => setFilters(prev => ({
-                      ...prev,
-                      servings: prev.servings === serving ? null : serving,
-                    }))}
-                  >
-                    <Text style={[
-                      styles.filterOptionText,
-                      filters.servings === serving && styles.filterOptionTextActive,
-                    ]}>
-                      {serving === '1-2' ? '1-2 people' : serving === '3-4' ? '3-4 people' : '5+ people'}
                     </Text>
                   </TouchableOpacity>
                 ))}
