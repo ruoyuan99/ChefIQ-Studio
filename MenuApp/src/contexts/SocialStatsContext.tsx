@@ -248,17 +248,49 @@ export const SocialStatsProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
         if (!userId) return;
 
-        // Insert view row (ignore duplicates on unique constraint)
-        const { error } = await supabase
-          .from('social_stat_views')
-          .upsert(
-            [{ recipe_id: recipeId, user_id: userId, viewed_at: new Date().toISOString() }],
-            { onConflict: 'recipe_id,user_id', ignoreDuplicates: true }
-          );
-        if (error) {
-          console.error('Failed to upsert distinct view:', error);
+        // Helper function to insert view with retry logic
+        const insertView = async (retryCount = 0): Promise<boolean> => {
+          const { error } = await supabase
+            .from('social_stat_views')
+            .upsert(
+              [{ recipe_id: recipeId, user_id: userId, viewed_at: new Date().toISOString() }],
+              { onConflict: 'recipe_id,user_id', ignoreDuplicates: true }
+            );
+          
+          if (error) {
+            // Check if it's a foreign key constraint error (recipe not yet in database)
+            // Error code 23503 = foreign key constraint violation
+            const isForeignKeyError = error.code === '23503' || 
+                                     error.message?.includes('foreign key constraint') ||
+                                     error.message?.includes('Key is not present in table "recipes"');
+            
+            if (isForeignKeyError && retryCount < 3) {
+              // Recipe might not be synced yet, wait and retry
+              const delay = (retryCount + 1) * 1000; // 1s, 2s, 3s
+              console.log(`⚠️ Recipe ${recipeId} not found in database yet, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return insertView(retryCount + 1);
+            } else {
+              // Max retries reached or other error - log but don't throw
+              if (isForeignKeyError) {
+                console.warn(`⚠️ Failed to record view for recipe ${recipeId} after ${retryCount + 1} attempts. Recipe may not be synced yet. This is OK for newly created recipes.`);
+              } else {
+                console.error('Failed to upsert distinct view:', error);
+              }
+              return false;
+            }
+          }
+          
+          return true;
+        };
+
+        // Try to insert view with retry logic
+        const success = await insertView();
+        if (!success) {
+          // If insertion failed, still update local state but don't sync to database
           return;
         }
+
         // Recount and sync totals
         const { count } = await supabase
           .from('social_stat_views')

@@ -295,14 +295,64 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               created_at: activity.timestamp.toISOString(),
             }));
 
-            const { error: insertError } = await supabase
-              .from('user_points')
-              .insert(pointsToInsert);
+            // Helper function to insert points with retry for foreign key errors
+            const insertPointsBatch = async (points: typeof pointsToInsert, retryCount = 0): Promise<boolean> => {
+              const { error: insertError } = await supabase
+                .from('user_points')
+                .insert(points);
 
-            if (insertError) {
-              console.log('Failed to sync activities to user_points:', insertError.message);
-            } else {
-              console.log(`✅ Synced ${activitiesToSync.length} activities to database`);
+              if (insertError) {
+                // Check if it's a foreign key constraint error (recipe not yet in database)
+                const isForeignKeyError = insertError.code === '23503' || 
+                                         insertError.message?.includes('foreign key constraint') ||
+                                         insertError.message?.includes('Key is not present in table "recipes"');
+                
+                if (isForeignKeyError && retryCount < 3) {
+                  // Filter out activities with recipe_id that might not exist yet
+                  // Only retry activities without recipe_id or split the batch
+                  const activitiesWithRecipeId = points.filter(p => p.recipe_id);
+                  const activitiesWithoutRecipeId = points.filter(p => !p.recipe_id);
+                  
+                  // First, try to insert activities without recipe_id (these should always work)
+                  if (activitiesWithoutRecipeId.length > 0) {
+                    await supabase
+                      .from('user_points')
+                      .insert(activitiesWithoutRecipeId);
+                  }
+                  
+                  // For activities with recipe_id, wait and retry (recipe might sync soon)
+                  if (activitiesWithRecipeId.length > 0) {
+                    const delay = (retryCount + 1) * 1000; // 1s, 2s, 3s
+                    console.log(`⚠️ Some recipes not found in database yet, retrying ${activitiesWithRecipeId.length} activities in ${delay}ms (attempt ${retryCount + 1}/3)`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return insertPointsBatch(activitiesWithRecipeId, retryCount + 1);
+                  }
+                  
+                  return true; // All activities without recipe_id were inserted
+                } else {
+                  // Max retries reached or other error
+                  if (isForeignKeyError) {
+                    console.warn(`⚠️ Failed to sync some activities after ${retryCount + 1} attempts. Some recipes may not be synced yet. This is OK for newly created recipes.`);
+                    // Try to insert activities without recipe_id anyway
+                    const activitiesWithoutRecipeId = points.filter(p => !p.recipe_id);
+                    if (activitiesWithoutRecipeId.length > 0) {
+                      await supabase
+                        .from('user_points')
+                        .insert(activitiesWithoutRecipeId);
+                    }
+                  } else {
+                    console.log('Failed to sync activities to user_points:', insertError.message);
+                  }
+                  return false;
+                }
+              }
+              
+              return true;
+            };
+
+            const success = await insertPointsBatch(pointsToInsert);
+            if (success) {
+              console.log(`✅ Synced ${pointsToInsert.length} activities to database`);
               
               // 验证数据已成功保存到数据库后，清除所有 AsyncStorage 中的积分数据
               setTimeout(async () => {
@@ -423,21 +473,49 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         // 立即添加新的积分活动到 user_points 表
         // 这样可以确保新活动立即保存，而不需要等待 useEffect 触发
-        const { error: insertError } = await supabase
-          .from('user_points')
-          .insert({
-            user_id: user.id,
-            points: points,
-            activity_type: type,
-            description: description,
-            recipe_id: recipeId || null,
-            created_at: activity.timestamp.toISOString(),
-          });
+        // Helper function to insert points with retry logic (for newly created recipes)
+        const insertPoints = async (retryCount = 0): Promise<boolean> => {
+          const { error: insertError } = await supabase
+            .from('user_points')
+            .insert({
+              user_id: user.id,
+              points: points,
+              activity_type: type,
+              description: description,
+              recipe_id: recipeId || null,
+              created_at: activity.timestamp.toISOString(),
+            });
 
-        if (insertError) {
-          console.log('Failed to insert user_points:', insertError.message);
-          // 如果插入失败，会在 useEffect 中重试同步
-        } else {
+          if (insertError) {
+            // Check if it's a foreign key constraint error (recipe not yet in database)
+            // Error code 23503 = foreign key constraint violation
+            const isForeignKeyError = insertError.code === '23503' || 
+                                     insertError.message?.includes('foreign key constraint') ||
+                                     insertError.message?.includes('Key is not present in table "recipes"');
+            
+            if (isForeignKeyError && recipeId && retryCount < 3) {
+              // Recipe might not be synced yet, wait and retry
+              const delay = (retryCount + 1) * 1000; // 1s, 2s, 3s
+              console.log(`⚠️ Recipe ${recipeId} not found in database yet for points, retrying in ${delay}ms (attempt ${retryCount + 1}/3)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return insertPoints(retryCount + 1);
+            } else {
+              // Max retries reached or other error - log but don't throw
+              if (isForeignKeyError && recipeId) {
+                console.warn(`⚠️ Failed to insert points for recipe ${recipeId} after ${retryCount + 1} attempts. Recipe may not be synced yet. This is OK for newly created recipes. Will retry in useEffect.`);
+              } else {
+                console.log('Failed to insert user_points:', insertError.message);
+              }
+              // 如果插入失败，会在 useEffect 中重试同步
+              return false;
+            }
+          }
+          
+          return true;
+        };
+
+        const success = await insertPoints();
+        if (success) {
           console.log('✅ Activity saved to database:', type);
         }
       } catch (error) {
