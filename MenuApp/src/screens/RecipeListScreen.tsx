@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,11 @@ import {
   FlatList,
   SafeAreaView,
   Alert,
+  Platform,
+  BackHandler,
+  Switch,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
 import { Recipe } from '../types';
@@ -18,8 +22,62 @@ interface RecipeListScreenProps {
 }
 
 const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
-  const { state, deleteRecipe } = useRecipe();
+  const { state, deleteRecipe, updateRecipe, getRecipeById } = useRecipe();
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Track if we're handling back programmatically to avoid duplicate calls
+  const isHandlingBackRef = useRef(false);
+
+  // Unified back handler function - always navigate to Home with More tab active
+  const handleBack = useCallback(() => {
+    // Prevent duplicate calls
+    if (isHandlingBackRef.current) {
+      return;
+    }
+    isHandlingBackRef.current = true;
+
+    // Always navigate to Home screen with More (profile) tab active
+    // This ensures the bottom navigation bar is visible
+    // Use navigate instead of reset to avoid clearing the entire stack
+    navigation.navigate('Home', { initialTab: 'profile' });
+
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isHandlingBackRef.current = false;
+    }, 100);
+  }, [navigation]);
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') {
+        const onBackPress = () => {
+          handleBack();
+          return true; // Prevent default back behavior
+        };
+
+        const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return () => subscription.remove();
+      }
+    }, [handleBack])
+  );
+
+  // Handle iOS swipe back gesture and navigation beforeRemove event
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      // Only intercept if this is a system back (not programmatic navigation)
+      if (!isHandlingBackRef.current) {
+        // Prevent default behavior
+        e.preventDefault();
+
+        // Use our unified back handler
+        handleBack();
+      }
+      // If we're already handling back programmatically, let it proceed
+    });
+
+    return unsubscribe;
+  }, [navigation, handleBack]);
 
   const filteredRecipes = state.recipes.filter(recipe =>
     recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -41,6 +99,29 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
     );
   };
 
+  const handleTogglePublic = (recipeId: string, currentIsPublic: boolean) => {
+    const recipe = getRecipeById(recipeId);
+    if (!recipe) {
+      Alert.alert('Error', 'Recipe not found');
+      return;
+    }
+
+    const newIsPublic = !currentIsPublic;
+    const updatedRecipe = {
+      ...recipe,
+      isPublic: newIsPublic,
+    };
+
+    updateRecipe(updatedRecipe);
+    
+    Alert.alert(
+      newIsPublic ? 'Recipe Published' : 'Recipe Set to Private',
+      newIsPublic 
+        ? 'Your recipe is now visible to everyone.'
+        : 'Your recipe is now only visible to you.'
+    );
+  };
+
   const renderRecipeCard = ({ item }: { item: Recipe }) => (
     <TouchableOpacity
       style={styles.menuCard}
@@ -58,29 +139,44 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
         <View style={styles.menuInfo}>
           <Text style={styles.menuTitle}>{item.title}</Text>
           <Text style={styles.menuDescription}>{item.description}</Text>
-          <Text style={styles.menuStats}>
-            {item.items.length} items • {item.isPublic ? 'Public' : 'Private'}
-          </Text>
         </View>
-        <View style={styles.menuActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('EditRecipe', { recipeId: item.id })}
-          >
-            <Ionicons name="create-outline" size={20} color="#2196F3" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('ShareRecipe', { recipeId: item.id })}
-          >
-            <Ionicons name="share-outline" size={20} color="#FF9800" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleDeleteRecipe(item.id, item.title)}
-          >
-            <Ionicons name="trash-outline" size={20} color="#F44336" />
-          </TouchableOpacity>
+      </View>
+      <View style={styles.menuActions}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.actionButtonFirst]}
+          onPress={() => navigation.navigate('EditRecipe', { recipeId: item.id })}
+        >
+          <Ionicons name="create-outline" size={20} color="#2196F3" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('ShareRecipe', { recipeId: item.id })}
+        >
+          <Ionicons name="share-outline" size={20} color="#FF9800" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => handleDeleteRecipe(item.id, item.title)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#F44336" />
+        </TouchableOpacity>
+        <View style={styles.publicToggleContainer}>
+          <View style={styles.publicToggleLabel}>
+            <Ionicons 
+              name={item.isPublic ? "globe" : "lock-closed"} 
+              size={16} 
+              color={item.isPublic ? "#4CAF50" : "#FF9800"} 
+            />
+            <Text style={styles.publicToggleText}>
+              {item.isPublic ? 'Public' : 'Private'}
+            </Text>
+          </View>
+          <Switch
+            value={item.isPublic}
+            onValueChange={() => handleTogglePublic(item.id, item.isPublic)}
+            trackColor={{ false: '#E0E0E0', true: '#C8E6C9' }}
+            thumbColor={item.isPublic ? '#4CAF50' : '#FF9800'}
+          />
         </View>
       </View>
       <View style={styles.menuFooter}>
@@ -206,9 +302,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   menuHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   menuInfo: {
     flex: 1,
@@ -231,18 +325,41 @@ const styles = StyleSheet.create({
   menuActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+    paddingTop: 0,
+    gap: 8,
   },
   actionButton: {
     padding: 8,
-    marginLeft: 4,
+    marginLeft: 8,
+  },
+  actionButtonFirst: {
+    marginLeft: 0,
+  },
+  publicToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  publicToggleLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  publicToggleText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   menuFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    paddingTop: 8,
   },
   menuDate: {
     fontSize: 12,

@@ -33,6 +33,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
   const [showScanModal, setShowScanModal] = useState(false);
   const [showTextImportModal, setShowTextImportModal] = useState(false);
 
+  // Update activeTab when route params change (e.g., when navigating back from My Recipes)
+  useEffect(() => {
+    if (route?.params?.initialTab) {
+      setActiveTab(route.params.initialTab);
+    }
+  }, [route?.params?.initialTab]);
+
   useEffect(() => {
     console.log('showRecipeOptions changed:', showRecipeOptions);
   }, [showRecipeOptions]);

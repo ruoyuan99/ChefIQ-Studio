@@ -32,7 +32,7 @@ const ChefIQChallengeScreen: React.FC<ChefIQChallengeScreenProps> = ({ navigatio
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#FF6B35" />
+      <StatusBar barStyle="light-content" backgroundColor="#d96709" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -77,22 +77,22 @@ const ChefIQChallengeScreen: React.FC<ChefIQChallengeScreenProps> = ({ navigatio
           <Text style={styles.sectionTitle}>Cook with iQ MiniOven</Text>
           <View style={styles.featuresGrid}>
             <View style={styles.featureCard}>
-              <Ionicons name="flash" size={24} color="#FF6B35" />
+              <Ionicons name="flash" size={24} color="#d96709" />
               <Text style={styles.featureTitle}>11 Functions</Text>
               <Text style={styles.featureText}>Bake, roast, air fry, and more</Text>
             </View>
             <View style={styles.featureCard}>
-              <Ionicons name="speedometer" size={24} color="#FF6B35" />
+              <Ionicons name="speedometer" size={24} color="#d96709" />
               <Text style={styles.featureTitle}>3200 RPM</Text>
               <Text style={styles.featureText}>DC motor for faster cooking</Text>
             </View>
             <View style={styles.featureCard}>
-              <Ionicons name="phone-portrait" size={24} color="#FF6B35" />
+              <Ionicons name="phone-portrait" size={24} color="#d96709" />
               <Text style={styles.featureTitle}>App Control</Text>
               <Text style={styles.featureText}>Remote monitoring & control</Text>
             </View>
             <View style={styles.featureCard}>
-              <Ionicons name="thermometer" size={24} color="#FF6B35" />
+              <Ionicons name="thermometer" size={24} color="#d96709" />
               <Text style={styles.featureTitle}>500°F Max</Text>
               <Text style={styles.featureText}>High-temperature cooking</Text>
             </View>
@@ -236,7 +236,7 @@ const ChefIQChallengeScreen: React.FC<ChefIQChallengeScreenProps> = ({ navigatio
         {/* Discount Code Section */}
         <View style={styles.discountSection}>
           <View style={styles.discountCard}>
-            <Ionicons name="pricetag" size={40} color="#FF6B35" />
+            <Ionicons name="pricetag" size={40} color="#d96709" />
             <Text style={styles.discountTitle}>Special Discount</Text>
             <Text style={styles.discountDescription}>
               Get your iQ MiniOven at a special price for challenge participants!
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight || 24),
     paddingHorizontal: 20,
     paddingBottom: 12,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#d96709',
   },
   backButton: {
     padding: 8,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     padding: 32,
     alignItems: 'center',
     marginBottom: 24,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#d96709',
     marginHorizontal: 0,
   },
   trophyContainer: {
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#d96709',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF6B35',
+    borderLeftColor: '#d96709',
   },
   prizeIcon: {
     marginBottom: 12,
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FF6B35',
+    borderColor: '#d96709',
     borderStyle: 'dashed',
   },
   discountTitle: {
@@ -515,13 +515,13 @@ const styles = StyleSheet.create({
   discountPrice: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FF6B35',
+    color: '#d96709',
     marginBottom: 20,
   },
   discountButton: {
     width: '100%',
     marginBottom: 12,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#d96709',
     borderRadius: 12,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 12,
     borderRadius: 12,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#d96709',
     overflow: 'hidden',
   },
   ctaButtonContent: {

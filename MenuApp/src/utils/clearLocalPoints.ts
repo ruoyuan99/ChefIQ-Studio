@@ -54,7 +54,7 @@ if (__DEV__) {
   (global as any).clearAllAsyncStorage = clearAllAsyncStorage;
   
   console.log('🧹 Local Points Clear Tools Available:');
-  console.log('  - clearLocalPoints() - 清除积分数据（仅 AsyncStorage）');
-  console.log('  - clearAllAsyncStorage() - 清除所有 AsyncStorage 数据');
+  console.log('  - clearLocalPoints() - Clear points data (AsyncStorage only)');
+  console.log('  - clearAllAsyncStorage() - Clear all AsyncStorage data');
 }
 

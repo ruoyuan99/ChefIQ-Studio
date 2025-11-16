@@ -15,6 +15,8 @@ import {
   Platform,
   FlatList,
   Pressable,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -53,13 +55,23 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   // Set default cookware to "Chef iQ Mini Oven" if from challenge
   const defaultCookware = fromChallenge ? 'Chef iQ Mini Oven' : (existingRecipe?.cookware || '');
 
+  // Helper function to extract numeric value from cookingTime (e.g., "122分钟" -> "122")
+  const extractCookingTimeNumber = (cookingTime: any): string => {
+    if (!cookingTime) return '';
+    if (typeof cookingTime === 'number') return String(cookingTime);
+    const str = String(cookingTime);
+    // Extract numeric part (remove "分钟" or any non-numeric characters)
+    const numericValue = str.replace(/[^0-9]/g, '');
+    return numericValue;
+  };
+
   const [recipeData, setRecipeData] = useState({
     title: existingRecipe?.title || recipeName || '',
     description: existingRecipe?.description || '',
     isPublic: existingRecipe?.isPublic || false,
     imageUri: existingRecipe?.imageUri || null,
     tags: existingRecipe?.tags || [],
-    cookingTime: existingRecipe?.cookingTime || '',
+    cookingTime: extractCookingTimeNumber(existingRecipe?.cookingTime),
     servings: existingRecipe?.servings || '',
     ingredients: existingRecipe?.ingredients || [],
     instructions: existingRecipe?.instructions || [],
@@ -140,6 +152,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   });
   const [isReordering, setIsReordering] = useState(false);
   const [showImportModal, setShowImportModal] = useState(showImportOnMount);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const placeholderImageRef = useRef<View>(null);
   const [isGeneratingPlaceholder, setIsGeneratingPlaceholder] = useState(false);
@@ -350,7 +363,7 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
           if (Array.isArray(importedTags)) {
             if (importedTags.length > 3) {
               const limitedTags = importedTags.slice(0, 3);
-              console.log(`⚠️  Imported recipe has ${importedTags.length} tags, limiting to 3: ${JSON.stringify(limitedTags)}`);
+              console.log(`⚠️ Imported recipe has ${importedTags.length} tags, limiting to 3: ${JSON.stringify(limitedTags)}`);
               return limitedTags;
             }
             console.log(`✅ Imported recipe has ${importedTags.length} tags: ${JSON.stringify(importedTags)}`);
@@ -1265,8 +1278,12 @@ const handleIngredientTagPress = (ingredientName: string) => {
         return; // Validation failed, don't continue
       }
       
+      // Get the current isPublic value from recipeData (user's choice)
+      const currentIsPublic = recipeDataRef.current.isPublic || false;
+      
       // Validation passed, continue with save process
-      saveRecipeDataWithVisibility(true);
+      // Use the user's isPublic choice, not force it to true
+      saveRecipeDataWithVisibility(currentIsPublic);
     }, 200); // Increase delay to ensure state update
   };
 
@@ -1344,8 +1361,26 @@ const handleIngredientTagPress = (ingredientName: string) => {
         ...existingRecipe,
         ...recipeDataToSave,
       };
-      updateRecipe(updatedRecipe);
-      savedRecipe = updatedRecipe;
+      // Show loading indicator while waiting for image upload and new image_url
+      setIsUploadingImage(true);
+      try {
+        // Wait for updateRecipe to complete and get the updated recipe with new image_url
+        console.log('⏳ Waiting for recipe update to complete (including image upload)...');
+        savedRecipe = await updateRecipe(updatedRecipe);
+        
+        // If updateRecipe returned updated recipe with new image_url, use it
+        if (savedRecipe && savedRecipe.image_url) {
+          console.log('✅ Recipe updated with new image_url:', savedRecipe.image_url);
+        } else {
+          console.log('⚠️ Using original recipe data (update may still be in progress)');
+          savedRecipe = updatedRecipe;
+        }
+        
+        // Wait a bit more to ensure cloud data is refreshed
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } finally {
+        setIsUploadingImage(false);
+      }
     } else {
       // Call addRecipe method, which now returns a Promise (since it generates UUID)
       console.log('➕ Creating new recipe - passing to addRecipe:', {
@@ -1552,7 +1587,21 @@ const handleIngredientTagPress = (ingredientName: string) => {
   const isAnyDropdownOpen = showCookwareDropdown || showUnitDropdown;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      {/* Loading Modal for Image Upload */}
+      <Modal
+        visible={isUploadingImage}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.loadingModalOverlay}>
+          <View style={styles.loadingModalContent}>
+            <ActivityIndicator size="large" color="#FF6B35" />
+            <Text style={styles.loadingModalText}>Uploading image...</Text>
+            <Text style={styles.loadingModalSubtext}>Please wait while we update your recipe</Text>
+          </View>
+        </View>
+      </Modal>
       <KeyboardAvoidingView 
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1831,7 +1880,16 @@ const handleIngredientTagPress = (ingredientName: string) => {
             />
           </View>
           <View style={styles.switchGroup}>
-            <Text style={styles.label}>Public Recipe</Text>
+            <View style={styles.switchLabelContainer}>
+              <Text style={styles.label}>
+                {recipeData.isPublic ? 'Public Recipe' : 'Private Recipe'}
+              </Text>
+              <Text style={styles.switchDescription}>
+                {recipeData.isPublic 
+                  ? 'Visible to everyone' 
+                  : 'Only visible to you'}
+              </Text>
+            </View>
             <Switch
               value={recipeData.isPublic}
               onValueChange={value => setRecipeData({ ...recipeData, isPublic: value })}
@@ -2919,6 +2977,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
   row: {
     flexDirection: 'row',
     position: 'relative',
@@ -3776,6 +3843,37 @@ const styles = StyleSheet.create({
   reorderActions: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  // Loading Modal Styles
+  loadingModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    minWidth: 250,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingModalText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  loadingModalSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   reorderMoveButton: {
     backgroundColor: '#f0f0f0',

@@ -43,7 +43,7 @@ const DataMigrationScreen: React.FC = () => {
       const status = await DataMigrationService.checkMigrationStatus();
       setMigrationStatus(status);
     } catch (error) {
-      console.error('检查迁移状态失败:', error);
+      console.error('Failed to check migration status:', error);
     }
   };
 
@@ -61,7 +61,7 @@ const DataMigrationScreen: React.FC = () => {
       
       setAsyncStorageData(data);
     } catch (error) {
-      console.error('检查AsyncStorage数据失败:', error);
+      console.error('Failed to check AsyncStorage data:', error);
     }
   };
 
@@ -101,7 +101,7 @@ const DataMigrationScreen: React.FC = () => {
     setMigrationProgress('正在检查用户认证...');
 
     try {
-      console.log('🚀 开始数据迁移...');
+      console.log('🚀 Starting data migration...');
       
       setMigrationProgress('正在迁移用户数据...');
       await new Promise(resolve => setTimeout(resolve, 500));

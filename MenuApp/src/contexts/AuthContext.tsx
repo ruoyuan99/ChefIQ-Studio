@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
     } catch (error) {
-      console.error('获取初始会话失败:', error);
+      console.error('Failed to get initial session:', error);
     } finally {
       isInitializing.current = false;
       setLoading(false);
@@ -110,7 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('获取用户资料失败:', error);
+        console.error('Failed to get user profile:', error);
         // If not found by id, try to merge existing data by email
         await createOrMergeUserProfile(authUser);
         return;
@@ -166,11 +166,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               })
               .eq('email', authUser.email);
             if (updateErr) {
-              console.error('合并用户资料失败:', updateErr);
+              console.error('Failed to merge user profile:', updateErr);
               return;
             }
           } else {
-            console.error('邮箱已存在但无法获取旧记录，跳过合并');
+            console.error('Email already exists but cannot get old record, skipping merge');
             return;
           }
         } else {
@@ -208,7 +208,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await AsyncStorage.setItem('user', JSON.stringify(mergedUser));
       }
     } catch (error) {
-      console.error('创建用户资料失败:', error);
+      console.error('Failed to create user profile:', error);
     }
   };
 

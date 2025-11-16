@@ -29,61 +29,61 @@ function toCookingTimeMinutes(v: any): number | null {
 export class DataMigrationService {
   // 迁移所有数据
   static async migrateAllData() {
-    console.log('🚀 开始数据迁移...');
+    console.log('🚀 Starting data migration...');
     
     try {
-      // 1. 迁移用户数据
+      // 1. Migrate user data
       const userId = await this.migrateUsers();
       
       if (!userId) {
-        console.log('⚠️ 无法获取用户ID，跳过其他数据迁移');
-        return { success: false, message: '需要先迁移用户数据' };
+        console.log('⚠️ Unable to get user ID, skipping other data migration');
+        return { success: false, message: 'Need to migrate user data first' };
       }
       
-      // 2. 迁移菜谱数据
+      // 2. Migrate recipe data
       await this.migrateRecipes(userId);
       
-      // 3. 迁移收藏数据
+      // 3. Migrate favorites data
       await this.migrateFavorites(userId);
       
-      // 4. 迁移评论数据
+      // 4. Migrate comments data
       await this.migrateComments(userId);
       
-      // 5. 迁移社交统计数据
+      // 5. Migrate social stats data
       await this.migrateSocialStats(userId);
       
-      console.log('✅ 数据迁移完成！');
-      return { success: true, message: '所有数据迁移成功' };
+      console.log('✅ Data migration completed!');
+      return { success: true, message: 'All data migration succeeded' };
       
     } catch (error: any) {
-      console.error('❌ 数据迁移失败:', error);
+      console.error('❌ Data migration failed:', error);
       return { success: false, message: `迁移失败: ${error?.message || 'Unknown error'}` };
     }
   }
 
   // 迁移用户数据
   static async migrateUsers() {
-    console.log('👤 迁移用户数据...');
+    console.log('👤 Migrating user data...');
     
     try {
-      // 从AsyncStorage获取用户数据
+      // Get user data from AsyncStorage
       const userData = await AsyncStorage.getItem('userData');
       if (!userData) {
-        console.log('📝 没有用户数据需要迁移');
+        console.log('📝 No user data to migrate');
         return null;
       }
 
       const user = JSON.parse(userData);
       
-      // 检查当前是否有认证用户
+      // Check if there is an authenticated user
       const { data: { user: authUser } } = await supabase.auth.getUser();
       
       if (!authUser) {
-        console.log('👤 用户未认证，跳过用户数据迁移');
+        console.log('👤 User not authenticated, skipping user data migration');
         return null;
       }
 
-      // 检查用户是否已存在
+      // Check if user already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -91,11 +91,11 @@ export class DataMigrationService {
         .single();
 
       if (existingUser) {
-        console.log('👤 用户已存在，跳过迁移');
+        console.log('👤 User already exists, skipping migration');
         return authUser.id;
       }
 
-      // 创建用户资料
+      // Create user profile
       const { data: newUser, error } = await supabase
         .from('users')
         .insert({
@@ -108,27 +108,27 @@ export class DataMigrationService {
         .single();
 
       if (error) {
-        throw new Error(`用户创建失败: ${error.message}`);
+        throw new Error(`User creation failed: ${error.message}`);
       }
 
-      console.log('✅ 用户数据迁移成功:', newUser.id);
+      console.log('✅ User data migration succeeded:', newUser.id);
       return newUser.id;
       
     } catch (error) {
-      console.error('❌ 用户数据迁移失败:', error);
+      console.error('❌ User data migration failed:', error);
       throw error;
     }
   }
 
   // 迁移菜谱数据
   static async migrateRecipes(userId: string) {
-    console.log('🍳 迁移菜谱数据...');
+    console.log('🍳 Migrating recipe data...');
     
     try {
-      // 从AsyncStorage获取菜谱数据
+      // Get recipe data from AsyncStorage
       const recipesData = await AsyncStorage.getItem('recipes');
       if (!recipesData) {
-        console.log('📝 没有菜谱数据需要迁移');
+        console.log('📝 No recipe data to migrate');
         return [];
       }
 
@@ -154,7 +154,7 @@ export class DataMigrationService {
             .single();
 
           if (recipeError) {
-            console.error(`❌ 菜谱创建失败: ${recipe.title}`, recipeError.message);
+            console.error(`❌ Recipe creation failed: ${recipe.title}`, recipeError.message);
             continue;
           }
 
@@ -174,18 +174,18 @@ export class DataMigrationService {
           }
 
           migratedRecipes.push(newRecipe);
-          console.log(`✅ 菜谱迁移成功: ${recipe.title || recipe.name || 'Untitled Recipe'}`);
+          console.log(`✅ Recipe migration succeeded: ${recipe.title || recipe.name || 'Untitled Recipe'}`);
 
         } catch (error) {
-          console.error(`❌ 菜谱迁移失败: ${recipe.title}`, error);
+          console.error(`❌ Recipe migration failed: ${recipe.title}`, error);
         }
       }
 
-      console.log(`✅ 菜谱数据迁移完成: ${migratedRecipes.length} 个菜谱`);
+      console.log(`✅ Recipe data migration completed: ${migratedRecipes.length} recipes`);
       return migratedRecipes;
 
     } catch (error) {
-      console.error('❌ 菜谱数据迁移失败:', error);
+      console.error('❌ Recipe data migration failed:', error);
       throw error;
     }
   }
@@ -205,11 +205,11 @@ export class DataMigrationService {
         .insert(ingredientsData);
 
       if (error) {
-        throw new Error(`食材创建失败: ${error.message}`);
+        throw new Error(`Ingredient creation failed: ${error.message}`);
       }
 
     } catch (error) {
-      console.error('❌ 食材数据迁移失败:', error);
+      console.error('❌ Ingredients data migration failed:', error);
       throw error;
     }
   }
@@ -229,11 +229,11 @@ export class DataMigrationService {
         .insert(instructionsData);
 
       if (error) {
-        throw new Error(`步骤创建失败: ${error.message}`);
+        throw new Error(`Instruction creation failed: ${error.message}`);
       }
 
     } catch (error) {
-      console.error('❌ 步骤数据迁移失败:', error);
+      console.error('❌ Instructions data migration failed:', error);
       throw error;
     }
   }
@@ -251,23 +251,23 @@ export class DataMigrationService {
         .insert(tagsData);
 
       if (error) {
-        throw new Error(`标签创建失败: ${error.message}`);
+        throw new Error(`Tag creation failed: ${error.message}`);
       }
 
     } catch (error) {
-      console.error('❌ 标签数据迁移失败:', error);
+      console.error('❌ Tags data migration failed:', error);
       throw error;
     }
   }
 
   // 迁移收藏数据
   static async migrateFavorites(userId: string) {
-    console.log('❤️ 迁移收藏数据...');
+    console.log('❤️ Migrating favorites data...');
     
     try {
       const favoritesData = await AsyncStorage.getItem('favorites');
       if (!favoritesData) {
-        console.log('📝 没有收藏数据需要迁移');
+        console.log('📝 No favorites data to migrate');
         return;
       }
 
@@ -294,26 +294,26 @@ export class DataMigrationService {
           .insert(favoritesDataToInsert);
 
         if (error) {
-          throw new Error(`收藏创建失败: ${error.message}`);
+          throw new Error(`Favorite creation failed: ${error.message}`);
         }
       }
 
-      console.log(`✅ 收藏数据迁移完成: ${favoritesDataToInsert.length} 个收藏`);
+      console.log(`✅ Favorites data migration completed: ${favoritesDataToInsert.length} favorites`);
 
     } catch (error) {
-      console.error('❌ 收藏数据迁移失败:', error);
+      console.error('❌ Favorites data migration failed:', error);
       throw error;
     }
   }
 
   // 迁移评论数据
   static async migrateComments(userId: string) {
-    console.log('💬 迁移评论数据...');
+    console.log('💬 Migrating comments data...');
     
     try {
       const commentsData = await AsyncStorage.getItem('comments');
       if (!commentsData) {
-        console.log('📝 没有评论数据需要迁移');
+        console.log('📝 No comments data to migrate');
         return;
       }
 
@@ -341,35 +341,35 @@ export class DataMigrationService {
           });
 
         if (error) {
-          console.error(`❌ 评论创建失败: ${comment.content}`, error.message);
+          console.error(`❌ Comment creation failed: ${comment.content}`, error.message);
         }
       }
 
-      console.log('✅ 评论数据迁移完成');
+      console.log('✅ Comments data migration completed');
 
     } catch (error) {
-      console.error('❌ 评论数据迁移失败:', error);
+      console.error('❌ Comments data migration failed:', error);
       throw error;
     }
   }
 
   // 迁移社交统计数据
   static async migrateSocialStats(userId: string) {
-    console.log('📊 迁移社交统计数据...');
+    console.log('📊 Migrating social stats data...');
     
     try {
       const socialStatsData = await AsyncStorage.getItem('socialStats');
       if (!socialStatsData) {
-        console.log('📝 没有社交统计数据需要迁移');
+        console.log('📝 No social stats data to migrate');
         return;
       }
 
       const socialStats = JSON.parse(socialStatsData);
-      console.log(`📝 社交统计数据已记录: ${Object.keys(socialStats).length} 个菜谱的统计`);
-      console.log('📝 注意: 由于RLS策略限制，实际数据迁移需要在用户认证后进行');
+      console.log(`📝 Social stats data recorded: ${Object.keys(socialStats).length} recipe stats`);
+      console.log('📝 Note: Due to RLS policy restrictions, actual data migration needs to be done after user authentication');
 
     } catch (error) {
-      console.error('❌ 社交统计数据迁移失败:', error);
+      console.error('❌ Social stats data migration failed:', error);
       throw error;
     }
   }
@@ -453,7 +453,7 @@ export class DataMigrationService {
       const migrationStatus = await AsyncStorage.getItem('migrationStatus');
       return migrationStatus ? JSON.parse(migrationStatus) : { migrated: false };
     } catch (error) {
-      console.error('❌ 检查迁移状态失败:', error);
+      console.error('❌ Failed to check migration status:', error);
       return { migrated: false };
     }
   }
@@ -466,7 +466,7 @@ export class DataMigrationService {
         migratedAt: new Date().toISOString()
       }));
     } catch (error) {
-      console.error('❌ 标记迁移完成失败:', error);
+      console.error('❌ Failed to mark migration complete:', error);
     }
   }
 
@@ -482,9 +482,9 @@ export class DataMigrationService {
       ];
 
       await AsyncStorage.multiRemove(keysToRemove);
-      console.log('✅ AsyncStorage数据清理完成');
+      console.log('✅ AsyncStorage data cleanup completed');
     } catch (error) {
-      console.error('❌ AsyncStorage数据清理失败:', error);
+      console.error('❌ AsyncStorage data cleanup failed:', error);
     }
   }
 }

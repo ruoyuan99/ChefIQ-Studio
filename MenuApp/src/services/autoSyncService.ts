@@ -297,16 +297,16 @@ export class AutoSyncService {
           }
 
           syncedRecipes.push({ id: recipeId, title: recipe.title });
-          console.log(`✅ 菜谱同步完成: ${recipe.title || recipe.name}`);
+          console.log(`✅ Recipe sync completed: ${recipe.title || recipe.name}`);
 
         } catch (error) {
-          console.error(`❌ 菜谱同步失败: ${recipe.title}`, error);
+          console.error(`❌ Recipe sync failed: ${recipe.title}`, error);
         }
       }
 
       return syncedRecipes;
     } catch (error) {
-      console.error('❌ 菜谱数据同步失败:', error);
+      console.error('❌ Recipe data sync failed:', error);
       return [];
     }
   }
@@ -333,9 +333,9 @@ export class AutoSyncService {
         .from('ingredients')
         .insert(ingredientsData);
 
-      console.log(`✅ 食材同步完成: ${ingredients.length} 个`);
+      console.log(`✅ Ingredients sync completed: ${ingredients.length} items`);
     } catch (error) {
-      console.error('❌ 食材同步失败:', error);
+      console.error('❌ Ingredients sync failed:', error);
     }
   }
 
@@ -361,9 +361,9 @@ export class AutoSyncService {
         .from('instructions')
         .insert(instructionsData);
 
-      console.log(`✅ 步骤同步完成: ${instructions.length} 个`);
+      console.log(`✅ Instructions sync completed: ${instructions.length} items`);
     } catch (error) {
-      console.error('❌ 步骤同步失败:', error);
+      console.error('❌ Instructions sync failed:', error);
     }
   }
 
@@ -386,9 +386,9 @@ export class AutoSyncService {
         .from('tags')
         .insert(tagsData);
 
-      console.log(`✅ 标签同步完成: ${tags.length} 个`);
+      console.log(`✅ Tags sync completed: ${tags.length} items`);
     } catch (error) {
-      console.error('❌ 标签同步失败:', error);
+      console.error('❌ Tags sync failed:', error);
     }
   }
 
@@ -417,9 +417,9 @@ export class AutoSyncService {
         .from('favorites')
         .insert(favoritesList);
 
-      console.log(`✅ 收藏同步完成: ${favorites.length} 个`);
+      console.log(`✅ Favorites sync completed: ${favorites.length} items`);
     } catch (error) {
-      console.error('❌ 收藏同步失败:', error);
+      console.error('❌ Favorites sync failed:', error);
     }
   }
 
@@ -447,9 +447,9 @@ export class AutoSyncService {
         }
       }
 
-      console.log('✅ 评论同步完成');
+      console.log('✅ Comments sync completed');
     } catch (error) {
-      console.error('❌ 评论同步失败:', error);
+      console.error('❌ Comments sync failed:', error);
     }
   }
 
@@ -474,9 +474,9 @@ export class AutoSyncService {
           });
       }
 
-      console.log('✅ 社交统计同步完成');
+      console.log('✅ Social stats sync completed');
     } catch (error) {
-      console.error('❌ 社交统计同步失败:', error);
+      console.error('❌ Social stats sync failed:', error);
     }
   }
 
@@ -488,7 +488,7 @@ export class AutoSyncService {
         syncedAt: new Date().toISOString()
       }));
     } catch (error) {
-      console.error('❌ 标记同步状态失败:', error);
+      console.error('❌ Failed to mark sync status:', error);
     }
   }
 
@@ -510,9 +510,9 @@ export class AutoSyncService {
     try {
       const keys = ['recipes', 'favorites', 'comments', 'socialStats', 'userData'];
       await AsyncStorage.multiRemove(keys);
-      console.log('✅ AsyncStorage清理完成');
+      console.log('✅ AsyncStorage cleanup completed');
     } catch (error) {
-      console.error('❌ AsyncStorage清理失败:', error);
+      console.error('❌ AsyncStorage cleanup failed:', error);
     }
   }
 }

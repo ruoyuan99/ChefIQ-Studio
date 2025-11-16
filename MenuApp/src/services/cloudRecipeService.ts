@@ -58,6 +58,23 @@ export const CloudRecipeService = {
     if (error) throw error;
     return (data || []).map(mapDbToRecipe);
   },
+
+  async fetchPublicRecipes(): Promise<Recipe[]> {
+    const { data, error } = await supabase
+      .from('recipes')
+      .select(`
+        id, title, description, image_url, cooking_time, servings, cookware, is_public, created_at, updated_at,
+        ingredients:ingredients(id, name, amount, unit, order_index),
+        instructions:instructions(id, step_number, description, image_url, order_index),
+        tags:tags(id, name),
+        user:users(name, avatar_url)
+      `)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(mapDbToRecipe);
+  },
 };
 
 

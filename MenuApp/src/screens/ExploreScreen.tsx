@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { useFavorite } from '../contexts/FavoriteContext';
 import { sampleRecipes } from '../data/sampleRecipes';
 import { UserPreferenceService } from '../services/userPreferenceService';
 import { RecommendationService } from '../services/recommendationService';
+import { CloudRecipeService } from '../services/cloudRecipeService';
+import { Recipe } from '../types';
 import OptimizedImage from '../components/OptimizedImage';
 
 interface ExploreScreenProps {
@@ -91,6 +93,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
   const [sortBy, setSortBy] = useState<'relevance' | 'popular' | 'newest' | 'oldest' | 'title' | 'recommend'>('relevance');
+  const [cloudPublicRecipes, setCloudPublicRecipes] = useState<Recipe[]>([]);
   
   const [filters, setFilters] = useState<FilterState>({
     cookingTime: null,
@@ -98,11 +101,37 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     selectedTags: [],
   });
 
-  // 合并用户创建的公开菜谱和示例菜谱
-  const allPublicRecipes = useMemo(() => [
-    ...state.recipes.filter(recipe => recipe.isPublic),
-    ...sampleRecipes,
-  ], [state.recipes]);
+  // 从云端获取所有public recipes
+  useEffect(() => {
+    const fetchPublicRecipes = async () => {
+      try {
+        const publicRecipes = await CloudRecipeService.fetchPublicRecipes();
+        setCloudPublicRecipes(publicRecipes);
+      } catch (error) {
+        console.error('Failed to fetch public recipes from cloud:', error);
+      }
+    };
+
+    fetchPublicRecipes();
+  }, []);
+
+  // 合并用户创建的公开菜谱、云端public recipes和示例菜谱
+  // 去重：如果本地recipe和云端recipe有相同的ID，优先使用本地版本（可能更新）
+  const allPublicRecipes = useMemo(() => {
+    const localPublicRecipes = state.recipes.filter(recipe => recipe.isPublic);
+    const localRecipeIds = new Set(localPublicRecipes.map(r => r.id));
+    
+    // 过滤掉云端recipes中与本地recipes重复的部分
+    const uniqueCloudRecipes = cloudPublicRecipes.filter(
+      cloudRecipe => !localRecipeIds.has(cloudRecipe.id)
+    );
+    
+    return [
+      ...localPublicRecipes,
+      ...uniqueCloudRecipes,
+      ...sampleRecipes,
+    ];
+  }, [state.recipes, cloudPublicRecipes]);
 
   // Get user interactions for recommendation
   const likedRecipeIds = likeContext.state.likedRecipes;
@@ -283,14 +312,23 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         style={styles.recipeCard}
         onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
       >
-      <OptimizedImage
-        source={recipe.image_url || recipe.imageUri || recipe.image}
-        style={styles.recipeImage}
-        contentFit="cover"
-        showLoader={true}
-        cachePolicy="memory-disk"
-        priority="normal"
-      />
+      <View style={styles.recipeImageContainer}>
+        <OptimizedImage
+          source={recipe.image_url || recipe.imageUri || recipe.image}
+          style={styles.recipeImage}
+          contentFit="cover"
+          showLoader={true}
+          cachePolicy="memory-disk"
+          priority="normal"
+        />
+        {/* Chef iQ Challenge Badge */}
+        {recipe.tags && recipe.tags.includes('Chef iQ Challenge') && (
+          <View style={styles.challengeBadge}>
+            <Ionicons name="trophy" size={12} color="#d96709" />
+            <Text style={styles.challengeBadgeText}>Chef iQ Challenge</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.recipeContent}>
         <View style={styles.recipeHeader}>
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
@@ -333,6 +371,54 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         </View>
         
       </View>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Render Chef iQ Challenge card - same style as recipe cards
+  const renderChallengeCard = () => (
+    <View key="chef-iq-challenge" style={styles.recipeCardWrapper}>
+      {/* Android上的渐变阴影效果 - 在卡片外部 */}
+      {Platform.OS === 'android' && (
+        <View style={styles.cardShadowContainer}>
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer1]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer2]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer3]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer4]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer5]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer6]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer7]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer8]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer9]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer10]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer11]} />
+          <View style={[styles.cardShadowLayer, styles.cardShadowLayer12]} />
+        </View>
+      )}
+      <TouchableOpacity
+        style={styles.recipeCard}
+        onPress={() => navigation.navigate('ChefIQChallenge')}
+        activeOpacity={0.9}
+      >
+        <View style={styles.challengeImageContainer}>
+          <Ionicons name="trophy" size={48} color="#FF6B35" />
+        </View>
+        <View style={styles.recipeContent}>
+          <View style={styles.recipeHeader}>
+            <Text style={styles.recipeTitle}>Chef iQ Challenge</Text>
+            <View style={styles.recipeStats}>
+              <View style={styles.recipeStat}>
+                <Ionicons name="restaurant-outline" size={14} color="#666" />
+                <Text style={styles.recipeStatText}>Chef iQ Mini Oven</Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.challengeDescription}>
+            <Text style={styles.challengeDescriptionText}>
+              Join the cooking competition and share your best recipes!
+            </Text>
+          </View>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -593,7 +679,22 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               </>
             )}
             <View style={styles.recipesGrid}>
-              {filteredRecipes.map(renderRecipeCard)}
+              {filteredRecipes.map((recipe, index) => {
+                // Insert Chef iQ Challenge card at position 4 (index 3)
+                if (index === 3) {
+                  return (
+                    <React.Fragment key={`challenge-${index}`}>
+                      {renderChallengeCard()}
+                      {renderRecipeCard(recipe)}
+                    </React.Fragment>
+                  );
+                }
+                return renderRecipeCard(recipe);
+              })}
+              {/* If there are fewer than 4 recipes, show challenge card after the last recipe (at position 4) */}
+              {filteredRecipes.length > 0 && filteredRecipes.length < 4 && renderChallengeCard()}
+              {/* If there are no recipes, show challenge card first */}
+              {filteredRecipes.length === 0 && renderChallengeCard()}
             </View>
           </>
         )}
@@ -986,10 +1087,37 @@ const styles = StyleSheet.create({
     borderRadius: 19.5,
     opacity: 0.004375,
   },
+  recipeImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 120,
+  },
   recipeImage: {
     width: '100%',
     height: 120,
     resizeMode: 'cover',
+  },
+  challengeBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  challengeBadgeText: {
+    fontSize: 10,
+    color: '#d96709',
+    fontWeight: '600',
+    marginLeft: 4,
   },
   recipeContent: {
     padding: 12,
@@ -1016,6 +1144,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 4,
+  },
+  challengeImageContainer: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  challengeDescription: {
+    marginTop: 8,
+  },
+  challengeDescriptionText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
   },
   recipeTriedInfo: {
     flexDirection: 'row',

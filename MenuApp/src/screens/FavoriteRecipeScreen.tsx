@@ -274,22 +274,51 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
       </Modal>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Generate Recipe from Ingredients Card */}
-        <TouchableOpacity 
-          style={styles.generateRecipeCard}
-          onPress={() => navigation.navigate('GenerateRecipe')}
-        >
-          <View style={styles.generateRecipeHeader}>
-            <View style={styles.generateRecipeIconContainer}>
-              <Ionicons name="sparkles" size={28} color="#d96709" />
-            </View>
-            <View style={styles.generateRecipeContent}>
-              <Text style={styles.generateRecipeTitle}>Generate from Ingredients</Text>
-              <Text style={styles.generateRecipeSubtitle}>Not sure what to cook? Let AI turn your fridge into recipes.</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#d96709" />
+        {/* Generate Recipe from Ingredients Card - Same style as favorite recipe cards with orange glow */}
+        <View style={styles.generateRecipeCardWrapper}>
+          {/* Orange glow effect layers */}
+          <View style={styles.orangeGlowContainer}>
+            <View style={[styles.orangeGlowLayer, styles.orangeGlowLayer1]} />
+            <View style={[styles.orangeGlowLayer, styles.orangeGlowLayer2]} />
+            <View style={[styles.orangeGlowLayer, styles.orangeGlowLayer3]} />
+            <View style={[styles.orangeGlowLayer, styles.orangeGlowLayer4]} />
+            <View style={[styles.orangeGlowLayer, styles.orangeGlowLayer5]} />
           </View>
-        </TouchableOpacity>
+          <View style={styles.cardShadowContainer}>
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer1]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer2]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer3]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer4]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer5]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer6]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer7]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer8]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer9]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer10]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer11]} />
+            <View style={[styles.cardShadowLayer, styles.cardShadowLayer12]} />
+          </View>
+          <TouchableOpacity 
+            style={styles.generateRecipeCard}
+            onPress={() => navigation.navigate('GenerateRecipe')}
+            activeOpacity={0.9}
+          >
+            <OptimizedImage
+              source={require('../../assets/GenerateFromIngredients2.png')}
+              style={styles.generateRecipeImage}
+              contentFit="cover"
+              showLoader={true}
+              cachePolicy="memory-disk"
+              priority="normal"
+            />
+            <View style={styles.generateRecipeContentContainer}>
+              <View style={styles.generateRecipeInfo}>
+                <Text style={styles.generateRecipeTitle}>Generate from Ingredients</Text>
+                <Text style={styles.generateRecipeDescription}>Not sure what to cook? Let AI turn your fridge into recipes.</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.recipesSection}>
           <Text style={styles.sectionSubtitle}>
@@ -342,46 +371,100 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 20 : 0, // Android上完全移除空白，iOS保留小间距
   },
-  // Generate Recipe Card Styles
+  // Generate Recipe Card Styles - Same as favorite recipe cards with orange gradient glow
+  generateRecipeCardWrapper: {
+    marginBottom: 20,
+    position: 'relative',
+  },
+  // Light gold gradient glow effect
+  orangeGlowContainer: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 16,
+    zIndex: -2,
+    pointerEvents: 'none',
+  },
+  orangeGlowLayer: {
+    position: 'absolute',
+    backgroundColor: '#FFD89B', // Light gold color
+    borderRadius: 16,
+  },
+  orangeGlowLayer1: {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.2,
+  },
+  orangeGlowLayer2: {
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: 17,
+    opacity: 0.15,
+  },
+  orangeGlowLayer3: {
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 18,
+    opacity: 0.12,
+  },
+  orangeGlowLayer4: {
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 19,
+    opacity: 0.08,
+  },
+  orangeGlowLayer5: {
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 20,
+    opacity: 0.05,
+  },
   generateRecipeCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#FFE0B2',
+    overflow: 'hidden',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#FFD89B', // Light gold shadow
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+    } : {
+      elevation: 8,
+    }),
   },
-  generateRecipeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+  generateRecipeImage: {
+    width: '100%',
+    height: 150,
+    resizeMode: 'cover',
   },
-  generateRecipeIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF3E0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  generateRecipeContentContainer: {
+    padding: 20,
   },
-  generateRecipeContent: {
+  generateRecipeInfo: {
     flex: 1,
   },
   generateRecipeTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: getFontWeight('600') as any,
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  generateRecipeSubtitle: {
+  generateRecipeDescription: {
     fontSize: 13,
     color: '#666',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   recipesSection: {
     marginBottom: 20,

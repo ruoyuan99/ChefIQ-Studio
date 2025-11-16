@@ -2,7 +2,7 @@ import { supabase } from '../config/supabase'
 
 // 测试Supabase连接
 export const testSupabaseConnection = async () => {
-  console.log('🔗 测试Supabase连接...')
+  console.log('🔗 Testing Supabase connection...')
   
   try {
     // 测试基本连接
@@ -12,24 +12,24 @@ export const testSupabaseConnection = async () => {
       .limit(1)
     
     if (error) {
-      console.error('❌ Supabase连接失败:', error.message)
+      console.error('❌ Supabase connection failed:', error.message)
       return false
     }
     
-    console.log('✅ Supabase连接成功!')
+    console.log('✅ Supabase connection successful!')
     // Note: supabaseUrl is protected, using alternative check
-    console.log('🔑 API密钥已配置')
+    console.log('🔑 API key configured')
     
     return true
   } catch (err) {
-    console.error('❌ 连接测试异常:', err)
+    console.error('❌ Connection test exception:', err)
     return false
   }
 }
 
 // 测试数据库表是否存在
 export const testDatabaseTables = async () => {
-  console.log('🗄️ 测试数据库表...')
+  console.log('🗄️ Testing database tables...')
   
   const tables = ['users', 'recipes', 'ingredients', 'instructions', 'comments', 'favorites', 'tags']
   
@@ -41,19 +41,19 @@ export const testDatabaseTables = async () => {
         .limit(1)
       
       if (error) {
-        console.log(`❌ 表 ${table} 不存在或无法访问:`, error.message)
+        console.log(`❌ Table ${table} does not exist or cannot be accessed:`, error.message)
       } else {
-        console.log(`✅ 表 ${table} 存在且可访问`)
+        console.log(`✅ Table ${table} exists and is accessible`)
       }
     } catch (err) {
-      console.log(`❌ 表 ${table} 测试异常:`, err)
+      console.log(`❌ Table ${table} test exception:`, err)
     }
   }
 }
 
 // 创建测试用户
 export const createTestUser = async () => {
-  console.log('👤 创建测试用户...')
+  console.log('👤 Creating test user...')
   
   try {
     const testUser = {
@@ -69,21 +69,21 @@ export const createTestUser = async () => {
       .single()
     
     if (error) {
-      console.log('⚠️ 测试用户可能已存在:', error.message)
+      console.log('⚠️ Test user may already exist:', error.message)
     } else {
-      console.log('✅ 测试用户创建成功:', data)
+      console.log('✅ Test user created successfully:', data)
     }
     
     return data
   } catch (err) {
-    console.error('❌ 创建测试用户失败:', err)
+    console.error('❌ Failed to create test user:', err)
     return null
   }
 }
 
 // 创建测试菜谱
 export const createTestRecipe = async (userId: string) => {
-  console.log('🍳 创建测试菜谱...')
+  console.log('🍳 Creating test recipe...')
   
   try {
     const testRecipe = {
@@ -102,13 +102,13 @@ export const createTestRecipe = async (userId: string) => {
       .single()
     
     if (error) {
-      console.error('❌ 创建测试菜谱失败:', error.message)
+      console.error('❌ Failed to create test recipe:', error.message)
       return null
     }
     
-    console.log('✅ 测试菜谱创建成功:', data)
+    console.log('✅ Test recipe created successfully:', data)
     
-    // 添加测试食材
+    // Add test ingredients
     const testIngredients = [
       { recipe_id: data.id, name: '测试食材1', amount: '100', unit: 'g' },
       { recipe_id: data.id, name: '测试食材2', amount: '2', unit: '个' }
@@ -120,12 +120,12 @@ export const createTestRecipe = async (userId: string) => {
       .select()
     
     if (ingredientsError) {
-      console.error('❌ 创建测试食材失败:', ingredientsError.message)
+      console.error('❌ Failed to create test ingredients:', ingredientsError.message)
     } else {
-      console.log('✅ 测试食材创建成功:', ingredients)
+      console.log('✅ Test ingredients created successfully:', ingredients)
     }
     
-    // 添加测试步骤
+    // Add test instructions
     const testInstructions = [
       { recipe_id: data.id, step_number: 1, description: '第一步：准备食材' },
       { recipe_id: data.id, step_number: 2, description: '第二步：开始烹饪' }
@@ -137,42 +137,42 @@ export const createTestRecipe = async (userId: string) => {
       .select()
     
     if (instructionsError) {
-      console.error('❌ 创建测试步骤失败:', instructionsError.message)
+      console.error('❌ Failed to create test instructions:', instructionsError.message)
     } else {
-      console.log('✅ 测试步骤创建成功:', instructions)
+      console.log('✅ Test instructions created successfully:', instructions)
     }
     
     return data
   } catch (err) {
-    console.error('❌ 创建测试菜谱异常:', err)
+    console.error('❌ Test recipe creation exception:', err)
     return null
   }
 }
 
 // 运行所有测试
 export const runAllTests = async () => {
-  console.log('🚀 开始Supabase集成测试...\n')
+  console.log('🚀 Starting Supabase integration test...\n')
   
-  // 1. 测试连接
+  // 1. Test connection
   const connectionOk = await testSupabaseConnection()
   if (!connectionOk) {
-    console.log('❌ 连接测试失败，停止后续测试')
+    console.log('❌ Connection test failed, stopping further tests')
     return
   }
   
   console.log('')
   
-  // 2. 测试数据库表
+  // 2. Test database tables
   await testDatabaseTables()
   
   console.log('')
   
-  // 3. 创建测试数据
+  // 3. Create test data
   const testUser = await createTestUser()
   if (testUser) {
     console.log('')
     await createTestRecipe(testUser.id)
   }
   
-  console.log('\n🎉 Supabase集成测试完成!')
+  console.log('\n🎉 Supabase integration test completed!')
 }

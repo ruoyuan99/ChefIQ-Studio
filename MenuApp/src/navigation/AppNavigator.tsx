@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Platform } from 'react-native';
+import { Platform, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
 import { getFontWeight } from '../styles/theme';
 
@@ -83,10 +84,25 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen
           name="RecipeList"
           component={RecipeListScreen}
-          options={{
+          options={({ navigation }) => ({
             title: 'My Recipes',
             headerBackTitle: 'Back',
-          }}
+            headerLeft: () => (
+              <TouchableOpacity
+                onPress={() => {
+                  // Navigate to Home with More (profile) tab active
+                  navigation.navigate('Home', { initialTab: 'profile' });
+                }}
+                style={{ marginLeft: Platform.OS === 'ios' ? 0 : 16, padding: 8 }}
+              >
+                <Ionicons 
+                  name="arrow-back" 
+                  size={24} 
+                  color="#333" 
+                />
+              </TouchableOpacity>
+            ),
+          })}
         />
         <Stack.Screen
           name="RecipeName"

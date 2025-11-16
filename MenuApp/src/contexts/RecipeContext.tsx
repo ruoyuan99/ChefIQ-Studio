@@ -91,7 +91,7 @@ const recipeReducer = (state: RecipeState, action: RecipeAction): RecipeState =>
 interface RecipeContextType {
   state: RecipeState;
   addRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => Recipe;
-  updateRecipe: (recipe: Recipe) => void;
+  updateRecipe: (recipe: Recipe) => Promise<Recipe | null>;
   deleteRecipe: (recipeId: string) => void;
   setCurrentRecipe: (recipe: Recipe | null) => void;
   getRecipeById: (recipeId: string) => Recipe | undefined;
@@ -118,15 +118,15 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const autoSync = async () => {
       if (user) {
         try {
-          console.log('🔄 用户已登录，开始自动同步数据...');
+          console.log('🔄 User logged in, starting automatic data sync...');
           const needsSync = await AutoSyncService.needsSync();
           
           if (needsSync) {
-            console.log('📤 检测到本地数据，开始同步到Supabase...');
+            console.log('📤 Local data detected, starting sync to Supabase...');
             const result = await AutoSyncService.syncAllDataToSupabase();
             
             if (result.success) {
-              console.log('✅ 自动同步完成:', result.message);
+              console.log('✅ Automatic sync completed:', result.message);
               
               // 验证数据已成功同步到数据库后，清除所有同类的历史数据
               setTimeout(async () => {
@@ -144,22 +144,22 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 }
               }, 2000); // 延迟 2 秒确保数据库已更新
             } else {
-              console.log('⚠️ 自动同步失败:', result.message);
+              console.log('⚠️ Automatic sync failed:', result.message);
             }
           } else {
-            console.log('✅ 数据已同步，无需重复同步');
+            console.log('✅ Data already synced, no need to sync again');
           }
 
-          // 从云端拉取并覆盖为权威数据
+          // Pull from cloud and overwrite as authoritative data
           try {
             const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
-            console.log('☁️ 从云端加载菜谱:', cloudRecipes.length);
+            console.log('☁️ Loaded recipes from cloud:', cloudRecipes.length);
             dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
           } catch (e) {
-            console.error('❌ 加载云端菜谱失败:', e);
+            console.error('❌ Failed to load recipes from cloud:', e);
           }
         } catch (error) {
-          console.error('❌ 自动同步出错:', error);
+          console.error('❌ Automatic sync error:', error);
         }
       }
     };
@@ -244,34 +244,34 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (user) {
       RealTimeSyncService.syncRecipe(newRecipe, user.id)
         .then((dbRecipeId) => {
-          console.log('✅ 同步完成，数据库recipe ID:', dbRecipeId);
+          console.log('✅ Sync completed, database recipe ID:', dbRecipeId);
           // Note: dbRecipeId should match newRecipe.id since we're using the same UUID
           if (dbRecipeId && dbRecipeId !== newRecipe.id) {
-            console.warn('⚠️ 数据库返回的ID与本地UUID不一致:', {
+            console.warn('⚠️ Database returned ID does not match local UUID:', {
               local: newRecipe.id,
               database: dbRecipeId
             });
           }
           
-          // 同步完成后，从云端刷新数据（延迟一下确保数据库已更新）
+          // After sync completes, refresh data from cloud (with delay to ensure DB is updated)
           setTimeout(async () => {
             try {
               const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
-              console.log('☁️ 同步后从云端加载菜谱:', cloudRecipes.length);
+              console.log('☁️ Loaded recipes from cloud after sync:', cloudRecipes.length);
               dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
               
-              // 验证数据已成功保存到数据库后，清除所有 AsyncStorage 中的菜谱数据
+              // After verifying data is successfully saved to database, clear all recipe data from AsyncStorage
               if (cloudRecipes && cloudRecipes.length > 0) {
                 await AsyncStorage.removeItem('recipes');
                 console.log('✅ Cleared all recipes from AsyncStorage after successful sync');
               }
             } catch (e) {
-              console.error('❌ 同步后加载云端菜谱失败:', e);
+              console.error('❌ Failed to load recipes from cloud after sync:', e);
             }
-          }, 1000); // 延迟1秒确保数据库已更新
+          }, 1000); // 1 second delay to ensure DB is updated
         })
         .catch(error => {
-          console.error('❌ 同步到Supabase失败:', error);
+          console.error('❌ Failed to sync to Supabase:', error);
           // 即使同步失败，也继续返回 recipe，因为本地已保存
         });
     }
@@ -279,30 +279,63 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return newRecipe; // 返回创建的recipe对象（ID是UUID，不会改变）
   };
 
-  const updateRecipe = (recipe: Recipe) => {
+  const updateRecipe = async (recipe: Recipe): Promise<Recipe | null> => {
     const updatedRecipe = { ...recipe, updatedAt: new Date() };
     dispatch({ type: 'UPDATE_RECIPE', payload: updatedRecipe });
     
     // 实时同步到Supabase（等待完成，确保数据保存成功）
     if (user) {
-      RealTimeSyncService.syncRecipe(updatedRecipe, user.id)
-        .then(() => {
-          console.log('✅ 更新同步完成，从云端刷新数据');
-          // 同步完成后，从云端刷新数据（延迟一下确保数据库已更新）
+      try {
+        const syncedRecipe = await RealTimeSyncService.syncRecipe(updatedRecipe, user.id);
+        console.log('✅ Update sync completed, refreshing data from cloud');
+        
+        // If syncRecipe returned updated recipe data, use it
+        if (syncedRecipe && typeof syncedRecipe === 'object' && 'image_url' in syncedRecipe) {
+          // Update local state with synced recipe (includes new image_url)
+          dispatch({ type: 'UPDATE_RECIPE', payload: syncedRecipe as Recipe });
+          
+          // Refresh data from cloud to ensure consistency
           setTimeout(async () => {
             try {
               const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
-              console.log('☁️ 更新后从云端加载菜谱:', cloudRecipes.length);
+              console.log('☁️ Loaded recipes from cloud after update:', cloudRecipes.length);
               dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
             } catch (e) {
-              console.error('❌ 更新后加载云端菜谱失败:', e);
+              console.error('❌ Failed to load recipes from cloud after update:', e);
             }
-          }, 500); // 延迟500ms确保数据库已更新
-        })
-        .catch(error => {
-          console.error('❌ 更新同步到Supabase失败:', error);
+          }, 500); // Reduced delay since we already have the updated data
+          
+          return syncedRecipe as Recipe;
+        }
+        
+        // Fallback: refresh from cloud after delay and return updated recipe
+        return new Promise<Recipe | null>((resolve) => {
+          setTimeout(async () => {
+            try {
+              const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
+              console.log('☁️ Loaded recipes from cloud after update:', cloudRecipes.length);
+              dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
+              
+              // Find and return the updated recipe
+              const foundRecipe = cloudRecipes.find(r => r.id === recipe.id);
+              if (foundRecipe) {
+                resolve(foundRecipe);
+              } else {
+                resolve(updatedRecipe);
+              }
+            } catch (e) {
+              console.error('❌ Failed to load recipes from cloud after update:', e);
+              resolve(updatedRecipe);
+            }
+          }, 1500); // Increased to 1500ms to ensure image upload and DB update are complete
         });
+      } catch (error) {
+        console.error('❌ Failed to sync update to Supabase:', error);
+        return updatedRecipe;
+      }
     }
+    
+    return updatedRecipe;
   };
 
   const deleteRecipe = (recipeId: string) => {

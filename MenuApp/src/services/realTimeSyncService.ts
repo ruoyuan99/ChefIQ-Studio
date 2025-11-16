@@ -47,17 +47,38 @@ export class RealTimeSyncService {
       });
 
       // Prepare image URL (upload if local path)
+      // Priority: imageUri (new local image) > image_url (existing remote URL) > image (fallback)
+      // This ensures that when user changes image, the new local imageUri is used instead of old image_url
       let imageUrl: string | null = null;
-      const candidate = recipe.image_url || recipe.image || recipe.imageUri;
+      
+      // Check if there's a new local image (imageUri with local path)
+      const hasNewLocalImage = recipe.imageUri && 
+        typeof recipe.imageUri === 'string' && 
+        !recipe.imageUri.startsWith('http://') && 
+        !recipe.imageUri.startsWith('https://');
+      
+      // Priority: new local imageUri > existing image_url > image (fallback)
+      const candidate = hasNewLocalImage 
+        ? recipe.imageUri 
+        : (recipe.image_url || recipe.image);
+      
       if (candidate) {
         const isRemote = typeof candidate === 'string' && (candidate.startsWith('http://') || candidate.startsWith('https://'));
         if (isRemote) {
           imageUrl = candidate as string;
+          console.log('📸 Using existing remote image URL:', imageUrl);
         } else {
           try {
+            console.log('📸 Uploading new recipe image:', candidate);
             imageUrl = await uploadRecipeImage(candidate as string, userId);
-          } catch (_) {
-            imageUrl = null;
+            console.log('✅ Recipe image uploaded successfully:', imageUrl);
+          } catch (error) {
+            console.error('❌ Failed to upload recipe image:', error);
+            // If upload fails, fall back to existing image_url if available
+            imageUrl = recipe.image_url || null;
+            if (imageUrl) {
+              console.log('⚠️ Falling back to existing image_url:', imageUrl);
+            }
           }
         }
       }
@@ -72,7 +93,7 @@ export class RealTimeSyncService {
       
       if (isUUID) {
         // recipe.id 是 UUID（数据库 ID），尝试直接查找
-        console.log('🔍 通过 UUID 查找 recipe:', recipe.id);
+        console.log('🔍 Searching recipe by UUID:', recipe.id);
         const { data: recipeById } = await supabase
           .from('recipes')
           .select('id')
@@ -83,7 +104,7 @@ export class RealTimeSyncService {
       } else {
         // recipe.id 是时间戳（新创建的本地 ID），应该创建新记录
         // 但为了安全，也检查一下是否真的不存在（避免重复导入）
-        console.log('🔍 新 recipe（时间戳 ID），检查是否已存在相同标题的 recipe');
+        console.log('🔍 New recipe (timestamp ID), checking if recipe with same title exists');
         const { data: recipeByTitle } = await supabase
           .from('recipes')
           .select('id')
@@ -95,7 +116,7 @@ export class RealTimeSyncService {
         // 对于新创建的 recipe（时间戳 ID），总是创建新记录
         // 这样可以避免覆盖用户之前保存的同名 recipe
         if (recipeByTitle) {
-          console.log('⚠️ 发现同名 recipe，但这是新创建的 recipe，将创建新记录而不是更新');
+          console.log('⚠️ Found recipe with same name, but this is a newly created recipe, will create new record instead of updating');
           existingRecipe = null; // 强制创建新记录
         }
       }
@@ -105,6 +126,7 @@ export class RealTimeSyncService {
         const { error: updateError } = await supabase
           .from('recipes')
           .update({
+            title: recipe.title || recipe.name || 'Untitled Recipe',
             description: recipe.description || '',
             image_url: imageUrl,
             cooking_time: toCookingTimeMinutes(recipe.cookingTime || recipe.cooking_time) ?? 30,
@@ -147,7 +169,7 @@ export class RealTimeSyncService {
         // 如果 recipe.id 是有效的 UUID，使用它作为数据库 ID
         if (isUUID && recipe.id) {
           insertData.id = recipe.id;
-          console.log('🆕 使用本地生成的 UUID 创建 recipe:', recipe.id);
+          console.log('🆕 Creating recipe with locally generated UUID:', recipe.id);
         }
         
         const { data: insertedRecipe, error: insertError } = await supabase
@@ -161,7 +183,7 @@ export class RealTimeSyncService {
         
         // 如果使用了本地UUID，验证数据库返回的ID与本地ID一致
         if (isUUID && recipe.id && newRecipe.id !== recipe.id) {
-          console.warn('⚠️ 数据库返回的ID与本地UUID不一致:', {
+          console.warn('⚠️ Database returned ID does not match local UUID:', {
             local: recipe.id,
             database: newRecipe.id
           });
@@ -183,12 +205,71 @@ export class RealTimeSyncService {
         }
       }
 
-      console.log('✅ 菜谱实时同步完成:', recipe.title, 'is_public:', recipe?.isPublic === true);
+      console.log('✅ Recipe real-time sync completed:', recipe.title, 'is_public:', recipe?.isPublic === true);
       
-      // 返回数据库中的recipe ID（用于更新本地recipe ID）
-      return existingRecipe ? existingRecipe.id : (newRecipe?.id || null);
+      // Fetch the updated recipe from database to get the latest data (including new image_url)
+      const recipeId = existingRecipe ? existingRecipe.id : (newRecipe?.id || null);
+      if (recipeId) {
+        try {
+          const { data: updatedRecipeData, error: fetchError } = await supabase
+            .from('recipes')
+            .select(`
+              id, title, description, image_url, cooking_time, servings, cookware, is_public, created_at, updated_at,
+              ingredients:ingredients(id, name, amount, unit, order_index),
+              instructions:instructions(id, step_number, description, image_url, order_index),
+              tags:tags(id, name)
+            `)
+            .eq('id', recipeId)
+            .single();
+          
+          if (!fetchError && updatedRecipeData) {
+            // Map database format to Recipe format
+            const ingredients = (updatedRecipeData.ingredients || []).sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)).map((ing: any, idx: number) => ({
+              id: ing.id || String(idx + 1),
+              name: ing.name || '',
+              amount: typeof ing.amount === 'number' ? ing.amount : parseFloat(ing.amount || '1'),
+              unit: ing.unit || '',
+            }));
+
+            const instructions = (updatedRecipeData.instructions || []).sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)).map((ins: any, idx: number) => ({
+              id: ins.id || String(idx + 1),
+              step: ins.step_number || idx + 1,
+              description: ins.description || '',
+              imageUri: ins.image_url || null,
+            }));
+
+            const tags = (updatedRecipeData.tags || []).map((t: any) => t.name).filter(Boolean);
+
+            const updatedRecipe = {
+              id: updatedRecipeData.id,
+              title: updatedRecipeData.title || 'Untitled',
+              description: updatedRecipeData.description || '',
+              items: [],
+              createdAt: updatedRecipeData.created_at ? new Date(updatedRecipeData.created_at) : new Date(),
+              updatedAt: updatedRecipeData.updated_at ? new Date(updatedRecipeData.updated_at) : new Date(),
+              isPublic: !!updatedRecipeData.is_public,
+              image_url: updatedRecipeData.image_url || null,
+              imageUri: updatedRecipeData.image_url || null,
+              tags,
+              cookingTime: updatedRecipeData.cooking_time ? `${updatedRecipeData.cooking_time}分钟` : '',
+              servings: updatedRecipeData.servings ? String(updatedRecipeData.servings) : '',
+              ingredients,
+              instructions,
+              cookware: updatedRecipeData.cookware || '',
+            };
+            
+            console.log('✅ Fetched updated recipe with new image_url:', updatedRecipe.image_url);
+            return updatedRecipe;
+          }
+        } catch (error) {
+          console.error('❌ Failed to fetch updated recipe:', error);
+        }
+      }
+      
+      // Fallback: return recipe ID if fetch fails
+      return recipeId;
     } catch (error) {
-      console.error('❌ 菜谱实时同步失败:', error);
+      console.error('❌ Recipe real-time sync failed:', error);
       throw error; // 重新抛出错误
     }
   }
@@ -204,9 +285,9 @@ export class RealTimeSyncService {
 
       if (error) throw error;
 
-      console.log(`✅ 菜谱删除已同步: recipeId=${recipeId}`);
+      console.log(`✅ Recipe deletion synced: recipeId=${recipeId}`);
     } catch (err) {
-      console.error('❌ 菜谱删除同步失败:', err);
+      console.error('❌ Recipe deletion sync failed:', err);
     }
   }
 
@@ -232,9 +313,9 @@ export class RealTimeSyncService {
 
       if (deleteError) throw deleteError;
 
-      console.log(`✅ 菜谱删除已同步: ${title} (删除了 ${recipes.length} 条记录)`);
+      console.log(`✅ Recipe deletion synced: ${title} (deleted ${recipes.length} records)`);
     } catch (err) {
-      console.error('❌ 菜谱删除同步失败:', err);
+      console.error('❌ Recipe deletion sync failed:', err);
     }
   }
 
@@ -259,9 +340,9 @@ export class RealTimeSyncService {
           .eq('recipe_id', recipeId);
       }
 
-      console.log('✅ 收藏实时同步完成');
+      console.log('✅ Favorite real-time sync completed');
     } catch (error) {
-      console.error('❌ 收藏实时同步失败:', error);
+      console.error('❌ Favorite real-time sync failed:', error);
     }
   }
 
@@ -278,9 +359,9 @@ export class RealTimeSyncService {
           created_at: comment.createdAt || new Date().toISOString()
         });
 
-      console.log('✅ 评论实时同步完成');
+      console.log('✅ Comment real-time sync completed');
     } catch (error) {
-      console.error('❌ 评论实时同步失败:', error);
+      console.error('❌ Comment real-time sync failed:', error);
     }
   }
 
@@ -298,16 +379,16 @@ export class RealTimeSyncService {
           updated_at: new Date().toISOString()
         });
 
-      console.log('✅ 社交统计实时同步完成');
+      console.log('✅ Social stats real-time sync completed');
     } catch (error) {
-      console.error('❌ 社交统计实时同步失败:', error);
+      console.error('❌ Social stats real-time sync failed:', error);
     }
   }
 
   // 同步食材
   private static async syncIngredients(recipeId: string, ingredients: any[]): Promise<void> {
     try {
-      console.log(`🔄 同步食材 - recipeId: ${recipeId}, count: ${ingredients.length}`);
+      console.log(`🔄 Syncing ingredients - recipeId: ${recipeId}, count: ${ingredients.length}`);
       
       // 删除现有食材
       const { error: deleteError } = await supabase
@@ -316,7 +397,7 @@ export class RealTimeSyncService {
         .eq('recipe_id', recipeId);
       
       if (deleteError) {
-        console.error('❌ 删除现有食材失败:', deleteError);
+        console.error('❌ Failed to delete existing ingredients:', deleteError);
         throw deleteError;
       }
 
@@ -329,7 +410,7 @@ export class RealTimeSyncService {
         order_index: index
       }));
 
-      console.log('📝 准备插入食材数据:', ingredientsData);
+      console.log('📝 Preparing to insert ingredients data:', ingredientsData);
 
       const { error: insertError, data } = await supabase
         .from('ingredients')
@@ -337,13 +418,13 @@ export class RealTimeSyncService {
         .select();
       
       if (insertError) {
-        console.error('❌ 插入食材失败:', insertError);
+        console.error('❌ Failed to insert ingredients:', insertError);
         throw insertError;
       }
       
-      console.log(`✅ 食材同步成功 - 插入了 ${data?.length || 0} 条记录`);
+      console.log(`✅ Ingredients sync succeeded - inserted ${data?.length || 0} records`);
     } catch (error) {
-      console.error('❌ 食材同步失败:', error);
+      console.error('❌ Ingredients sync failed:', error);
       throw error; // 重新抛出错误，让调用者知道同步失败
     }
   }
@@ -351,7 +432,7 @@ export class RealTimeSyncService {
   // 同步步骤
   private static async syncInstructions(recipeId: string, instructions: any[]): Promise<void> {
     try {
-      console.log(`🔄 同步步骤 - recipeId: ${recipeId}, count: ${instructions.length}`);
+      console.log(`🔄 Syncing instructions - recipeId: ${recipeId}, count: ${instructions.length}`);
       
       // 删除现有步骤
       const { error: deleteError } = await supabase
@@ -360,7 +441,7 @@ export class RealTimeSyncService {
         .eq('recipe_id', recipeId);
       
       if (deleteError) {
-        console.error('❌ 删除现有步骤失败:', deleteError);
+        console.error('❌ Failed to delete existing instructions:', deleteError);
         throw deleteError;
       }
 
@@ -375,7 +456,7 @@ export class RealTimeSyncService {
         order_index: index
       }));
 
-      console.log('📝 准备插入步骤数据:', instructionsData);
+      console.log('📝 Preparing to insert instructions data:', instructionsData);
 
       const { error: insertError, data } = await supabase
         .from('instructions')
@@ -383,13 +464,13 @@ export class RealTimeSyncService {
         .select();
       
       if (insertError) {
-        console.error('❌ 插入步骤失败:', insertError);
+        console.error('❌ Failed to insert instructions:', insertError);
         throw insertError;
       }
       
-      console.log(`✅ 步骤同步成功 - 插入了 ${data?.length || 0} 条记录`);
+      console.log(`✅ Instructions sync succeeded - inserted ${data?.length || 0} records`);
     } catch (error) {
-      console.error('❌ 步骤同步失败:', error);
+      console.error('❌ Instructions sync failed:', error);
       throw error; // 重新抛出错误，让调用者知道同步失败
     }
   }
@@ -413,7 +494,7 @@ export class RealTimeSyncService {
         .from('tags')
         .insert(tagsData);
     } catch (error) {
-      console.error('❌ 标签同步失败:', error);
+      console.error('❌ Tags sync failed:', error);
     }
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,11 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Linking,
+  BackHandler,
+  SafeAreaView,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useFavorite } from '../contexts/FavoriteContext';
@@ -80,6 +84,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const { addPoints } = usePoints();
   const { getStats, fetchStats, incrementViews, adjustLikes, adjustFavorites, adjustTried } = useSocialStats();
   const { checkBadgeUnlock, getBadgeById } = useBadges();
+  const insets = useSafeAreaInsets();
 
   // Derived display helpers for social numbers with sensible minimums
   const getDisplayLikes = (id: string) => {
@@ -143,12 +148,8 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
       return;
     }
     
-    // If recipe is already found and ID matches, no need to search again
-    if (recipe && recipe.id === recipeId) {
-      return;
-    }
-    
-    // First, try to find recipe by ID directly
+    // Always re-find recipe when state.recipes changes (to get updated data like new image_url)
+    // This ensures that when recipe is updated (e.g., image changed), the screen reflects the changes
     const found = findRecipe(recipeId, state.recipes);
     
     if (!found && !recipeId.startsWith('sample_')) {
@@ -233,6 +234,74 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
 
   // Custom in-app share button (non-native header)
 
+  // Track if we're handling back programmatically to avoid duplicate calls
+  const isHandlingBackRef = useRef(false);
+
+  // Unified back handler function - used by both custom back button and system back button
+  const handleBack = useCallback(() => {
+    // Prevent duplicate calls
+    if (isHandlingBackRef.current) {
+      return;
+    }
+    isHandlingBackRef.current = true;
+
+    if (route.params?.returnTo === 'RecipeList') {
+      // If coming from CreateRecipe after publish, reset navigation to RecipeList
+      // This removes CreateRecipe from the navigation stack
+      navigation.reset({
+        index: 1, // Navigate to RecipeList (second route in stack)
+        routes: [
+          { name: 'Home' },
+          { name: 'RecipeList' }
+        ],
+      });
+    } else if (route.params?.returnTo) {
+      // Other returnTo targets - navigate normally
+      navigation.navigate(route.params.returnTo as any);
+    } else {
+      // Default behavior - go back
+      navigation.goBack();
+    }
+
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isHandlingBackRef.current = false;
+    }, 100);
+  }, [navigation, route.params?.returnTo]);
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') {
+        const onBackPress = () => {
+          handleBack();
+          return true; // Prevent default back behavior
+        };
+
+        const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return () => subscription.remove();
+      }
+    }, [handleBack])
+  );
+
+  // Handle iOS swipe back gesture and system navigation - use beforeRemove to intercept
+  // Note: This ensures system back (swipe/gesture) and custom back button behave the same
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      // Only intercept if we have custom returnTo logic and haven't already handled it
+      if (route.params?.returnTo && !isHandlingBackRef.current) {
+        // Prevent default behavior
+        e.preventDefault();
+
+        // Use our unified back handler
+        handleBack();
+      }
+      // If no returnTo param or already handling, let default behavior proceed
+    });
+
+    return unsubscribe;
+  }, [navigation, handleBack, route.params?.returnTo]);
+
   // Early return must be after all hooks are called
   if (isLoading) {
     return (
@@ -254,22 +323,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           <Text style={styles.errorText}>Recipe not found</Text>
           <TouchableOpacity
             style={styles.backButtonError}
-            onPress={() => {
-              if (route.params?.returnTo === 'RecipeList') {
-                // If coming from CreateRecipe after publish, reset navigation to RecipeList
-                navigation.reset({
-                  index: 1, // Navigate to RecipeList (second route in stack)
-                  routes: [
-                    { name: 'Home' },
-                    { name: 'RecipeList' }
-                  ],
-                });
-              } else if (route.params?.returnTo) {
-                navigation.navigate(route.params.returnTo as any);
-              } else {
-                navigation.goBack();
-              }
-            }}
+            onPress={handleBack}
           >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -412,35 +466,18 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
 
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
-    >
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+      >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       {/* Custom Header with Back Button and Share Button */}
       <View style={styles.customHeader}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            if (route.params?.returnTo === 'RecipeList') {
-              // If coming from CreateRecipe after publish, reset navigation to RecipeList
-              // This removes CreateRecipe from the navigation stack
-              navigation.reset({
-                index: 1, // Navigate to RecipeList (second route in stack)
-                routes: [
-                  { name: 'Home' },
-                  { name: 'RecipeList' }
-                ],
-              });
-            } else if (route.params?.returnTo) {
-              // Other returnTo targets - navigate normally
-              navigation.navigate(route.params.returnTo as any);
-            } else {
-              // Default behavior - go back
-              navigation.goBack();
-            }
-          }}
+          onPress={handleBack}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -460,6 +497,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         {/* Recipe Main Image */}
         <View style={styles.recipeImageSection}>
           <OptimizedImage
+            key={recipe.image_url || recipe.imageUri || recipe.image} // Add key to force re-render when image changes
             source={recipe.image_url || recipe.imageUri || recipe.image}
             style={styles.recipeImage}
             contentFit="cover"
@@ -800,8 +838,10 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
 
       </ScrollView>
 
-      {/* Bottom fixed bar: Social stats + Comment input */}
-      <View style={styles.bottomBarContainer}>
+      </KeyboardAvoidingView>
+
+      {/* Bottom fixed bar: Social stats + Comment input - Outside KeyboardAvoidingView to avoid iOS padding issues */}
+      <View style={[styles.bottomBarContainer, { paddingBottom: insets.bottom }]}>
         {/* Social Stats */}
         <View style={styles.socialStatsFooter}>
         <TouchableOpacity 
@@ -954,7 +994,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         </View>
       </Modal>
 
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -962,6 +1002,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  keyboardView: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -995,7 +1038,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 16, // Leave space for header
-    paddingBottom: 24,
+    paddingBottom: 200, // Extra padding for bottom bar (social stats + comment input)
   },
   // Recipe Image Section
   recipeImageSection: {
@@ -1364,6 +1407,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   bottomBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#eee',

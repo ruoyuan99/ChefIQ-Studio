@@ -166,12 +166,12 @@ if (__DEV__) {
   (global as any).clearLocalPointsOnly = clearLocalPointsOnly;
   
   console.log('🔧 AsyncStorage Debug Tools Available:');
-  console.log('  - debugAsyncStorage() - 查看所有数据');
-  console.log('  - debugSpecificKey(key) - 查看特定 key');
-  console.log('  - debugUserPoints() - 查看积分数据');
-  console.log('  - debugAllKeys() - 查看所有 keys');
-  console.log('  - debugStorageSize() - 查看存储大小');
-  console.log('  - clearLocalPointsOnly() - 仅清除积分数据（推荐）');
-  console.log('  - clearAllAsyncStorage() - 清理所有 AsyncStorage 数据');
+  console.log('  - debugAsyncStorage() - View all data');
+  console.log('  - debugSpecificKey(key) - View specific key');
+  console.log('  - debugUserPoints() - View points data');
+  console.log('  - debugAllKeys() - View all keys');
+  console.log('  - debugStorageSize() - View storage size');
+  console.log('  - clearLocalPointsOnly() - Clear points data only (recommended)');
+  console.log('  - clearAllAsyncStorage() - Clear all AsyncStorage data');
 }
 

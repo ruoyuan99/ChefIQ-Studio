@@ -24,7 +24,7 @@ const SupabaseTestScreen: React.FC = () => {
 
   const testBasicConnection = async () => {
     try {
-      console.log('🔗 测试基本连接...')
+      console.log('🔗 Testing basic connection...')
       const { data, error } = await supabase
         .from('recipes')
         .select('count')
@@ -160,7 +160,7 @@ const SupabaseTestScreen: React.FC = () => {
     setIsRunning(true)
     clearResults()
     
-    console.log('🚀 开始Supabase集成测试...\n')
+    console.log('🚀 Starting Supabase integration test...\n')
     
     // 1. 测试基本连接
     const connectionOk = await testBasicConnection()
