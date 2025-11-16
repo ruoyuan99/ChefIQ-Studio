@@ -132,26 +132,40 @@ export class RealTimeSyncService {
         }
       } else {
         // 创建新菜谱
+        // 如果 recipe.id 是 UUID，使用它；否则让数据库生成
+        const insertData: any = {
+          title: recipe.title || recipe.name || 'Untitled Recipe',
+          description: recipe.description || '',
+          image_url: imageUrl,
+          cooking_time: toCookingTimeMinutes(recipe.cookingTime || recipe.cooking_time) ?? 30,
+          servings: parseInt(recipe.servings) || 4,
+          cookware: recipe.cookware || '',
+          is_public: recipe.isPublic || false,
+          user_id: userId
+        };
+        
+        // 如果 recipe.id 是有效的 UUID，使用它作为数据库 ID
+        if (isUUID && recipe.id) {
+          insertData.id = recipe.id;
+          console.log('🆕 使用本地生成的 UUID 创建 recipe:', recipe.id);
+        }
+        
         const { data: insertedRecipe, error: insertError } = await supabase
           .from('recipes')
-          .insert({
-            title: recipe.title || recipe.name || 'Untitled Recipe',
-            description: recipe.description || '',
-            image_url: imageUrl,
-            cooking_time: toCookingTimeMinutes(recipe.cookingTime || recipe.cooking_time) ?? 30,
-            servings: parseInt(recipe.servings) || 4,
-            cookware: recipe.cookware || '',
-            is_public: recipe.isPublic || false,
-            user_id: userId
-          })
+          .insert(insertData)
           .select()
           .single();
         if (insertError) throw insertError;
         newRecipe = insertedRecipe; // 赋值给外部声明的变量
         console.log('🆕 Recipe inserted with id:', newRecipe?.id);
         
-        // 重要：返回数据库生成的 ID，以便后续更新本地 recipe
-        // 这样下次同步时就能找到正确的 recipe
+        // 如果使用了本地UUID，验证数据库返回的ID与本地ID一致
+        if (isUUID && recipe.id && newRecipe.id !== recipe.id) {
+          console.warn('⚠️ 数据库返回的ID与本地UUID不一致:', {
+            local: recipe.id,
+            database: newRecipe.id
+          });
+        }
 
         // 同步食材
         if (recipe.ingredients && recipe.ingredients.length > 0) {

@@ -43,6 +43,41 @@ const COOKWARE_OPTIONS = [
   'Wok',
 ];
 
+/**
+ * Format cooking time to display as "x minutes" format
+ * Extracts number and formats as "X minutes" (singular "minute" for 1)
+ */
+const formatCookingTimeMinutes = (cookingTime: string | number | undefined | null): string => {
+  if (!cookingTime) return '';
+  
+  let minutes: number;
+  
+  // If it's a number, use it directly
+  if (typeof cookingTime === 'number') {
+    minutes = cookingTime;
+  } else if (typeof cookingTime === 'string') {
+    // Remove "分钟", "min", "minutes" and extract number
+    const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
+    const parsed = parseInt(cleaned, 10);
+    if (!isNaN(parsed)) {
+      minutes = parsed;
+    } else {
+      // If no number found, try to extract any number from the string
+      const numberMatch = cookingTime.match(/\d+/);
+      if (numberMatch) {
+        minutes = parseInt(numberMatch[0], 10);
+      } else {
+        return cookingTime; // Return original if can't parse
+      }
+    }
+  } else {
+    return '';
+  }
+  
+  // Format as "X minute(s)"
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+};
+
 const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const { state } = useRecipe();
   const { getTriedCount } = useTried();
@@ -260,10 +295,12 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         <View style={styles.recipeHeader}>
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
           <View style={styles.recipeStats}>
-            <View style={styles.recipeStat}>
-              <Ionicons name="time-outline" size={14} color="#666" />
-              <Text style={styles.recipeStatText}>{recipe.cookingTime}</Text>
-            </View>
+            {recipe.cookingTime && (
+              <View style={styles.recipeStat}>
+                <Ionicons name="time-outline" size={14} color="#666" />
+                <Text style={styles.recipeStatText}>{formatCookingTimeMinutes(recipe.cookingTime)}</Text>
+              </View>
+            )}
             {recipe.cookware && (
               <View style={styles.recipeStat}>
                 <Ionicons name="restaurant-outline" size={14} color="#666" />
@@ -726,7 +763,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   filtersPanel: {
-    maxHeight: 400,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -737,39 +773,39 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   filtersScroll: {
-    maxHeight: 400,
+    // 移除 maxHeight，完全展开
   },
   filterSection: {
-    padding: 16,
+    padding: 12, // 从 16 减小到 12，使布局更紧凑
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   filterSectionTitle: {
-    fontSize: 16,
+    fontSize: 15, // 从 16 减小到 15，调小一号
     fontWeight: getFontWeight('600') as any,
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 8, // 从 12 减小到 8，使布局更紧凑
   },
   filterOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   filterOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12, // 从 16 减小到 12，使布局更紧凑
+    paddingVertical: 6, // 从 8 减小到 6，使布局更紧凑
+    borderRadius: 16, // 从 20 减小到 16，使布局更紧凑
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginRight: 8,
-    marginBottom: 8,
+    marginRight: 6, // 从 8 减小到 6，使布局更紧凑
+    marginBottom: 6, // 从 8 减小到 6，使布局更紧凑
   },
   filterOptionActive: {
     backgroundColor: '#d96709',
     borderColor: '#d96709',
   },
   filterOptionText: {
-    fontSize: 11.5, // 从12.5再缩小1个字号
+    fontSize: 11, // 从 11.5 减小到 11，调小一号
     color: '#666',
     fontWeight: '500',
   },
@@ -780,15 +816,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 16,
+    padding: 12, // 从 16 减小到 12，使布局更紧凑
+    marginTop: 6, // 从 8 减小到 6，使布局更紧凑
+    marginBottom: 12, // 从 16 减小到 12，使布局更紧凑
   },
   clearFiltersText: {
-    fontSize: 16,
+    fontSize: 15, // 从 16 减小到 15，调小一号
     fontWeight: getFontWeight('600') as any,
     color: '#d96709',
-    marginLeft: 8,
+    marginLeft: 6, // 从 8 减小到 6，使布局更紧凑
   },
   emptyState: {
     flex: 1,

@@ -156,12 +156,16 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
 
       const nextIndex = (currentFeatureIndex + 1) % FEATURE_INTRODUCTIONS.length;
       const cardWidth = SCREEN_WIDTH - 80;
+      const targetX = nextIndex * cardWidth;
+      
+      console.log(`🔄 Auto-scrolling to card ${nextIndex}, targetX: ${targetX}, currentIndex: ${currentFeatureIndex}`);
       
       scrollViewRef.current.scrollTo({
-        x: nextIndex * cardWidth,
+        x: targetX,
         animated: true,
       });
       
+      // Update index immediately to ensure next scroll works correctly
       setCurrentFeatureIndex(nextIndex);
     };
 
@@ -180,13 +184,14 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
     };
   }, [currentFeatureIndex]);
 
-  // Handle manual scroll
+  // Handle manual scroll - use onMomentumScrollEnd for more accurate index detection
   const handleScroll = (event: any) => {
     const cardWidth = SCREEN_WIDTH - 80;
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / cardWidth);
     
     if (newIndex !== currentFeatureIndex && newIndex >= 0 && newIndex < FEATURE_INTRODUCTIONS.length) {
+      console.log(`👆 Manual scroll detected: index ${currentFeatureIndex} -> ${newIndex}`);
       setCurrentFeatureIndex(newIndex);
       // Temporarily disable auto-scroll when user manually scrolls
       autoScrollEnabledRef.current = false;
@@ -197,7 +202,20 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
       }
       scrollTimeoutRef.current = setTimeout(() => {
         autoScrollEnabledRef.current = true;
+        console.log('✅ Auto-scroll re-enabled after manual scroll');
       }, 5000);
+    }
+  };
+
+  // Handle scroll end to ensure index is correctly updated
+  const handleMomentumScrollEnd = (event: any) => {
+    const cardWidth = SCREEN_WIDTH - 80;
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / cardWidth);
+    
+    if (newIndex >= 0 && newIndex < FEATURE_INTRODUCTIONS.length && newIndex !== currentFeatureIndex) {
+      console.log(`🏁 Scroll ended at card ${newIndex}`);
+      setCurrentFeatureIndex(newIndex);
     }
   };
 
@@ -379,13 +397,15 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
         <ScrollView
           ref={scrollViewRef}
           horizontal
-          pagingEnabled
+          pagingEnabled={false}
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
           scrollEventThrottle={16}
           style={styles.cardsScrollView}
           contentContainerStyle={styles.cardsScrollContent}
           snapToInterval={SCREEN_WIDTH - 80}
+          snapToAlignment="start"
           decelerationRate="fast"
         >
           {FEATURE_INTRODUCTIONS.map((feature, index) => (
@@ -397,7 +417,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
               ]}
             >
               <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon as any} size={28} color="#d96709" />
+                <Ionicons name={feature.icon as any} size={14} color="#d96709" />
               </View>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -489,7 +509,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cardsScrollView: {
-    marginBottom: 24,
+    marginBottom: 16, // 从 24 减小到 16，删除空白
   },
   cardsScrollContent: {
     paddingHorizontal: 0,
@@ -497,7 +517,7 @@ const styles = StyleSheet.create({
   featureCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 12,
+    padding: 4, // Reduced to 1/2 of 8
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -505,19 +525,19 @@ const styles = StyleSheet.create({
     shadowRadius: Platform.OS === 'ios' ? 4 : 0,
     elevation: Platform.OS === 'android' ? 3 : 3,
     marginRight: 0,
-    minHeight: 120,
+    minHeight: 50, // Reduced to 1/2 of 100
     justifyContent: 'center',
     borderWidth: Platform.OS === 'android' ? 0 : 0,
     borderColor: 'transparent',
   },
   featureIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 24, // Reduced to 1/2 of 48
+    height: 24, // Reduced to 1/2 of 48
+    borderRadius: 12, // Reduced to 1/2 of 24
     backgroundColor: '#fff5f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4, // Reduced to 1/2 of 8
     shadowColor: '#d96709',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0,
@@ -527,19 +547,19 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   featureTitle: {
-    fontSize: 15,
+    fontSize: 12, // Reduced from 15 to maintain readability
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 6,
+    marginBottom: 2, // Reduced to 1/2 of 4
     textAlign: 'center',
     letterSpacing: 0.1,
   },
   featureDescription: {
-    fontSize: 12,
+    fontSize: 10, // Reduced from 12 to maintain readability
     color: '#666',
     textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 4,
+    lineHeight: 14, // Reduced from 18 to maintain proportion
+    paddingHorizontal: 0,
   },
   progressContainer: {
     flexDirection: 'row',

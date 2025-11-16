@@ -37,6 +37,37 @@ interface RecipeDetailScreenProps {
   route: any;
 }
 
+/**
+ * Format cooking time to display as number only
+ * Extracts and returns only the number, without "分钟" or "min"
+ */
+const formatCookingTimeNumber = (cookingTime: string | number | undefined | null): string => {
+  if (!cookingTime) return 'Not specified';
+  
+  // If it's a number, return as string (number only)
+  if (typeof cookingTime === 'number') {
+    return String(cookingTime);
+  }
+  
+  // If it's a string, extract the number part
+  if (typeof cookingTime === 'string') {
+    // Remove "分钟", "min", "minutes" and extract number
+    const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
+    const parsed = parseInt(cleaned, 10);
+    if (!isNaN(parsed)) {
+      return String(parsed);
+    }
+    // If no number found, try to extract any number from the string
+    const numberMatch = cookingTime.match(/\d+/);
+    if (numberMatch) {
+      return numberMatch[0];
+    }
+    return cookingTime;
+  }
+  
+  return String(cookingTime);
+};
+
 const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   navigation,
   route,
@@ -122,52 +153,43 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     
     if (!found && !recipeId.startsWith('sample_')) {
       // If not found, recipe ID might have been updated to UUID (after creation)
-      // Try to find recently created recipe (within 5 minutes)
-      const recentRecipes = state.recipes
-        .filter((r: any) => {
-          const createdAt = new Date(r.createdAt).getTime();
-          const now = Date.now();
-          return (now - createdAt) < 5 * 60 * 1000; // 5 minutes
-        })
-        .sort((a: any, b: any) => {
-          // Sort by creation time, newest first
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-      
-      if (recentRecipes.length > 0) {
-        // Use the most recently created recipe (likely the updated version with new ID)
-        const latestRecipe = recentRecipes[0];
-        setRecipe(latestRecipe);
-        setIsUserCreated(true);
-        setIsLoading(false);
-        // Update navigation params to use the new ID
-        navigation.setParams({ recipeId: latestRecipe.id });
-      } else if (state.recipes.length === 0) {
+      // Wait a bit for sync to complete and try again by ID only
+      // NEVER fallback to finding by title or most recent - always use ID-based lookup
+      // Sync flow: syncRecipe (~500ms) -> UPDATE_RECIPE_ID -> fetchUserRecipes (1000ms delay) -> SET_RECIPES
+      // Total: ~1500ms for sync + refresh, we wait 4000ms to ensure everything is complete
+      if (state.recipes.length === 0) {
         // If recipes list is empty, wait a bit and try again (give sync some time)
         const timer = setTimeout(() => {
           const retryFound = findRecipe(recipeId, state.recipes);
-          if (!retryFound && state.recipes.length > 0) {
-            // Last attempt: use the most recently created recipe
-            const lastTry = state.recipes
-              .sort((a: any, b: any) => {
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-              })[0];
-            if (lastTry) {
-              setRecipe(lastTry);
-              setIsUserCreated(true);
-              setIsLoading(false);
-              navigation.setParams({ recipeId: lastTry.id });
-            } else {
-              setIsLoading(false);
-            }
-          } else if (!retryFound) {
+          if (retryFound) {
+            setRecipe(retryFound);
+            setIsUserCreated(true);
+            setIsLoading(false);
+          } else {
+            // Still not found - recipe truly doesn't exist
+            console.log('❌ Recipe not found after retry. Recipe ID:', recipeId);
+            console.log('❌ Available recipe IDs:', state.recipes.map((r: any) => r.id));
             setIsLoading(false);
           }
-        }, 2000);
+        }, 4000); // Increased to 4000ms to ensure sync and context update complete
         return () => clearTimeout(timer);
       } else {
-        // If recipes list is not empty but recipe not found, it truly doesn't exist
-        setIsLoading(false);
+        // If recipes list is not empty but recipe not found by ID, wait a bit more for sync
+        // This handles the case where ID was updated to UUID after creation
+        const timer = setTimeout(() => {
+          const retryFound = findRecipe(recipeId, state.recipes);
+          if (retryFound) {
+            setRecipe(retryFound);
+            setIsUserCreated(true);
+            setIsLoading(false);
+          } else {
+            // Still not found by ID - recipe truly doesn't exist
+            console.log('❌ Recipe not found after retry. Recipe ID:', recipeId);
+            console.log('❌ Available recipe IDs:', state.recipes.map((r: any) => r.id));
+            setIsLoading(false);
+          }
+        }, 4000); // Increased to 4000ms to ensure sync and context update complete
+        return () => clearTimeout(timer);
       }
     }
   }, [state.recipes, recipeId, recipe]);
@@ -516,7 +538,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             <View style={styles.cookingInfoItem}>
               <Ionicons name="time-outline" size={20} color="#666" />
               <Text style={styles.cookingInfoLabel}>Cooking Time (Minutes)</Text>
-              <Text style={styles.cookingInfoValue}>{recipe.cookingTime || 'Not specified'}</Text>
+              <Text style={styles.cookingInfoValue}>{formatCookingTimeNumber(recipe.cookingTime)}</Text>
             </View>
             {recipe.cookware && (
               <View style={styles.cookingInfoItem}>
@@ -666,58 +688,76 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           </View>
         )}
 
-        {/* YouTube Videos Section */}
-        {(recipe.youtubeVideos && recipe.youtubeVideos.length > 0) || recipe.youtubeSearchUrl ? (
-          <View style={styles.youtubeSection}>
-            <Text style={styles.sectionTitle}>Related Videos</Text>
-            <Text style={styles.youtubeSubtitle}>Watch cooking tutorials on YouTube</Text>
-            
-            {recipe.youtubeVideos && recipe.youtubeVideos.length > 0 ? (
-              <View style={styles.youtubeVideosList}>
-                {recipe.youtubeVideos.map((video: YouTubeVideo, index: number) => (
+        {/* YouTube Videos Section - Hide for AI generated recipes */}
+        {(() => {
+          // Check if recipe is AI generated
+          // AI generated recipes typically have IDs starting with "recipe_" followed by timestamp
+          // Once saved, they may have UUIDs, but we can check for presence of YouTube info
+          // that was added during AI generation (these are typically added in GenerateRecipeResultsScreen)
+          const isAIGenerated = recipe.id && recipe.id.startsWith('recipe_');
+          
+          // Only show YouTube videos section for non-AI generated recipes
+          if (isAIGenerated) {
+            return null;
+          }
+          
+          // Show YouTube videos for regular recipes (not AI generated)
+          if ((recipe.youtubeVideos && recipe.youtubeVideos.length > 0) || recipe.youtubeSearchUrl) {
+            return (
+              <View style={styles.youtubeSection}>
+                <Text style={styles.sectionTitle}>Related Videos</Text>
+                <Text style={styles.youtubeSubtitle}>Watch cooking tutorials on YouTube</Text>
+                
+                {recipe.youtubeVideos && recipe.youtubeVideos.length > 0 ? (
+                  <View style={styles.youtubeVideosList}>
+                    {recipe.youtubeVideos.map((video: YouTubeVideo, index: number) => (
+                      <TouchableOpacity
+                        key={video.videoId || index}
+                        style={styles.youtubeVideoCard}
+                        onPress={() => Linking.openURL(video.url)}
+                      >
+                        {video.thumbnail && (
+                          <Image 
+                            source={{ uri: video.thumbnail }} 
+                            style={styles.youtubeThumbnail}
+                          />
+                        )}
+                        <View style={styles.youtubeVideoInfo}>
+                          <Text style={styles.youtubeVideoTitle} numberOfLines={2}>
+                            {video.title}
+                          </Text>
+                          {video.channelTitle && (
+                            <Text style={styles.youtubeChannelName} numberOfLines={1}>
+                              {video.channelTitle}
+                            </Text>
+                          )}
+                          <View style={styles.youtubePlayButton}>
+                            <Ionicons name="play-circle" size={24} color="#d96709" />
+                            <Text style={styles.youtubePlayText}>Watch on YouTube</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+                
+                {recipe.youtubeSearchUrl && (
                   <TouchableOpacity
-                    key={video.videoId || index}
-                    style={styles.youtubeVideoCard}
-                    onPress={() => Linking.openURL(video.url)}
+                    style={styles.youtubeSearchButton}
+                    onPress={() => Linking.openURL(recipe.youtubeSearchUrl)}
                   >
-                    {video.thumbnail && (
-                      <Image 
-                        source={{ uri: video.thumbnail }} 
-                        style={styles.youtubeThumbnail}
-                      />
-                    )}
-                    <View style={styles.youtubeVideoInfo}>
-                      <Text style={styles.youtubeVideoTitle} numberOfLines={2}>
-                        {video.title}
-                      </Text>
-                      {video.channelTitle && (
-                        <Text style={styles.youtubeChannelName} numberOfLines={1}>
-                          {video.channelTitle}
-                        </Text>
-                      )}
-                      <View style={styles.youtubePlayButton}>
-                        <Ionicons name="play-circle" size={24} color="#d96709" />
-                        <Text style={styles.youtubePlayText}>Watch on YouTube</Text>
-                      </View>
-                    </View>
+                    <Ionicons name="logo-youtube" size={20} color="#fff" />
+                    <Text style={styles.youtubeSearchButtonText}>
+                      Search More Videos on YouTube
+                    </Text>
                   </TouchableOpacity>
-                ))}
+                )}
               </View>
-            ) : null}
-            
-            {recipe.youtubeSearchUrl && (
-              <TouchableOpacity
-                style={styles.youtubeSearchButton}
-                onPress={() => Linking.openURL(recipe.youtubeSearchUrl)}
-              >
-                <Ionicons name="logo-youtube" size={20} color="#fff" />
-                <Text style={styles.youtubeSearchButtonText}>
-                  Search More Videos on YouTube
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : null}
+            );
+          }
+          
+          return null;
+        })()}
 
         {/* Comments Section at the end of detail page */}
         <View style={styles.commentsSectionInline}>
@@ -1320,7 +1360,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     backgroundColor: 'white',
-    paddingVertical: 12,
+    paddingVertical: 8, // Reduced from 12 to 8 to shorten distance to comment input
     paddingHorizontal: 20,
   },
   bottomBarContainer: {

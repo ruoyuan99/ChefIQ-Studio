@@ -26,6 +26,8 @@ import { RealTimeSyncService } from '../services/realTimeSyncService';
 import { Recipe, MenuItem } from '../types';
 import ImportRecipeModal from '../components/ImportRecipeModal';
 import RecipeImagePlaceholder from '../components/RecipeImagePlaceholder';
+import { captureRef } from 'react-native-view-shot';
+import { Dimensions } from 'react-native';
 
 interface CreateRecipeScreenProps {
   navigation: any;
@@ -139,7 +141,121 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   const [isReordering, setIsReordering] = useState(false);
   const [showImportModal, setShowImportModal] = useState(showImportOnMount);
   const scrollViewRef = useRef<ScrollView>(null);
-  
+  const placeholderImageRef = useRef<View>(null);
+  const [isGeneratingPlaceholder, setIsGeneratingPlaceholder] = useState(false);
+  const pendingNavigationRef = useRef<{ originalId: string; savedCreatedAt: Date | string; fromChallenge: boolean; isPublic: boolean } | null>(null);
+  const recipesRef = useRef(state.recipes);
+
+  // Keep recipesRef updated with latest state
+  useEffect(() => {
+    recipesRef.current = state.recipes;
+  }, [state.recipes]);
+
+  // Listen for recipe ID updates and navigate when found
+  useEffect(() => {
+    if (!pendingNavigationRef.current) return;
+    
+    const { originalId, savedCreatedAt, fromChallenge: navFromChallenge, isPublic: navIsPublic } = pendingNavigationRef.current;
+    
+    // Check if original ID still exists in context
+    const originalRecipeExists = getRecipeById(originalId);
+    
+    // Try to find recipe by createdAt (within 3 seconds)
+    // This will find the recipe even if ID has been updated to UUID
+    let latestRecipe = null;
+    if (savedCreatedAt) {
+      const allRecipes = recipesRef.current;
+      const matchingRecipe = allRecipes.find((r: any) => {
+        if (!r.createdAt) return false;
+        const recipeCreatedAt = new Date(r.createdAt).getTime();
+        const savedCreatedAtTime = new Date(savedCreatedAt).getTime();
+        const timeDiff = Math.abs(recipeCreatedAt - savedCreatedAtTime);
+        return timeDiff < 3000; // Within 3 seconds
+      });
+      
+      if (matchingRecipe) {
+        latestRecipe = matchingRecipe;
+        console.log('✅ Found recipe by createdAt in useEffect:', matchingRecipe.id);
+      }
+    }
+    
+    // If found a recipe by createdAt and it's different from original ID, navigate
+    // Also navigate if original ID no longer exists (meaning ID was updated)
+    if (latestRecipe && latestRecipe.id !== originalId) {
+      const recipeIdToUse = latestRecipe.id;
+      console.log('🧭 Navigating from useEffect (ID updated):', {
+        originalId: originalId,
+        newId: recipeIdToUse,
+        idChanged: true,
+        originalExists: !!originalRecipeExists,
+        note: 'Found new UUID, navigating immediately'
+      });
+      
+      // Clear pending navigation
+      pendingNavigationRef.current = null;
+      
+      // Navigate
+      if (navFromChallenge && navIsPublic) {
+        Alert.alert(
+          '🎉 Challenge Participation Success!',
+          'Congratulations! Your recipe has been submitted to the Chef iQ Challenge. Good luck!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('RecipeDetail', { 
+                  recipeId: recipeIdToUse,
+                  returnTo: 'RecipeList'
+                });
+              }
+            }
+          ]
+        );
+      } else {
+        navigation.navigate('RecipeDetail', { 
+          recipeId: recipeIdToUse,
+          returnTo: 'RecipeList'
+        });
+      }
+    } else if (!originalRecipeExists && latestRecipe) {
+      // Original ID no longer exists, but we found a matching recipe
+      // This means ID was updated
+      const recipeIdToUse = latestRecipe.id;
+      console.log('🧭 Navigating from useEffect (original ID removed):', {
+        originalId: originalId,
+        newId: recipeIdToUse,
+        idChanged: true,
+        note: 'Original ID removed, found matching recipe by createdAt'
+      });
+      
+      // Clear pending navigation
+      pendingNavigationRef.current = null;
+      
+      // Navigate
+      if (navFromChallenge && navIsPublic) {
+        Alert.alert(
+          '🎉 Challenge Participation Success!',
+          'Congratulations! Your recipe has been submitted to the Chef iQ Challenge. Good luck!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('RecipeDetail', { 
+                  recipeId: recipeIdToUse,
+                  returnTo: 'RecipeList'
+                });
+              }
+            }
+          ]
+        );
+      } else {
+        navigation.navigate('RecipeDetail', { 
+          recipeId: recipeIdToUse,
+          returnTo: 'RecipeList'
+        });
+      }
+    }
+  }, [state.recipes, navigation, getRecipeById]);  
   // Calculate section completion status - use useMemo to ensure reactivity
   const sectionCompletion = React.useMemo(() => ({
     info: (): boolean => {
@@ -315,9 +431,63 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
         instructions: importedInstructions,
       }));
 
-      Alert.alert('Success', 'Recipe imported successfully! Please review and edit as needed.');
+      // Auto-generate placeholder image if no image is provided
+      if (!scannedImageUri && !importedRecipe.imageUri && !importedRecipe.image_url) {
+        console.log('🖼️  No image provided, will auto-generate placeholder image');
+        setIsGeneratingPlaceholder(true);
+      } else {
+        Alert.alert('Success', 'Recipe imported successfully! Please review and edit as needed.');
+      }
     }
-  }, [importedRecipe]);
+  }, [importedRecipe, scannedImageUri]);
+
+  // Auto-generate placeholder image after component renders
+  useEffect(() => {
+    const generatePlaceholderImage = async () => {
+      if (!isGeneratingPlaceholder || !placeholderImageRef.current || !importedRecipe) {
+        return;
+      }
+
+      try {
+        // Wait for component to fully render
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        if (!placeholderImageRef.current) {
+          console.warn('⚠️  Placeholder image ref is not available');
+          setIsGeneratingPlaceholder(false);
+          return;
+        }
+
+        console.log('📸 Capturing placeholder image...');
+        
+        // Capture the placeholder image
+        const { width: SCREEN_WIDTH } = Dimensions.get('window');
+        const imageUri = await captureRef(placeholderImageRef.current, {
+          format: 'png',
+          quality: 1,
+          result: 'tmpfile',
+          width: Math.round(SCREEN_WIDTH * 2), // High resolution
+        });
+
+        console.log('✅ Placeholder image generated:', imageUri);
+
+        // Update recipeData with the generated image
+        setRecipeData((prev: any) => ({
+          ...prev,
+          imageUri: imageUri,
+        }));
+
+        Alert.alert('Success', 'Recipe imported successfully! A placeholder image has been generated. You can replace it with your own image.');
+      } catch (error) {
+        console.error('❌ Failed to generate placeholder image:', error);
+        Alert.alert('Success', 'Recipe imported successfully! Please add an image manually.');
+      } finally {
+        setIsGeneratingPlaceholder(false);
+      }
+    };
+
+    generatePlaceholderImage();
+  }, [isGeneratingPlaceholder, importedRecipe]);
 
   // Sync ingredients and instructions to recipeData whenever they change
   // This ensures they are always saved correctly
@@ -403,6 +573,11 @@ const commonIngredientTags = [
 ];
 
   const pickImage = async () => {
+    // Cancel placeholder generation if user manually uploads image
+    if (isGeneratingPlaceholder) {
+      setIsGeneratingPlaceholder(false);
+    }
+
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (permissionResult.granted === false) {
@@ -435,6 +610,11 @@ const commonIngredientTags = [
   };
 
   const takePhoto = async () => {
+    // Cancel placeholder generation if user manually takes photo
+    if (isGeneratingPlaceholder) {
+      setIsGeneratingPlaceholder(false);
+    }
+
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     
     if (permissionResult.granted === false) {
@@ -1090,7 +1270,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
     }, 200); // Increase delay to ensure state update
   };
 
-  const saveRecipeDataWithVisibility = (isPublic: boolean) => {
+  const saveRecipeDataWithVisibility = async (isPublic: boolean) => {
     // Use the latest value from ref
     const currentRecipeData = recipeDataRef.current;
 
@@ -1167,7 +1347,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
       updateRecipe(updatedRecipe);
       savedRecipe = updatedRecipe;
     } else {
-      // Call addRecipe method, which returns the created recipe object
+      // Call addRecipe method, which now returns a Promise (since it generates UUID)
       console.log('➕ Creating new recipe - passing to addRecipe:', {
         title: recipeDataToSave.title,
         ingredientsCount: recipeDataToSave.ingredients?.length || 0,
@@ -1175,9 +1355,9 @@ const handleIngredientTagPress = (ingredientName: string) => {
         ingredients: recipeDataToSave.ingredients,
         instructions: recipeDataToSave.instructions,
       });
-      savedRecipe = addRecipe(recipeDataToSave);
+      savedRecipe = await addRecipe(recipeDataToSave);
       
-      // Award points for creating recipe (using current ID, if ID updates after sync, points record might have issues, but this is minor)
+      // Award points for creating recipe (using UUID that won't change)
       addPoints('create_recipe', `Created recipe: ${savedRecipe.title}`, savedRecipe.id).catch(err => console.error('Failed to add points:', err));
       
       // Check for badge unlocks after publishing
@@ -1235,88 +1415,45 @@ const handleIngredientTagPress = (ingredientName: string) => {
       console.error('savedRecipe:', JSON.stringify(savedRecipe, null, 2));
     }
 
-    // Navigate directly to recipe preview page and set return target to My Recipe
-    // Note: addRecipe internally triggers sync, but sync is asynchronous
-    // We wait a bit for sync to complete, then get updated recipe ID from context
-    // If not found, sync hasn't completed yet, use local ID for navigation (will refresh from cloud later)
+    // Navigate directly to recipe preview page using the recipe ID
+    // Note: addRecipe now generates UUID locally, so ID is already UUID and won't change
+    // Always use ID-based navigation
     const originalId = savedRecipe.id;
     const isUUID = originalId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(originalId);
     
-    if (user && !isEditing && !isUUID) {
-      // Newly created recipe (timestamp ID), wait for sync to complete, then get updated ID from context
-      // Note: Don't call syncRecipe again, as addRecipe already called it internally
-      setTimeout(() => {
-        // Try to get latest recipe from context (ID might have been updated to database UUID)
-        const latestRecipe = getRecipeById(originalId);
-        // If found and ID updated, use new ID; otherwise try to find by title
-        let recipeIdToUse = latestRecipe?.id || originalId;
-        
-        // If not found by original ID or ID is still timestamp, try to find latest recipe by title
-        if (!latestRecipe || latestRecipe.id === originalId) {
-          // Find all recipes with same title, select the newest (largest createdAt) with UUID ID
-          const recipesByTitle = state.recipes.filter((r: Recipe) => r.title === savedRecipe.title);
-          if (recipesByTitle.length > 0) {
-            // Prioritize recipes with UUID ID (synced to database), then select newest by createdAt
-            const uuidRecipes = recipesByTitle.filter((r: Recipe) => 
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.id)
-            );
-            
-            if (uuidRecipes.length > 0) {
-              // If UUID recipes exist, select the newest by createdAt
-              const newestUUIDRecipe = uuidRecipes.reduce((latest, current) => {
-                const latestDate = new Date(latest.createdAt).getTime();
-                const currentDate = new Date(current.createdAt).getTime();
-                return currentDate > latestDate ? current : latest;
-              });
-              recipeIdToUse = newestUUIDRecipe.id;
-              console.log('🔍 Found latest UUID recipe ID by title:', recipeIdToUse);
-            } else {
-              // If no UUID recipes, select the newest by createdAt
-              const newestRecipe = recipesByTitle.reduce((latest, current) => {
-                const latestDate = new Date(latest.createdAt).getTime();
-                const currentDate = new Date(current.createdAt).getTime();
-                return currentDate > latestDate ? current : latest;
-              });
-              if (newestRecipe.id !== originalId) {
-                recipeIdToUse = newestRecipe.id;
-                console.log('🔍 Found latest recipe ID by title:', recipeIdToUse);
+    // Since we now use UUID from the start, we can navigate directly
+    // No need to wait for ID updates or use complex polling logic
+    if (user && !isEditing) {
+      // Newly created recipe with UUID, navigate directly
+      // The ID won't change since it's already a UUID
+      console.log('🧭 Navigating with UUID (no ID update needed):', {
+        recipeId: originalId,
+        isUUID: isUUID,
+        note: 'Using locally generated UUID, navigating immediately'
+      });
+      
+      if (fromChallenge && isPublic) {
+        Alert.alert(
+          '🎉 Challenge Participation Success!',
+          'Congratulations! Your recipe has been submitted to the Chef iQ Challenge. Good luck!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('RecipeDetail', { 
+                  recipeId: originalId,
+                  returnTo: 'RecipeList'
+                });
               }
             }
-          }
-        }
-        
-        console.log('🧭 Navigating to RecipeDetail:', {
-          originalId: originalId,
-          latestId: latestRecipe?.id,
-          usingId: recipeIdToUse,
-          idChanged: recipeIdToUse !== originalId,
+          ]
+        );
+      } else {
+        navigation.navigate('RecipeDetail', { 
+          recipeId: originalId,
+          returnTo: 'RecipeList'
         });
-        
-        // Check if this is from challenge and recipe is published
-        if (fromChallenge && isPublic) {
-          // Show challenge participation success message
-          Alert.alert(
-            '🎉 Challenge Participation Success!',
-            'Congratulations! Your recipe has been submitted to the Chef iQ Challenge. Good luck!',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  navigation.navigate('RecipeDetail', { 
-                    recipeId: recipeIdToUse,
-                    returnTo: 'RecipeList'
-                  });
-                }
-              }
-            ]
-          );
-        } else {
-          navigation.navigate('RecipeDetail', { 
-            recipeId: recipeIdToUse,
-            returnTo: 'RecipeList'
-          });
-        }
-      }, 1000); // Increase to 1000ms to ensure sync and ID update complete
+      }
     } else {
       // Edit mode, no user, or already UUID, navigate directly
       // Check if this is from challenge and recipe is published
@@ -1603,13 +1740,34 @@ const handleIngredientTagPress = (ingredientName: string) => {
                   <Ionicons name="close-circle" size={20} color="#F44336" />
                 </TouchableOpacity>
               </View>
-            ) : importedRecipe && !scannedImageUri ? (
-              // AI生成的菜谱没有主图时，显示橙色背景、白色文字的占位图
+            ) : importedRecipe && !scannedImageUri && !recipeData.imageUri ? (
+              // AI生成的菜谱没有主图时，显示橙色背景、白色文字的占位图，并自动生成图片
               <View style={styles.recipeImagePreview}>
-                <RecipeImagePlaceholder 
-                  title={recipeData.title || importedRecipe.title || 'Untitled Recipe'}
+                <View 
+                  ref={placeholderImageRef}
+                  collapsable={false}
                   style={styles.recipeImage}
-                />
+                >
+                  <RecipeImagePlaceholder 
+                    title={recipeData.title || importedRecipe.title || 'Untitled Recipe'}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
+                {/* Show upload overlay buttons while placeholder is being generated */}
+                {!isGeneratingPlaceholder && (
+                  <View style={styles.placeholderOverlay}>
+                    <View style={styles.placeholderButtonRow}>
+                      <TouchableOpacity style={styles.placeholderUploadButton} onPress={pickImage}>
+                        <Ionicons name="image-outline" size={18} color="white" />
+                        <Text style={styles.placeholderUploadButtonText}>Upload</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.placeholderCameraButton} onPress={takePhoto}>
+                        <Ionicons name="camera-outline" size={18} color="white" />
+                        <Text style={styles.placeholderUploadButtonText}>Camera</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
               </View>
             ) : (
               <View style={styles.recipeImageUploadContent}>
@@ -2640,6 +2798,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 4,
+  },
+  placeholderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  placeholderUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d96709',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  placeholderCameraButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d96709',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  placeholderUploadButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   recipeImageButtonRow: {
     flexDirection: 'row',

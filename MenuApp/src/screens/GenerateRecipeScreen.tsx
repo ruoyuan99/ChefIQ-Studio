@@ -127,7 +127,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
       ingredients,
       dietaryRestrictions: dietaryRestrictions.length > 0 ? dietaryRestrictions : undefined,
       cuisine: selectedCuisine && selectedCuisine !== 'None' ? selectedCuisine : undefined,
-      servings: selectedServings || undefined,
+      // servings: removed - no longer accepting user input for servings
       cookingTime: selectedCookingTime || undefined,
       cookware: selectedCookware,
     });
@@ -139,7 +139,7 @@ const handleQuickAddIngredient = (ingredient: string) => {
         ingredients,
         dietaryRestrictions: dietaryRestrictions.length > 0 ? dietaryRestrictions : undefined,
         cuisine: selectedCuisine && selectedCuisine !== 'None' ? selectedCuisine : undefined,
-        servings: selectedServings || undefined,
+        // servings: removed - no longer accepting user input for servings
         cookingTime: selectedCookingTime || undefined,
         cookware: selectedCookware,
       });
@@ -363,31 +363,8 @@ const handleQuickAddIngredient = (ingredient: string) => {
           </View>
         </View>
 
-        {/* Servings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Servings (Optional)</Text>
-          <View style={styles.optionsGrid}>
-            {SERVINGS_OPTIONS.map((serving) => (
-              <TouchableOpacity
-                key={serving}
-                style={[
-                  styles.optionButton,
-                  selectedServings === serving && styles.optionButtonSelected,
-                ]}
-                onPress={() => setSelectedServings(serving === selectedServings ? '' : serving)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedServings === serving && styles.optionTextSelected,
-                  ]}
-                >
-                  {serving}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* Servings - Disabled/Hidden */}
+        {/* Servings options have been removed per user request */}
       </ScrollView>
 
       {/* Generate Button */}

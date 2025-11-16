@@ -5,6 +5,26 @@ import { AutoSyncService } from '../services/autoSyncService';
 import { CloudRecipeService } from '../services/cloudRecipeService';
 import { RealTimeSyncService } from '../services/realTimeSyncService';
 import { useAuth } from './AuthContext';
+import * as Crypto from 'expo-crypto';
+
+// Helper function to generate UUID
+function generateUUID(): string {
+  // Use expo-crypto if available
+  try {
+    if (Crypto && typeof Crypto.randomUUID === 'function') {
+      return Crypto.randomUUID();
+    }
+  } catch (e) {
+    console.warn('expo-crypto randomUUID not available, using fallback');
+  }
+  
+  // Fallback: generate UUID v4 manually
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 interface RecipeState {
   recipes: Recipe[];
@@ -191,17 +211,20 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     saveRecipes();
   }, [state.recipes]);
 
-  const addRecipe = (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addRecipe = async (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // Generate UUID locally before creating recipe
+    const recipeId = generateUUID();
+    
     const newRecipe: Recipe = {
       ...recipeData,
-      id: Date.now().toString(),
+      id: recipeId, // Use UUID instead of timestamp
       createdAt: new Date(),
       updatedAt: new Date(),
       authorName: user?.name || (user?.email ? user.email.split('@')[0] : 'Chef'),
       authorAvatar: user?.avatar_url || null,
     };
     
-    console.log('RecipeContext - Adding recipe:', {
+    console.log('RecipeContext - Adding recipe with UUID:', {
       id: newRecipe.id,
       title: newRecipe.title,
       ingredients: newRecipe.ingredients?.length || 0,
@@ -216,30 +239,18 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     
     dispatch({ type: 'ADD_RECIPE', payload: newRecipe });
     
-    // 实时同步到Supabase（等待完成，确保数据保存成功）
-    // 注意：同步是异步的，但我们需要立即返回recipe对象
-    // 所以先返回本地recipe，然后异步更新ID
+    // 实时同步到Supabase（使用本地生成的UUID）
+    // 由于ID已经是UUID，不需要更新ID了
     if (user) {
-      const originalLocalId = newRecipe.id; // 保存原始本地ID
       RealTimeSyncService.syncRecipe(newRecipe, user.id)
         .then((dbRecipeId) => {
           console.log('✅ 同步完成，数据库recipe ID:', dbRecipeId);
-          
-          // 如果返回了数据库ID，更新本地recipe的ID
-          if (dbRecipeId && typeof dbRecipeId === 'string' && dbRecipeId !== originalLocalId) {
-            console.log('🔄 更新本地recipe ID:', originalLocalId, '->', dbRecipeId);
-            // 使用新的 action type 来更新 recipe ID，reducer 会检查重复
-            const updatedRecipe = { ...newRecipe, id: dbRecipeId };
-            dispatch({ 
-              type: 'UPDATE_RECIPE_ID', 
-              payload: { 
-                oldId: originalLocalId, 
-                newId: dbRecipeId, 
-                recipe: updatedRecipe 
-              } 
+          // Note: dbRecipeId should match newRecipe.id since we're using the same UUID
+          if (dbRecipeId && dbRecipeId !== newRecipe.id) {
+            console.warn('⚠️ 数据库返回的ID与本地UUID不一致:', {
+              local: newRecipe.id,
+              database: dbRecipeId
             });
-            // 更新返回的recipe对象的引用（这样调用者也能获取到新ID）
-            newRecipe.id = dbRecipeId;
           }
           
           // 同步完成后，从云端刷新数据（延迟一下确保数据库已更新）
@@ -265,7 +276,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         });
     }
     
-    return newRecipe; // 返回创建的recipe对象（ID可能会在同步后更新）
+    return newRecipe; // 返回创建的recipe对象（ID是UUID，不会改变）
   };
 
   const updateRecipe = (recipe: Recipe) => {

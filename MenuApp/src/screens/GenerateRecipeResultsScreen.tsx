@@ -39,31 +39,38 @@ const CARD_INNER_PADDING = 20;
 const CARD_WIDTH = WINDOW_WIDTH - CARD_HORIZONTAL_PADDING * 2;
 
 /**
- * Format cooking time to display as minutes
- * Converts integer (minutes) or string to "X分钟" format
+ * Format cooking time to display as "x minutes" format (for AI-generated recipes)
+ * Extracts number and formats as "X minutes" (singular "minute" for 1)
  */
 const formatCookingTime = (cookingTime: string | number | undefined | null): string | null => {
   if (!cookingTime) return null;
   
-  // If it's already a string and contains "分钟" or "min", return as is
-  if (typeof cookingTime === 'string') {
-    if (cookingTime.includes('分钟') || cookingTime.includes('min')) {
-      return cookingTime;
-    }
-    // Try to parse string to number
-    const parsed = parseInt(cookingTime, 10);
-    if (!isNaN(parsed)) {
-      return `${parsed}分钟`;
-    }
-    return cookingTime;
-  }
+  let minutes: number;
   
-  // If it's a number (minutes), format as "X分钟"
+  // If it's a number, use it directly
   if (typeof cookingTime === 'number') {
-    return `${cookingTime}分钟`;
+    minutes = cookingTime;
+  } else if (typeof cookingTime === 'string') {
+    // Remove "分钟", "min", "minutes" and extract number
+    const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
+    const parsed = parseInt(cleaned, 10);
+    if (!isNaN(parsed)) {
+      minutes = parsed;
+    } else {
+      // If no number found, try to extract any number from the string
+      const numberMatch = cookingTime.match(/\d+/);
+      if (numberMatch) {
+        minutes = parseInt(numberMatch[0], 10);
+      } else {
+        return cookingTime; // Return original if can't parse
+      }
+    }
+  } else {
+    return null;
   }
   
-  return String(cookingTime);
+  // Format as "X minute(s)"
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 };
 
 const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = ({ navigation, route }) => {

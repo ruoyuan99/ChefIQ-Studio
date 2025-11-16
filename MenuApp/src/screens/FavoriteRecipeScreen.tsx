@@ -25,6 +25,41 @@ interface FavoriteRecipeScreenProps {
   navigation: any;
 }
 
+/**
+ * Format cooking time to display as "x minutes" format
+ * Extracts number and formats as "X minutes" (singular "minute" for 1)
+ */
+const formatCookingTimeMinutes = (cookingTime: string | number | undefined | null): string => {
+  if (!cookingTime) return '';
+  
+  let minutes: number;
+  
+  // If it's a number, use it directly
+  if (typeof cookingTime === 'number') {
+    minutes = cookingTime;
+  } else if (typeof cookingTime === 'string') {
+    // Remove "分钟", "min", "minutes" and extract number
+    const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
+    const parsed = parseInt(cleaned, 10);
+    if (!isNaN(parsed)) {
+      minutes = parsed;
+    } else {
+      // If no number found, try to extract any number from the string
+      const numberMatch = cookingTime.match(/\d+/);
+      if (numberMatch) {
+        minutes = parseInt(numberMatch[0], 10);
+      } else {
+        return cookingTime; // Return original if can't parse
+      }
+    }
+  } else {
+    return '';
+  }
+  
+  // Format as "X minute(s)"
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+};
+
 const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation }) => {
   const { state } = useFavorite();
   const { getTriedCount } = useTried();
@@ -140,7 +175,7 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
             <View style={styles.favoriteStats}>
               <View style={styles.favoriteStat}>
                 <Ionicons name="time-outline" size={14} color="#666" />
-                <Text style={styles.favoriteStatText}>{recipe.cookingTime}</Text>
+                <Text style={styles.favoriteStatText}>{formatCookingTimeMinutes(recipe.cookingTime)}</Text>
               </View>
               {recipe.cookware && (
                 <View style={styles.favoriteStat}>
