@@ -25,8 +25,8 @@ export const sampleRecipes: (Recipe & { image_url?: string | null })[] = [
     authorName: 'Chef Marie',
     authorBio: 'Passionate French chef with 15 years of experience in traditional French cuisine.',
     tags: ['French', 'Creamy', 'Comfort Food', 'Herbs'],
-    cookingTime: '20-30 minutes',
-    servings: '4 servings',
+    cookingTime: '25',
+    servings: '4',
     cookware: 'Regular Pan/Pot',
     ingredients: [
       {
@@ -141,8 +141,8 @@ export const sampleRecipes: (Recipe & { image_url?: string | null })[] = [
     authorName: 'Chef David',
     authorBio: 'Asian cuisine specialist who learned authentic techniques from street vendors in Hong Kong.',
     tags: ['Asian', 'Stir-Fry', 'Comfort Food', 'Quick & Easy'],
-    cookingTime: '15-25 minutes',
-    servings: '3-4 servings',
+    cookingTime: '20',
+    servings: '4',
     cookware: 'Wok',
     ingredients: [
       {
@@ -269,8 +269,8 @@ export const sampleRecipes: (Recipe & { image_url?: string | null })[] = [
     authorName: 'Chef Sarah',
     authorBio: 'Home cooking enthusiast who specializes in comfort food and family-friendly recipes.',
     tags: ['Comfort Food', 'Crispy', 'Herbs', 'Quick & Easy'],
-    cookingTime: '20-30 minutes',
-    servings: '4-6 servings',
+    cookingTime: '25',
+    servings: '5',
     cookware: 'Air Fryer',
     ingredients: [
       {
@@ -385,8 +385,8 @@ export const sampleRecipes: (Recipe & { image_url?: string | null })[] = [
     authorName: 'Chef Antonio',
     authorBio: 'Mediterranean cuisine expert with a passion for artisanal cooking.',
     tags: ['Artisan', 'Spicy', 'Vegetarian', 'Mediterranean'],
-    cookingTime: '25-35 minutes',
-    servings: '2-4 servings',
+    cookingTime: '30',
+    servings: '3',
     cookware: 'Pizza Oven',
     ingredients: [
       {
@@ -501,8 +501,8 @@ export const sampleRecipes: (Recipe & { image_url?: string | null })[] = [
     authorName: 'Chef Marcus',
     authorBio: 'Seafood specialist and spice master from New Orleans.',
     tags: ['Spicy', 'Healthy', 'Seafood', 'Cajun'],
-    cookingTime: '15-25 minutes',
-    servings: '2-4 servings',
+    cookingTime: '20',
+    servings: '3',
     cookware: 'Grill',
     ingredients: [
       {

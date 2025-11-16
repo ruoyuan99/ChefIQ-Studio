@@ -515,7 +515,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
           <View style={styles.cookingInfoRow}>
             <View style={styles.cookingInfoItem}>
               <Ionicons name="time-outline" size={20} color="#666" />
-              <Text style={styles.cookingInfoLabel}>Cooking Time</Text>
+              <Text style={styles.cookingInfoLabel}>Cooking Time (Minutes)</Text>
               <Text style={styles.cookingInfoValue}>{recipe.cookingTime || 'Not specified'}</Text>
             </View>
             {recipe.cookware && (

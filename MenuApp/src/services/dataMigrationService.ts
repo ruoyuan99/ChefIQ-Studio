@@ -2,6 +2,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../config/supabase';
 import { uploadRecipeImage } from './storageService';
 
+// Convert cookingTime string (e.g., "25分钟", "25", "20-30 minutes") to integer minutes
+function toCookingTimeMinutes(v: any): number | null {
+  if (!v) return null;
+  
+  // If already a number, return it (clamped to 1-999)
+  if (typeof v === 'number') {
+    return Math.min(999, Math.max(1, Math.round(v)));
+  }
+  
+  const str = String(v).trim();
+  
+  // Extract number from formats like "25分钟", "25", "20-30 minutes"
+  const numberMatch = str.match(/(\d+)/);
+  if (numberMatch) {
+    const num = parseInt(numberMatch[1], 10);
+    if (Number.isFinite(num) && num > 0) {
+      return Math.min(999, Math.max(1, num));
+    }
+  }
+  
+  return null;
+}
+
 // 数据迁移服务
 export class DataMigrationService {
   // 迁移所有数据
@@ -121,7 +144,7 @@ export class DataMigrationService {
               title: recipe.title || recipe.name || 'Untitled Recipe',
               description: recipe.description || '',
               image_url: recipe.image || recipe.imageUri || null,
-              cooking_time: recipe.cookingTime || recipe.cooking_time || '30分钟',
+              cooking_time: toCookingTimeMinutes(recipe.cookingTime || recipe.cooking_time) ?? 30,
               servings: parseInt(recipe.servings) || 4,
               cookware: recipe.cookware || '',
               is_public: recipe.isPublic || false,

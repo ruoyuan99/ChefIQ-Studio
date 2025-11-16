@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS recipes (
   title TEXT NOT NULL,
   description TEXT,
   image_url TEXT,
-  cooking_time TEXT,
-  servings INTEGER,
+  cooking_time INTEGER, -- Cooking time in minutes (1-999)
+  servings INTEGER, -- Number of servings (1-20)
   cookware TEXT,
   is_public BOOLEAN DEFAULT false,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,

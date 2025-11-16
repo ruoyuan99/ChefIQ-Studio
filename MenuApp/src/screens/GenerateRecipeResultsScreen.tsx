@@ -38,6 +38,34 @@ const CARD_HORIZONTAL_PADDING = 20; // Increased from 16 to 20 for more side spa
 const CARD_INNER_PADDING = 20;
 const CARD_WIDTH = WINDOW_WIDTH - CARD_HORIZONTAL_PADDING * 2;
 
+/**
+ * Format cooking time to display as minutes
+ * Converts integer (minutes) or string to "X分钟" format
+ */
+const formatCookingTime = (cookingTime: string | number | undefined | null): string | null => {
+  if (!cookingTime) return null;
+  
+  // If it's already a string and contains "分钟" or "min", return as is
+  if (typeof cookingTime === 'string') {
+    if (cookingTime.includes('分钟') || cookingTime.includes('min')) {
+      return cookingTime;
+    }
+    // Try to parse string to number
+    const parsed = parseInt(cookingTime, 10);
+    if (!isNaN(parsed)) {
+      return `${parsed}分钟`;
+    }
+    return cookingTime;
+  }
+  
+  // If it's a number (minutes), format as "X分钟"
+  if (typeof cookingTime === 'number') {
+    return `${cookingTime}分钟`;
+  }
+  
+  return String(cookingTime);
+};
+
 const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = ({ navigation, route }) => {
   const {
     recipeOptions: routeRecipeOptions = [],
@@ -247,7 +275,7 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                 return null;
               }
               const metaItems = [
-                recipe.cookingTime ? { icon: 'time-outline' as const, text: recipe.cookingTime } : null,
+                recipe.cookingTime ? { icon: 'time-outline' as const, text: formatCookingTime(recipe.cookingTime) || '' } : null,
                 recipe.servings ? { icon: 'people-outline' as const, text: recipe.servings } : null,
                 recipe.cookware ? { icon: 'restaurant-outline' as const, text: recipe.cookware } : null,
               ].filter(Boolean) as Array<{ icon: keyof typeof Ionicons.glyphMap; text: string }>;
@@ -437,7 +465,7 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                   ) : null}
                   <View style={styles.relatedRecipeMeta}>
                     {recipe.cookingTime && (
-                      <Text style={styles.relatedRecipeMetaText}>{recipe.cookingTime}</Text>
+                      <Text style={styles.relatedRecipeMetaText}>{formatCookingTime(recipe.cookingTime)}</Text>
                     )}
                     {recipe.servings && (
                       <Text style={[styles.relatedRecipeMetaText, { marginLeft: 8 }]}>{recipe.servings}</Text>
@@ -466,8 +494,8 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
               style={Buttons.secondary.container}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="refresh-outline" size={20} color={Colors.primary} />
-              <Text style={Buttons.secondary.text}>Try Again</Text>
+              <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
+              <Text style={styles.actionButtonText}>Try Again</Text>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
@@ -475,8 +503,8 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
               style={Buttons.secondary.container}
               onPress={() => navigation.navigate('ImportRecipe', { mode: 'url' })}
             >
-              <Ionicons name="link-outline" size={20} color={Colors.primary} />
-              <Text style={Buttons.secondary.text}>Import from URL</Text>
+              <Ionicons name="link-outline" size={18} color={Colors.primary} />
+              <Text style={styles.actionButtonText}>Import from URL</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -909,6 +937,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 6,
+  },
+  actionButtonText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

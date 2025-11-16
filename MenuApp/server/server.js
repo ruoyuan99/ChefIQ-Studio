@@ -489,12 +489,44 @@ function generateCompleteRecipeSchema(rawRecipe, isSchemaImport = false) {
     
     // Optional fields with defaults
     items: [], // Empty array, user can add menu items if needed
-    // Convert cookingTime to integer (handle string, number, or null)
-    cookingTime: typeof rawRecipe.cookingTime === 'number' 
-      ? Math.max(1, Math.min(999, Math.round(rawRecipe.cookingTime)))
-      : (typeof rawRecipe.cookingTime === 'string' && rawRecipe.cookingTime.trim() !== ''
-          ? Math.max(1, Math.min(999, parseInt(rawRecipe.cookingTime, 10) || 0))
-          : 0), // Default to 0 if invalid (will be validated later)
+    // Convert cookingTime to string format "X分钟" (handle string, number, or null)
+    // First convert to integer minutes, then format as string
+    cookingTime: (() => {
+      let minutes = null;
+      
+      if (typeof rawRecipe.cookingTime === 'number') {
+        minutes = Math.max(1, Math.min(999, Math.round(rawRecipe.cookingTime)));
+      } else if (typeof rawRecipe.cookingTime === 'string' && rawRecipe.cookingTime.trim() !== '') {
+        const timeStr = rawRecipe.cookingTime.toLowerCase().trim();
+        
+        // Extract hours and minutes
+        const hoursMatch = timeStr.match(/(\d+)\s*(hour|hours|hr|h)\b/);
+        const minutesMatch = timeStr.match(/(\d+)\s*(minute|minutes|min|m)\b/);
+        
+        let totalMinutes = 0;
+        if (hoursMatch) {
+          totalMinutes += parseInt(hoursMatch[1], 10) * 60;
+        }
+        if (minutesMatch) {
+          totalMinutes += parseInt(minutesMatch[1], 10);
+        }
+        
+        // If no hours/minutes pattern found, try to extract just a number
+        if (totalMinutes === 0) {
+          const numberMatch = timeStr.match(/(\d+)/);
+          if (numberMatch) {
+            totalMinutes = parseInt(numberMatch[1], 10);
+          }
+        }
+        
+        if (totalMinutes > 0) {
+          minutes = Math.max(1, Math.min(999, totalMinutes));
+        }
+      }
+      
+      // Format as "X分钟" string
+      return minutes !== null ? `${minutes}分钟` : '';
+    })(),
     // Convert servings to integer (handle string, number, array, or null)
     // If servings > 20, it's likely a parsing error, return null (will be empty in frontend)
     servings: (() => {
@@ -573,8 +605,8 @@ function generateCompleteRecipeSchema(rawRecipe, isSchemaImport = false) {
     console.warn('⚠️  Recipe has no instructions - can be saved as draft');
   }
 
-  // Validate cookingTime (must be integer between 1 and 999)
-  if (!recipe.cookingTime || typeof recipe.cookingTime !== 'number' || recipe.cookingTime < 1 || recipe.cookingTime > 999) {
+  // Validate cookingTime (must be string in format "X分钟" or empty)
+  if (!recipe.cookingTime || typeof recipe.cookingTime !== 'string' || recipe.cookingTime.trim() === '') {
     console.warn('⚠️  Recipe has invalid cooking time - can be saved as draft');
   }
 
@@ -2094,8 +2126,10 @@ IMPORTANT FORMATTING RULES:
 CRITICAL RULES:
 1. cookingTime: Must be an INTEGER in minutes (1-999). Convert any time format to total minutes.
    - Examples: "30 minutes" = 30, "1 hour" = 60, "1 hour 30 minutes" = 90, "45 min" = 45
-2. servings: Must be an INTEGER (1-20). Extract the number directly from text.
+2. servings: MUST be an INTEGER (1-20) - this is REQUIRED. Extract the number directly from text.
+   - CRITICAL: servings MUST be an INTEGER, NOT a string
    - Examples: "4 servings" = 4, "6-8 servings" = 6 (use lower number), "serves 4" = 4, "for 4 people" = 4
+   - If not specified, use a realistic number (typically 4-6)
 3. tags: MAXIMUM 3 tags only. Select the most relevant tags.
 4. cookware: MUST be one of these predefined options: ${cookwareOptions.join(', ')}. Do NOT create custom names. If cookware is mentioned, match it to the closest predefined option. If not specified, use null.`
         },
@@ -3198,7 +3232,12 @@ app.post('/api/generate-recipe-from-ingredients', async (req, res) => {
           }
         },
         cookingTime: { type: ['string', 'null'] },
-        servings: { type: ['string', 'null'] },
+        servings: { 
+          type: 'integer',
+          description: 'Number of servings as an integer (minimum 1, maximum 20). This is REQUIRED.',
+          minimum: 1,
+          maximum: 20
+        },
         tags: {
           type: 'array',
           items: { type: 'string' },
@@ -3335,9 +3374,11 @@ RECIPE STRUCTURE:
    - Include both active and passive cooking time
    - Examples: 25 (for 25 minutes), 60 (for 1 hour), 420 (for 7 hours)
 
-6. SERVINGS: ${servings ? servings : 'Realistic serving sizes'}
-   - Return as INTEGER (minimum 1, maximum 99)
+6. SERVINGS: ${servings ? `MUST be ${servings} (REQUIRED)` : 'REQUIRED - Return as INTEGER (minimum 1, maximum 20)'}
+   - CRITICAL: This field is REQUIRED and MUST be an INTEGER
+   - Return as INTEGER (minimum 1, maximum 20)
    - Examples: 4 (for 4 servings), 6 (for 6 servings)
+   - If user specified servings, ALL three recipes MUST use that exact number
 
 7. COOKWARE: "${cookware}" (REQUIRED for all recipes)
    - CRITICAL: You MUST use ONLY "${cookware}" for ALL recipes
@@ -3376,6 +3417,10 @@ RULES:
    - AVOID generic terms: "Supper", "Feast", "Showcase", "Dish", "Meal"
 5. DESCRIPTIONS: "Perfect for: ..." + what makes it special (flavor, texture, occasion)
 6. RESPECT ALL USER CONSTRAINTS: cookware, time, servings, cuisine, dietary restrictions
+   - SERVINGS CONSTRAINT IS CRITICAL:
+     * servings MUST be an INTEGER (not a string) - this is REQUIRED
+     * If user specified servings, ALL three recipes MUST use that exact number
+     * If not specified, use a realistic number (typically 4-6)
    - COOKWARE CONSTRAINT IS CRITICAL: 
      * You MUST use EXACTLY "${cookware}" as the cookware value
      * Valid cookware options are: ${cookwareOptions.join(', ')}
@@ -3517,54 +3562,104 @@ RULES:
         }));
       }
 
-      // Force servings if user specified
+      // Force servings if user specified - ensure it's a number
       if (servings) {
-        generatedRecipe.servings = servings;
+        // Convert servings to integer if it's a string
+        if (typeof servings === 'string') {
+          const numberMatch = servings.match(/(\d+)/);
+          if (numberMatch) {
+            generatedRecipe.servings = parseInt(numberMatch[1], 10);
+          } else {
+            generatedRecipe.servings = parseInt(servings, 10) || 4; // Default to 4 if can't parse
+          }
+        } else if (typeof servings === 'number') {
+          generatedRecipe.servings = Math.max(1, Math.min(20, Math.round(servings)));
+        } else {
+          generatedRecipe.servings = servings;
+        }
       }
+      
+      // Ensure servings is always a number (integer) and is present
+      if (!generatedRecipe.servings || typeof generatedRecipe.servings !== 'number') {
+        // Try to extract number from generatedRecipe.servings if it's a string
+        if (typeof generatedRecipe.servings === 'string') {
+          const numberMatch = generatedRecipe.servings.match(/(\d+)/);
+          if (numberMatch) {
+            generatedRecipe.servings = parseInt(numberMatch[1], 10);
+          } else {
+            generatedRecipe.servings = 4; // Default to 4 if can't parse
+          }
+        } else {
+          generatedRecipe.servings = 4; // Default to 4 if missing or invalid
+        }
+      }
+      
+      // Ensure servings is within valid range
+      generatedRecipe.servings = Math.max(1, Math.min(20, Math.round(generatedRecipe.servings)));
 
       // Validate and enforce cooking time category if user specified
-      if (cookingTime) {
-        const recipeCookingTime = generatedRecipe.cookingTime || '';
-        const cookingTimeLower = recipeCookingTime.toLowerCase();
+      // Also convert cookingTime to integer (minutes) if it's a string
+      if (cookingTime || generatedRecipe.cookingTime) {
+        let cookingTimeMinutes = null;
         
-        // Check if cooking time matches the category
-        let timeMatches = false;
-        if (cookingTime === 'Quick') {
-          // Extract minutes from cooking time (e.g., "25 minutes" -> 25)
-          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(min|minute|m)/);
-          if (minutesMatch) {
-            const minutes = parseInt(minutesMatch[1], 10);
-            timeMatches = minutes < 30;
-          }
-        } else if (cookingTime === 'Medium') {
-          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(min|minute|m)/);
-          if (minutesMatch) {
-            const minutes = parseInt(minutesMatch[1], 10);
-            timeMatches = minutes >= 30 && minutes <= 60;
-          }
-        } else if (cookingTime === 'Long') {
-          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(min|minute|m)/);
-          if (minutesMatch) {
-            const minutes = parseInt(minutesMatch[1], 10);
-            timeMatches = minutes > 60;
-          }
-          // Also check for hours
-          const hoursMatch = cookingTimeLower.match(/(\d+)\s*(hour|hr|h)/);
+        // Convert cookingTime to minutes (integer) if it's a string
+        if (typeof generatedRecipe.cookingTime === 'string') {
+          const cookingTimeLower = generatedRecipe.cookingTime.toLowerCase().trim();
+          
+          // Extract hours and minutes
+          const hoursMatch = cookingTimeLower.match(/(\d+)\s*(hour|hours|hr|h)\b/);
+          const minutesMatch = cookingTimeLower.match(/(\d+)\s*(minute|minutes|min|m)\b/);
+          
+          let totalMinutes = 0;
           if (hoursMatch) {
-            timeMatches = true;
+            totalMinutes += parseInt(hoursMatch[1], 10) * 60;
+          }
+          if (minutesMatch) {
+            totalMinutes += parseInt(minutesMatch[1], 10);
+          }
+          
+          // If no hours/minutes pattern found, try to extract just a number
+          if (totalMinutes === 0) {
+            const numberMatch = cookingTimeLower.match(/(\d+)/);
+            if (numberMatch) {
+              totalMinutes = parseInt(numberMatch[1], 10);
+            }
+          }
+          
+          if (totalMinutes > 0) {
+            cookingTimeMinutes = Math.max(1, Math.min(999, totalMinutes));
+          }
+        } else if (typeof generatedRecipe.cookingTime === 'number') {
+          cookingTimeMinutes = Math.max(1, Math.min(999, Math.round(generatedRecipe.cookingTime)));
+        }
+        
+        // Check if cooking time matches the category (if user specified)
+        if (cookingTime && cookingTimeMinutes !== null) {
+          let timeMatches = false;
+          if (cookingTime === 'Quick') {
+            timeMatches = cookingTimeMinutes < 30;
+          } else if (cookingTime === 'Medium') {
+            timeMatches = cookingTimeMinutes >= 30 && cookingTimeMinutes <= 60;
+          } else if (cookingTime === 'Long') {
+            timeMatches = cookingTimeMinutes > 60;
+          }
+          
+          if (!timeMatches) {
+            console.warn(`⚠️  Recipe ${i + 1} cooking time ${cookingTimeMinutes} minutes doesn't match category "${cookingTime}". Adjusting...`);
+            // Set appropriate cooking time based on category (as integer minutes)
+            if (cookingTime === 'Quick') {
+              cookingTimeMinutes = 25;
+            } else if (cookingTime === 'Medium') {
+              cookingTimeMinutes = 45;
+            } else if (cookingTime === 'Long') {
+              cookingTimeMinutes = 75;
+            }
           }
         }
         
-        if (!timeMatches && generatedRecipe.cookingTime) {
-          console.warn(`⚠️  Recipe ${i + 1} cooking time "${generatedRecipe.cookingTime}" doesn't match category "${cookingTime}". Adjusting...`);
-          // Set appropriate cooking time based on category
-          if (cookingTime === 'Quick') {
-            generatedRecipe.cookingTime = '25 minutes';
-          } else if (cookingTime === 'Medium') {
-            generatedRecipe.cookingTime = '45 minutes';
-          } else if (cookingTime === 'Long') {
-            generatedRecipe.cookingTime = '75 minutes';
-          }
+        // Update cookingTime to integer (minutes)
+        if (cookingTimeMinutes !== null) {
+          generatedRecipe.cookingTime = cookingTimeMinutes;
         }
       }
 

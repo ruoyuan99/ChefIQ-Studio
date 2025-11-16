@@ -10,7 +10,30 @@ const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const toServings = (v: any) => {
   if (!v) return 4;
   const num = parseFloat(String(v).replace(/[^\d.]/g, ''));
-  return Number.isFinite(num) && num > 0 ? Math.min(99, Math.max(1, Math.round(num))) : 4;
+  return Number.isFinite(num) && num > 0 ? Math.min(20, Math.max(1, Math.round(num))) : 4;
+};
+
+// Convert cookingTime string (e.g., "25分钟", "25", "20-30 minutes") to integer minutes
+const toCookingTime = (v: any): number | null => {
+  if (!v) return null;
+  
+  // If already a number, return it (clamped to 1-999)
+  if (typeof v === 'number') {
+    return Math.min(999, Math.max(1, Math.round(v)));
+  }
+  
+  const str = String(v).trim();
+  
+  // Extract number from formats like "25分钟", "25", "20-30 minutes"
+  const numberMatch = str.match(/(\d+)/);
+  if (numberMatch) {
+    const num = parseInt(numberMatch[1], 10);
+    if (Number.isFinite(num) && num > 0) {
+      return Math.min(999, Math.max(1, num));
+    }
+  }
+  
+  return null;
 };
 
 async function upsertRecipe(r: any) {
@@ -18,7 +41,7 @@ async function upsertRecipe(r: any) {
     title: r.title,
     description: r.description || '',
     image_url: r.image_url || null,
-    cooking_time: r.cookingTime || '30分钟',
+    cooking_time: toCookingTime(r.cookingTime) ?? 30, // Default to 30 minutes if not provided
     servings: toServings(r.servings),
     cookware: r.cookware || '',
     is_public: true,

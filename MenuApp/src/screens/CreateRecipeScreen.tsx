@@ -25,6 +25,7 @@ import { useBadges } from '../contexts/BadgeContext';
 import { RealTimeSyncService } from '../services/realTimeSyncService';
 import { Recipe, MenuItem } from '../types';
 import ImportRecipeModal from '../components/ImportRecipeModal';
+import RecipeImagePlaceholder from '../components/RecipeImagePlaceholder';
 
 interface CreateRecipeScreenProps {
   navigation: any;
@@ -1601,6 +1602,14 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
                   <Ionicons name="close-circle" size={20} color="#F44336" />
                 </TouchableOpacity>
+              </View>
+            ) : importedRecipe && !scannedImageUri ? (
+              // AI生成的菜谱没有主图时，显示橙色背景、白色文字的占位图
+              <View style={styles.recipeImagePreview}>
+                <RecipeImagePlaceholder 
+                  title={recipeData.title || importedRecipe.title || 'Untitled Recipe'}
+                  style={styles.recipeImage}
+                />
               </View>
             ) : (
               <View style={styles.recipeImageUploadContent}>

@@ -250,7 +250,7 @@ export class AutoSyncService {
               .update({
                 description: recipe.description || '',
                 image_url: recipe.image || recipe.imageUri || null,
-                cooking_time: recipe.cookingTime || recipe.cooking_time || '30分钟',
+                cooking_time: toCookingTimeMinutes(recipe.cookingTime || recipe.cooking_time) ?? 30,
                 servings: parseInt(recipe.servings) || 4,
                 cookware: recipe.cookware || '',
                 is_public: recipe.isPublic || false,
@@ -269,7 +269,7 @@ export class AutoSyncService {
                 title: recipe.title || recipe.name || 'Untitled Recipe',
                 description: recipe.description || '',
                 image_url: recipe.image || recipe.imageUri || null,
-                cooking_time: recipe.cookingTime || recipe.cooking_time || '30分钟',
+                cooking_time: toCookingTimeMinutes(recipe.cookingTime || recipe.cooking_time) ?? 30,
                 servings: parseInt(recipe.servings) || 4,
                 cookware: recipe.cookware || '',
                 is_public: recipe.isPublic || false,

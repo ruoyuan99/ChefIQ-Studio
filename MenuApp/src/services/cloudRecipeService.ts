@@ -31,8 +31,10 @@ function mapDbToRecipe(row: any): Recipe {
     authorName: row.user?.name || undefined,
     authorAvatar: row.user?.avatar_url || undefined,
     tags,
-    cookingTime: row.cooking_time || '',
-    servings: String(row.servings ?? ''),
+    // Convert cooking_time (INTEGER minutes) to string format "X分钟"
+    cookingTime: row.cooking_time ? `${row.cooking_time}分钟` : '',
+    // Convert servings (INTEGER) to string
+    servings: row.servings ? String(row.servings) : '',
     ingredients,
     instructions,
     cookware: row.cookware || '',
