@@ -21,10 +21,95 @@ A React Native recipe management app with AI-powered recipe generation, social f
 - **Authentication**: Supabase Auth
 - **Storage**: Supabase Storage, AsyncStorage
 
-## Documentation
+## 环境变量配置
 
-- **[Environment Setup Guide](MenuApp/ENVIRONMENT_SETUP.md)** - 详细的环境变量配置指南
-- **[本地运行指南](#本地运行指南)** - 完整的本地开发和运行指南（包含故障排查）
+### 快速设置
+
+**方法 1: 使用设置脚本（推荐）**
+```bash
+# MenuApp 目录
+cd MenuApp
+./setup-env.sh
+
+# Server 目录
+cd ../server
+./setup-env.sh
+```
+
+**方法 2: 手动设置**
+```bash
+# 复制示例文件
+cd MenuApp
+cp env.example .env
+
+cd ../server
+cp env.example .env
+```
+
+### 环境变量说明
+
+#### MenuApp/.env（必需）
+
+| 变量名 | 说明 | 获取方式 |
+|--------|------|----------|
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | Supabase 项目设置 > API |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Supabase 项目设置 > API |
+
+#### server/.env（必需）
+
+| 变量名 | 说明 | 获取方式 |
+|--------|------|----------|
+| `OPENAI_API_KEY` | OpenAI API 密钥 | https://platform.openai.com/api-keys |
+| `YOUTUBE_API_KEY` | YouTube Data API 密钥 | Google Cloud Console > Credentials |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | Supabase 项目设置 > API |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Supabase 项目设置 > API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase 服务角色密钥（⚠️ 服务器端专用，保密！） | Supabase 项目设置 > API > service_role key |
+
+### 获取 API 密钥详细步骤
+
+#### 1. Supabase
+1. 访问 https://app.supabase.com
+2. 创建新项目或选择现有项目
+3. 进入 **Project Settings > API**
+4. 复制以下信息：
+   - **Project URL** → `EXPO_PUBLIC_SUPABASE_URL`
+   - **anon public** key → `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+   - **service_role** key → `SUPABASE_SERVICE_ROLE_KEY`（⚠️ 仅用于服务器端，保密！）
+
+#### 2. OpenAI
+1. 访问 https://platform.openai.com
+2. 注册/登录账户
+3. 进入 **API Keys**: https://platform.openai.com/api-keys
+4. 点击 **Create new secret key**
+5. 复制密钥 → `OPENAI_API_KEY`
+
+#### 3. YouTube Data API
+1. 访问 Google Cloud Console: https://console.cloud.google.com
+2. 创建新项目或选择现有项目
+3. 启用 **YouTube Data API v3**:
+   - 进入 **APIs & Services > Library**
+   - 搜索 "YouTube Data API v3"
+   - 点击 **Enable**
+4. 创建 API 密钥:
+   - 进入 **APIs & Services > Credentials**
+   - 点击 **Create Credentials > API Key**
+   - 复制密钥 → `YOUTUBE_API_KEY`
+
+### 安全注意事项
+
+1. **永远不要提交 `.env` 文件到 Git**
+   - `.env` 文件已在 `.gitignore` 中
+   - 只提交 `env.example` 文件
+
+2. **保护 Service Role Key**
+   - `SUPABASE_SERVICE_ROLE_KEY` 具有管理员权限
+   - 只在服务器端使用
+   - 不要暴露在客户端代码中
+
+3. **API 密钥管理**
+   - 使用环境变量，不要硬编码
+   - 定期轮换 API 密钥
+   - 使用不同的密钥用于开发和生产环境
 
 ## Getting Started
 
@@ -107,26 +192,6 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 ```
 
-### Getting API Keys
-
-1. **Supabase**:
-   - Sign up at https://app.supabase.com
-   - Create a new project
-   - Go to Project Settings > API
-   - Copy the Project URL and anon/public key
-   - For service role key, copy the `service_role` key (⚠️ keep this secret!)
-
-2. **OpenAI**:
-   - Sign up at https://platform.openai.com
-   - Go to API Keys: https://platform.openai.com/api-keys
-   - Create a new API key
-
-3. **YouTube Data API**:
-   - Go to Google Cloud Console: https://console.cloud.google.com
-   - Create a new project or select existing
-   - Enable "YouTube Data API v3"
-   - Go to Credentials and create an API Key
-
 4. Set up the database (if using Supabase):
 
    Run the database migration scripts in the `MenuApp/database/` directory:
@@ -135,6 +200,16 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
    # 1. schema.sql (or step1_tables.sql, step2_indexes.sql, step3_security.sql)
    # 2. recipe_surveys_table.sql (if using survey feature)
    ```
+   
+   **数据库表结构：**
+   - `users` - 用户表
+   - `recipes` - 菜谱表
+   - `ingredients` - 食材表
+   - `instructions` - 步骤表
+   - `tags` - 标签表
+   - `favorites` - 收藏表
+   - `comments` - 评论表
+   - `recipe_surveys` - 菜谱调查表（可选功能）
 
 5. Start the development server:
 ```bash
@@ -409,12 +484,37 @@ Chef iQ RN/
 │   │   ├── services/        # API services
 │   │   ├── navigation/      # Navigation setup
 │   │   └── types/           # TypeScript types
-│   └── package.json
-├── server/                  # Backend server
-│   ├── server.js           # Express server
+│   ├── database/            # Database migration scripts
+│   │   ├── schema.sql       # Main database schema
+│   │   ├── recipe_surveys_table.sql  # Survey feature table
+│   │   └── ...              # Other migration scripts
+│   ├── server/              # Backend server
+│   │   ├── server.js        # Express server
+│   │   └── package.json
+│   ├── env.example          # Environment variables template
+│   ├── setup-env.sh         # Environment setup script
 │   └── package.json
 └── README.md
 ```
+
+## 核心功能实现
+
+### 图片管理
+- **自动上传**: 从网站导入的图片会自动下载并上传到 Supabase Storage
+- **统一存储**: 所有图片存储在 Supabase Storage，确保持久性和可靠性
+- **图片压缩**: 自动压缩图片以优化性能和存储空间
+- **智能处理**: 支持本地图片和远程 URL，自动识别并处理
+
+### 数据同步
+- **实时同步**: 使用 Supabase 实时功能同步菜谱数据
+- **离线支持**: 使用 AsyncStorage 缓存数据，支持离线访问
+- **自动清理**: 同步成功后自动清理本地缓存，确保数据一致性
+- **UUID 管理**: 使用 UUID 作为主键，确保全局唯一性
+
+### 食谱来源统一
+- **单一数据源**: 示例食谱使用硬编码数组，避免重复
+- **智能去重**: 自动过滤重复的食谱，优先使用用户创建的版本
+- **ID 管理**: 使用 UUID 确保唯一性，避免与示例食谱 ID 冲突
 
 ## Key Features
 
@@ -425,17 +525,33 @@ Chef iQ RN/
 - Automatic tagging and cookware locking
 
 ### AI Recipe Generation
-- Generate recipes from ingredients
+- Generate recipes from ingredients using OpenAI GPT-4o-mini / GPT-4o
 - Multiple recipe options
 - YouTube video recommendations
 - Dietary restrictions and cuisine preferences
 
 ### Recipe Management
 - Create and edit recipes
-- Import recipes from URLs
+- Import recipes from URLs (with automatic image download and upload to Supabase Storage)
 - Draft and publish workflow
-- Image uploads
+- Image uploads (local images and remote URLs are automatically uploaded to Supabase Storage)
 - Ingredient and instruction management
+- Real-time sync with Supabase backend
+
+### Recipe Survey Feature
+- Users can provide feedback after trying a recipe
+- Three survey questions:
+  1. **Taste preference** (Like / Neutral / Dislike)
+  2. **Difficulty level** (Easy / Medium / Hard)
+  3. **Would make again?** (Yes / No)
+- Community feedback statistics displayed on recipe detail page
+- Data stored in `recipe_surveys` table (requires database migration: `recipe_surveys_table.sql`)
+
+### Social Features
+- Like, favorite, and comment on recipes
+- Share recipes with share codes
+- View community statistics (likes, favorites, views, tried count)
+- Points system for user engagement
 
 ## Contributing
 
