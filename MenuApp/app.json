@@ -20,7 +20,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chefiq.app",
+      "bundleIdentifier": "com.chefiq.max.app",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of recipes.",
@@ -35,7 +35,7 @@
         "foregroundImage": "./assets/AppLogo.png",
         "backgroundColor": "#DA6809"
       },
-      "package": "com.chefiq.app",
+      "package": "com.chefiq.max.app",
       "versionCode": 2,
       "permissions": [
         "android.permission.CAMERA",
