@@ -2,7 +2,7 @@ import React, { createContext, useReducer, useContext, ReactNode, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LikeState {
-  likedRecipes: string[]; // 存储被点赞的菜谱ID列表
+  likedRecipes: string[]; // Store list of recipe IDs that have been liked
 }
 
 type LikeAction =
@@ -46,7 +46,7 @@ const LikeContext = createContext<LikeContextType | undefined>(undefined);
 export const LikeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(likeReducer, initialState);
 
-  // 加载保存的点赞数据
+  // Load saved like data
   useEffect(() => {
     const loadLikes = async () => {
       try {
@@ -61,7 +61,7 @@ export const LikeProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loadLikes();
   }, []);
 
-  // 保存点赞数据到AsyncStorage
+  // Save like data to AsyncStorage
   useEffect(() => {
     const saveLikes = async () => {
       if (state.likedRecipes.length > 0) {

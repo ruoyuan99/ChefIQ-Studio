@@ -21,24 +21,24 @@ A React Native recipe management app with AI-powered recipe generation, social f
 - **Authentication**: Supabase Auth
 - **Storage**: Supabase Storage, AsyncStorage
 
-## 环境变量配置
+## Environment Variables Configuration
 
-### 快速设置
+### Quick Setup
 
-**方法 1: 使用设置脚本（推荐）**
+**Method 1: Use Setup Script (Recommended)**
 ```bash
-# MenuApp 目录
+# MenuApp directory
 cd MenuApp
 ./setup-env.sh
 
-# Server 目录
+# Server directory
 cd ../server
 ./setup-env.sh
 ```
 
-**方法 2: 手动设置**
+**Method 2: Manual Setup**
 ```bash
-# 复制示例文件
+# Copy example files
 cd MenuApp
 cp env.example .env
 
@@ -46,70 +46,70 @@ cd ../server
 cp env.example .env
 ```
 
-### 环境变量说明
+### Environment Variables Description
 
-#### MenuApp/.env（必需）
+#### MenuApp/.env (Required)
 
-| 变量名 | 说明 | 获取方式 |
+| Variable Name | Description | How to Obtain |
 |--------|------|----------|
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | Supabase 项目设置 > API |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Supabase 项目设置 > API |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase Project URL | Supabase Project Settings > API |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anonymous Key | Supabase Project Settings > API |
 
-#### server/.env（必需）
+#### server/.env (Required)
 
-| 变量名 | 说明 | 获取方式 |
+| Variable Name | Description | How to Obtain |
 |--------|------|----------|
-| `OPENAI_API_KEY` | OpenAI API 密钥 | https://platform.openai.com/api-keys |
-| `YOUTUBE_API_KEY` | YouTube Data API 密钥 | Google Cloud Console > Credentials |
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | Supabase 项目设置 > API |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Supabase 项目设置 > API |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase 服务角色密钥（⚠️ 服务器端专用，保密！） | Supabase 项目设置 > API > service_role key |
+| `OPENAI_API_KEY` | OpenAI API Key | https://platform.openai.com/api-keys |
+| `YOUTUBE_API_KEY` | YouTube Data API Key | Google Cloud Console > Credentials |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase Project URL | Supabase Project Settings > API |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anonymous Key | Supabase Project Settings > API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role Key (⚠️ Server-side only, keep secret!) | Supabase Project Settings > API > service_role key |
 
-### 获取 API 密钥详细步骤
+### Detailed Steps to Obtain API Keys
 
 #### 1. Supabase
-1. 访问 https://app.supabase.com
-2. 创建新项目或选择现有项目
-3. 进入 **Project Settings > API**
-4. 复制以下信息：
+1. Visit https://app.supabase.com
+2. Create a new project or select an existing project
+3. Go to **Project Settings > API**
+4. Copy the following information:
    - **Project URL** → `EXPO_PUBLIC_SUPABASE_URL`
    - **anon public** key → `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-   - **service_role** key → `SUPABASE_SERVICE_ROLE_KEY`（⚠️ 仅用于服务器端，保密！）
+   - **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` (⚠️ Server-side only, keep secret!)
 
 #### 2. OpenAI
-1. 访问 https://platform.openai.com
-2. 注册/登录账户
-3. 进入 **API Keys**: https://platform.openai.com/api-keys
-4. 点击 **Create new secret key**
-5. 复制密钥 → `OPENAI_API_KEY`
+1. Visit https://platform.openai.com
+2. Register/login to your account
+3. Go to **API Keys**: https://platform.openai.com/api-keys
+4. Click **Create new secret key**
+5. Copy the key → `OPENAI_API_KEY`
 
 #### 3. YouTube Data API
-1. 访问 Google Cloud Console: https://console.cloud.google.com
-2. 创建新项目或选择现有项目
-3. 启用 **YouTube Data API v3**:
-   - 进入 **APIs & Services > Library**
-   - 搜索 "YouTube Data API v3"
-   - 点击 **Enable**
-4. 创建 API 密钥:
-   - 进入 **APIs & Services > Credentials**
-   - 点击 **Create Credentials > API Key**
-   - 复制密钥 → `YOUTUBE_API_KEY`
+1. Visit Google Cloud Console: https://console.cloud.google.com
+2. Create a new project or select an existing project
+3. Enable **YouTube Data API v3**:
+   - Go to **APIs & Services > Library**
+   - Search for "YouTube Data API v3"
+   - Click **Enable**
+4. Create API Key:
+   - Go to **APIs & Services > Credentials**
+   - Click **Create Credentials > API Key**
+   - Copy the key → `YOUTUBE_API_KEY`
 
-### 安全注意事项
+### Security Notes
 
-1. **永远不要提交 `.env` 文件到 Git**
-   - `.env` 文件已在 `.gitignore` 中
-   - 只提交 `env.example` 文件
+1. **Never commit `.env` files to Git**
+   - `.env` files are already in `.gitignore`
+   - Only commit `env.example` files
 
-2. **保护 Service Role Key**
-   - `SUPABASE_SERVICE_ROLE_KEY` 具有管理员权限
-   - 只在服务器端使用
-   - 不要暴露在客户端代码中
+2. **Protect Service Role Key**
+   - `SUPABASE_SERVICE_ROLE_KEY` has administrator privileges
+   - Only use on server-side
+   - Do not expose in client-side code
 
-3. **API 密钥管理**
-   - 使用环境变量，不要硬编码
-   - 定期轮换 API 密钥
-   - 使用不同的密钥用于开发和生产环境
+3. **API Key Management**
+   - Use environment variables, don't hardcode
+   - Rotate API keys regularly
+   - Use different keys for development and production environments
 
 ## Getting Started
 
@@ -201,15 +201,15 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
    # 2. recipe_surveys_table.sql (if using survey feature)
    ```
    
-   **数据库表结构：**
-   - `users` - 用户表
-   - `recipes` - 菜谱表
-   - `ingredients` - 食材表
-   - `instructions` - 步骤表
-   - `tags` - 标签表
-   - `favorites` - 收藏表
-   - `comments` - 评论表
-   - `recipe_surveys` - 菜谱调查表（可选功能）
+   **Database Table Structure:**
+   - `users` - User table
+   - `recipes` - Recipe table
+   - `ingredients` - Ingredient table
+   - `instructions` - Instruction table
+   - `tags` - Tag table
+   - `favorites` - Favorite table
+   - `comments` - Comment table
+   - `recipe_surveys` - Recipe survey table (optional feature)
 
 5. Start the development server:
 ```bash
@@ -222,62 +222,62 @@ cd MenuApp
 npm start
 ```
 
-## 本地运行指南
+## Local Development Guide
 
-### 完整运行步骤
+### Complete Running Steps
 
-#### 1. 启动后端服务器
+#### 1. Start Backend Server
 
 ```bash
 cd server
 npm start
 ```
 
-后端服务器将在 `http://localhost:3001` 启动。确保看到以下信息：
+The backend server will start at `http://localhost:3001`. Make sure you see the following message:
 ```
 ✅ Server is running on port 3001
 ```
 
-#### 2. 启动 Expo 应用
+#### 2. Start Expo App
 
-在新的终端窗口中：
+In a new terminal window:
 
 ```bash
 cd MenuApp
 npm start
 ```
 
-这将启动 Expo 开发服务器，你会看到：
-- QR 码（用于在手机上扫描）
-- 开发菜单选项
+This will start the Expo development server, and you'll see:
+- QR code (for scanning on your phone)
+- Development menu options
 
-#### 3. 运行应用
+#### 3. Run Application
 
-**在 iOS 模拟器上运行：**
+**Run on iOS Simulator:**
 ```bash
-# 在 Expo 开发服务器启动后，按 'i' 键
-# 或者
+# After Expo dev server starts, press 'i' key
+# Or
 npm run ios
 ```
 
-**在 Android 模拟器上运行：**
+**Run on Android Emulator:**
 ```bash
-# 在 Expo 开发服务器启动后，按 'a' 键
-# 或者
+# After Expo dev server starts, press 'a' key
+# Or
 npm run android
 ```
 
-**在真实设备上运行：**
-1. 安装 Expo Go 应用（iOS App Store 或 Google Play）
-2. 确保手机和电脑在同一 Wi-Fi 网络
-3. 扫描终端中显示的 QR 码
-4. 或者使用 Expo 开发菜单中的 "Enter URL manually" 选项
+**Run on Real Device:**
+1. Install Expo Go app (iOS App Store or Google Play)
+2. Make sure your phone and computer are on the same Wi-Fi network
+3. Scan the QR code shown in the terminal
+4. Or use the "Enter URL manually" option in the Expo development menu
 
-### 配置本地网络（真实设备）
+### Configure Local Network (Real Device)
 
-如果使用真实设备，需要配置后端 URL：
+If using a real device, you need to configure the backend URL:
 
-1. **查找你的本地 IP 地址：**
+1. **Find your local IP address:**
    ```bash
    # Mac/Linux
    ifconfig | grep "inet " | grep -v 127.0.0.1
@@ -285,179 +285,179 @@ npm run android
    # Windows
    ipconfig
    ```
-   找到类似 `192.168.x.x` 的 IP 地址
+   Find an IP address similar to `192.168.x.x`
 
-2. **更新 MenuApp/.env：**
+2. **Update MenuApp/.env:**
    ```env
    EXPO_PUBLIC_BACKEND_URL_DEV=http://192.168.x.x:3001
    ```
 
-3. **重启 Expo 开发服务器：**
+3. **Restart Expo development server:**
    ```bash
-   # 按 Ctrl+C 停止，然后重新启动
+   # Press Ctrl+C to stop, then restart
    npm start
    ```
 
-### 不同平台的 localhost 地址
+### localhost Addresses for Different Platforms
 
-| 平台 | 后端 URL |
+| Platform | Backend URL |
 |------|----------|
 | iOS Simulator | `http://localhost:3001` |
 | Android Emulator | `http://10.0.2.2:3001` |
-| 真实设备 | `http://YOUR_LOCAL_IP:3001` |
+| Real Device | `http://YOUR_LOCAL_IP:3001` |
 
-### 开发工具
+### Development Tools
 
-#### Expo 开发菜单
+#### Expo Development Menu
 
-在应用中，你可以：
-- **摇动设备**（iOS）或**按菜单键**（Android）打开开发菜单
-- 或者按 `Cmd+D`（iOS）或 `Cmd+M`（Android）在模拟器中打开
+In the app, you can:
+- **Shake device** (iOS) or **press menu key** (Android) to open the development menu
+- Or press `Cmd+D` (iOS) or `Cmd+M` (Android) in the simulator
 
-开发菜单选项：
-- **Reload** - 重新加载应用
-- **Debug Remote JS** - 启用远程调试
-- **Show Element Inspector** - 显示元素检查器
-- **Enable Fast Refresh** - 启用快速刷新
+Development menu options:
+- **Reload** - Reload the app
+- **Debug Remote JS** - Enable remote debugging
+- **Show Element Inspector** - Display element inspector
+- **Enable Fast Refresh** - Enable fast refresh
 
-#### 热重载
+#### Hot Reload
 
-应用支持热重载（Hot Reload）：
-- 修改代码后，应用会自动重新加载
-- 如果修改了原生代码或配置文件，需要完全重启
+The app supports Hot Reload:
+- After modifying code, the app will automatically reload
+- If you modified native code or configuration files, you need to fully restart
 
-#### 清除缓存
+#### Clear Cache
 
-如果遇到问题，可以清除缓存：
+If you encounter problems, you can clear the cache:
 ```bash
-# 清除 Expo 缓存
+# Clear Expo cache
 expo start -c
 
-# 或者
+# Or
 npm start -- --clear
 ```
 
-### 常见问题排查
+### Common Troubleshooting
 
-#### 1. 后端连接失败
+#### 1. Backend Connection Failed
 
-**症状：** 应用无法连接到后端服务器
+**Symptoms:** App cannot connect to backend server
 
-**解决方案：**
-- 确保后端服务器正在运行（`cd server && npm start`）
-- 检查端口是否正确（默认 3001）
-- 检查防火墙设置
-- 确保设备和服务器在同一网络
-- 检查 `MenuApp/.env` 中的 `EXPO_PUBLIC_BACKEND_URL_DEV` 配置
+**Solutions:**
+- Make sure backend server is running (`cd server && npm start`)
+- Check if the port is correct (default 3001)
+- Check firewall settings
+- Make sure device and server are on the same network
+- Check `EXPO_PUBLIC_BACKEND_URL_DEV` configuration in `MenuApp/.env`
 
-#### 2. 环境变量未生效
+#### 2. Environment Variables Not Taking Effect
 
-**症状：** 修改 `.env` 文件后，应用仍使用旧值
+**Symptoms:** After modifying `.env` file, app still uses old values
 
-**解决方案：**
-- 重启 Expo 开发服务器（`Ctrl+C` 然后 `npm start`）
-- 确保变量名以 `EXPO_PUBLIC_` 开头
-- 清除缓存：`expo start -c`
+**Solutions:**
+- Restart Expo development server (`Ctrl+C` then `npm start`)
+- Make sure variable names start with `EXPO_PUBLIC_`
+- Clear cache: `expo start -c`
 
-#### 3. Supabase 连接失败
+#### 3. Supabase Connection Failed
 
-**症状：** 无法连接到 Supabase 数据库
+**Symptoms:** Cannot connect to Supabase database
 
-**解决方案：**
-- 检查 `MenuApp/.env` 中的 Supabase 配置
-- 验证 Supabase 项目是否正常运行
-- 检查网络连接
-- 查看浏览器控制台或终端中的错误信息
+**Solutions:**
+- Check Supabase configuration in `MenuApp/.env`
+- Verify that Supabase project is running normally
+- Check network connection
+- View error messages in browser console or terminal
 
-#### 4. 模块未找到错误
+#### 4. Module Not Found Error
 
-**症状：** `Module not found` 或 `Cannot find module`
+**Symptoms:** `Module not found` or `Cannot find module`
 
-**解决方案：**
+**Solutions:**
 ```bash
-# 删除 node_modules 和重新安装
+# Delete node_modules and reinstall
 rm -rf node_modules
 npm install
 
-# 如果问题仍然存在，清除所有缓存
+# If problem persists, clear all caches
 rm -rf node_modules package-lock.json
 npm install
 ```
 
-#### 5. iOS 构建错误
+#### 5. iOS Build Error
 
-**症状：** iOS 模拟器或设备无法启动应用
+**Symptoms:** iOS simulator or device cannot start app
 
-**解决方案：**
+**Solutions:**
 ```bash
-# 清理 iOS 构建缓存
+# Clean iOS build cache
 cd ios
 pod deintegrate
 pod install
 cd ..
 
-# 重新启动
+# Restart
 npm run ios
 ```
 
-#### 6. Android 构建错误
+#### 6. Android Build Error
 
-**症状：** Android 模拟器或设备无法启动应用
+**Symptoms:** Android emulator or device cannot start app
 
-**解决方案：**
+**Solutions:**
 ```bash
-# 清理 Android 构建缓存
+# Clean Android build cache
 cd android
 ./gradlew clean
 cd ..
 
-# 重新启动
+# Restart
 npm run android
 ```
 
-### 调试技巧
+### Debugging Tips
 
-#### 1. 查看日志
+#### 1. View Logs
 
-**终端日志：**
-- 后端服务器日志显示在 `server` 终端
-- Expo 日志显示在 `MenuApp` 终端
+**Terminal Logs:**
+- Backend server logs are displayed in the `server` terminal
+- Expo logs are displayed in the `MenuApp` terminal
 
-**应用内日志：**
-- 在开发模式下，`console.log` 会显示在终端
-- 使用 React Native Debugger 查看更详细的日志
+**In-App Logs:**
+- In development mode, `console.log` will display in the terminal
+- Use React Native Debugger to view more detailed logs
 
-#### 2. 网络请求调试
+#### 2. Network Request Debugging
 
-**查看后端请求：**
-- 后端服务器终端会显示所有 API 请求
-- 检查请求路径、参数和响应
+**View Backend Requests:**
+- Backend server terminal will display all API requests
+- Check request paths, parameters, and responses
 
-**查看前端请求：**
-- 在浏览器中打开 `http://localhost:19002`（Expo DevTools）
-- 使用 React Native Debugger 的网络面板
+**View Frontend Requests:**
+- Open `http://localhost:19002` in browser (Expo DevTools)
+- Use React Native Debugger's network panel
 
-#### 3. 数据库调试
+#### 3. Database Debugging
 
-**Supabase Dashboard：**
-- 访问 https://app.supabase.com
-- 进入项目 > Table Editor 查看数据
-- 使用 SQL Editor 运行查询
+**Supabase Dashboard:**
+- Visit https://app.supabase.com
+- Go to project > Table Editor to view data
+- Use SQL Editor to run queries
 
-### 性能优化建议
+### Performance Optimization Suggestions
 
-1. **使用生产模式测试：**
+1. **Test with production mode:**
    ```bash
    npm start -- --no-dev --minify
    ```
 
-2. **监控网络请求：**
-   - 使用 React Native Debugger 的网络面板
-   - 检查是否有重复请求
+2. **Monitor network requests:**
+   - Use React Native Debugger's network panel
+   - Check for duplicate requests
 
-3. **优化图片加载：**
-   - 使用 `OptimizedImage` 组件
-   - 启用图片缓存
+3. **Optimize image loading:**
+   - Use `OptimizedImage` component
+   - Enable image caching
 
 ### Quick Setup Checklist
 
@@ -497,24 +497,24 @@ Chef iQ RN/
 └── README.md
 ```
 
-## 核心功能实现
+## Core Feature Implementation
 
-### 图片管理
-- **自动上传**: 从网站导入的图片会自动下载并上传到 Supabase Storage
-- **统一存储**: 所有图片存储在 Supabase Storage，确保持久性和可靠性
-- **图片压缩**: 自动压缩图片以优化性能和存储空间
-- **智能处理**: 支持本地图片和远程 URL，自动识别并处理
+### Image Management
+- **Automatic Upload**: Images imported from websites are automatically downloaded and uploaded to Supabase Storage
+- **Unified Storage**: All images are stored in Supabase Storage, ensuring persistence and reliability
+- **Image Compression**: Automatically compress images to optimize performance and storage space
+- **Smart Processing**: Supports both local images and remote URLs, automatically identifies and processes them
 
-### 数据同步
-- **实时同步**: 使用 Supabase 实时功能同步菜谱数据
-- **离线支持**: 使用 AsyncStorage 缓存数据，支持离线访问
-- **自动清理**: 同步成功后自动清理本地缓存，确保数据一致性
-- **UUID 管理**: 使用 UUID 作为主键，确保全局唯一性
+### Data Synchronization
+- **Real-time Sync**: Uses Supabase real-time features to sync recipe data
+- **Offline Support**: Uses AsyncStorage to cache data, supports offline access
+- **Auto Cleanup**: Automatically cleans local cache after successful sync, ensuring data consistency
+- **UUID Management**: Uses UUID as primary key, ensuring global uniqueness
 
-### 食谱来源统一
-- **单一数据源**: 示例食谱使用硬编码数组，避免重复
-- **智能去重**: 自动过滤重复的食谱，优先使用用户创建的版本
-- **ID 管理**: 使用 UUID 确保唯一性，避免与示例食谱 ID 冲突
+### Recipe Source Unification
+- **Single Data Source**: Sample recipes use hardcoded arrays, avoiding duplication
+- **Smart Deduplication**: Automatically filters duplicate recipes, prioritizes user-created versions
+- **ID Management**: Uses UUID to ensure uniqueness, avoids conflicts with sample recipe IDs
 
 ## Key Features
 

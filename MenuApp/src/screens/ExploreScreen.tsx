@@ -59,7 +59,7 @@ const formatCookingTimeMinutes = (cookingTime: string | number | undefined | nul
   if (typeof cookingTime === 'number') {
     minutes = cookingTime;
   } else if (typeof cookingTime === 'string') {
-    // Remove "min", "minutes" and extract number
+    // Remove Chinese "分钟", "min", "minutes" and extract number
     const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
     const parsed = parseInt(cleaned, 10);
     if (!isNaN(parsed)) {
