@@ -29,7 +29,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { getStats } = useSocialStats();
   const { badges, getBadgesByCategory, unlockedBadges } = useBadges();
 
-  // Calculate social statistics for all user recipes
+  // 计算用户所有食谱的社交统计
   const calculateSocialStats = () => {
     let totalLikes = 0;
     let totalFavorites = 0;
@@ -126,7 +126,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          {/* Edit Profile Button - inside profile header */}
+          {/* Edit Profile Button - 在 profile header 内 */}
           <View style={styles.profileHeaderTop}>
             <View style={styles.profileHeaderSpacer} />
             <TouchableOpacity
@@ -140,7 +140,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </View>
           
           <View style={styles.profileTopRow}>
-            {/* Left avatar - 1/3 */}
+            {/* 左侧头像 - 1/3 */}
             <View style={styles.avatarContainer}>
               <View style={styles.avatar}>
                 {user?.avatar_url ? (
@@ -158,7 +158,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               </View>
             </View>
             
-            {/* Right username and email - 2/3 */}
+            {/* 右侧用户名和邮箱 - 2/3 */}
             <View style={styles.profileInfoContainer}>
               <Text style={styles.userName}>{user?.name || 'Recipe Chef'}</Text>
               <Text style={styles.userEmail}>{user?.email || 'chef@recipeapp.com'}</Text>
@@ -326,14 +326,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-    paddingBottom: Platform.OS === 'ios' ? 100 : 0, // iOS needs safe area, Android doesn't need extra padding
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, // Android adds status bar height
+    paddingBottom: Platform.OS === 'ios' ? 100 : 0, // iOS需要安全区域，Android不需要额外padding
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, // Android添加状态栏高度
   },
   pointsDisplayWrapper: {
-    marginTop: -8, // Negative margin to reduce distance with Social Stats
+    marginTop: -8, // 负边距缩短与 Social Stats 的距离
   },
   scrollContent: {
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0, // Android completely removes whitespace, iOS keeps small spacing
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0, // Android上完全移除空白，iOS保留小间距
   },
   profileHeader: {
     backgroundColor: 'white',
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   avatarContainer: {
-    width: '33.33%', // Left 1/3
+    width: '33.33%', // 左侧1/3
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: 37,
   },
   profileInfoContainer: {
-    flex: 1, // Right 2/3
+    flex: 1, // 右侧2/3
     paddingLeft: 16,
     justifyContent: 'center',
   },
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 0, // Remove bottom margin because it's no longer below avatar
+    marginBottom: 0, // 移除底部间距，因为不再在头像下方
   },
   editButton: {
     flexDirection: 'row',
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 12, // Reduce top margin to shorten distance with Profile
+    marginTop: 12, // 减少顶部间距，缩短与 Profile 的距离
     width: '100%',
   },
   statCard: {
@@ -518,9 +518,9 @@ const styles = StyleSheet.create({
   },
   badgesHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Title on left, count on right
+    justifyContent: 'space-between', // 让标题在左，计数在右
     alignItems: 'center',
-    marginBottom: 8, // Reduce bottom margin to shorten distance with icons
+    marginBottom: 8, // 减少底部间距，缩短与图标之间的距离
   },
   badgesCount: {
     fontSize: 14,
@@ -532,15 +532,15 @@ const styles = StyleSheet.create({
   },
   badgesScrollContent: {
     paddingHorizontal: 20,
-    paddingVertical: 4, // Reduce vertical padding
+    paddingVertical: 4, // 减少垂直padding
   },
   badgeItemHorizontal: {
-    width: 80, // Reduce width from 100 to 80
+    width: 80, // 缩小宽度从100到80
     alignItems: 'center',
-    marginRight: 8, // Reduce card spacing from 12 to 8
-    paddingVertical: 8, // Reduce vertical padding from 12 to 8
-    paddingHorizontal: 6, // Reduce horizontal padding from 8 to 6
-    borderRadius: 10, // Slightly reduce border radius
+    marginRight: 8, // 减少卡片间距从12到8
+    paddingVertical: 8, // 减少垂直padding从12到8
+    paddingHorizontal: 6, // 减少水平padding从8到6
+    borderRadius: 10, // 稍微减小圆角
     backgroundColor: '#f8f9fa',
     position: 'relative',
   },
@@ -548,12 +548,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   badgeIconContainer: {
-    width: 48, // Reduce icon container from 56 to 48
+    width: 48, // 缩小图标容器从56到48
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4, // Reduce bottom margin from 8 to 4
+    marginBottom: 4, // 减少底部间距从8到4
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   badgeName: {
-    fontSize: 11, // Reduce font size from 12 to 11
+    fontSize: 11, // 减小字体从12到11
     fontWeight: getFontWeight('600') as any,
     color: '#333',
     textAlign: 'center',
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   badgeUnlockedIndicator: {
     position: 'absolute',
-    top: 2, // Adjust position to fit smaller cards
+    top: 2, // 调整位置以适应更小的卡片
     right: 2,
   },
   menuContainer: {

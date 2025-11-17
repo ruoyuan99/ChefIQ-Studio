@@ -7,9 +7,9 @@ interface RecipeImagePlaceholderProps {
 }
 
 /**
- * RecipeImagePlaceholder - Recipe image placeholder component
- * Displays recipe name placeholder with orange background and white text
- * Supports automatic word wrapping to ensure all text is displayed
+ * RecipeImagePlaceholder - 菜谱图片占位符组件
+ * 显示橙色背景、白色文字的菜谱名称占位图
+ * 支持自动换行，确保所有文字都能显示
  */
 const RecipeImagePlaceholder: React.FC<RecipeImagePlaceholderProps> = ({ title, style }) => {
   return (
@@ -30,7 +30,7 @@ const RecipeImagePlaceholder: React.FC<RecipeImagePlaceholderProps> = ({ title, 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#d96709', // Orange background
+    backgroundColor: '#d96709', // 橙色背景
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   text: {
-    color: '#ffffff', // White text
+    color: '#ffffff', // 白色文字
     fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',

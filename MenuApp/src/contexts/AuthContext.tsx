@@ -413,9 +413,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, message: error.message };
       }
 
-      return { success: true, message: 'Password reset email sent!' };
+      return { success: true, message: '密码重置邮件已发送！' };
     } catch (error) {
-      return { success: false, message: `Send failed: ${error}` };
+      return { success: false, message: `发送失败: ${error}` };
     }
   };
 

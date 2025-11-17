@@ -70,14 +70,14 @@ const recipeReducer = (state: RecipeState, action: RecipeAction): RecipeState =>
     case 'SET_CURRENT_RECIPE':
       return { ...state, currentRecipe: action.payload };
     case 'UPDATE_RECIPE_ID':
-      // Check if recipe with new ID already exists to avoid duplicate additions
+      // 检查是否已经存在新ID的recipe，避免重复添加
       const existingWithNewId = state.recipes.find(r => r.id === action.payload.newId);
       if (!existingWithNewId) {
-        // Delete old, then add new
+        // 先删除旧的，再添加新的
         const filteredRecipes = state.recipes.filter(r => r.id !== action.payload.oldId);
         return { ...state, recipes: [...filteredRecipes, action.payload.recipe] };
       } else {
-        // If recipe with new ID already exists, only delete recipe with old ID
+        // 如果已经存在新ID的recipe，只删除旧ID的recipe
         return {
           ...state,
           recipes: state.recipes.filter(r => r.id !== action.payload.oldId)
@@ -105,7 +105,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { user } = useAuth();
   const previousUserIdRef = useRef<string | null>(null);
 
-  // Automatically sync data to Supabase
+  // 自动同步数据到Supabase
   useEffect(() => {
     if (user?.id && previousUserIdRef.current !== user.id) {
       AsyncStorage.removeItem('recipes').catch(console.error);
@@ -129,13 +129,13 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (result.success) {
               console.log('✅ Automatic sync completed:', result.message);
               
-              // After verifying data has been successfully synced to database, clear all similar historical data
+              // 验证数据已成功同步到数据库后，清除所有同类的历史数据
               setTimeout(async () => {
                 try {
-                  // Verify recipe data is in the database
+                  // 验证菜谱数据已在数据库中
                   const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
                   
-                  // If recipe data exists in database, sync is successful, clear all local AsyncStorage recipe data (including historical data)
+                  // 如果数据库中有菜谱数据，说明同步成功，清除所有本地 AsyncStorage 中的菜谱数据（包括历史数据）
                   if (cloudRecipes && cloudRecipes.length > 0) {
                     await AsyncStorage.removeItem('recipes');
                     console.log('✅ Cleared all recipes from AsyncStorage after successful sync (including historical data)');
@@ -143,7 +143,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 } catch (error) {
                   console.error('Error verifying sync and clearing AsyncStorage:', error);
                 }
-              }, 2000); // Delay 2 seconds to ensure database has been updated
+              }, 2000); // 延迟 2 秒确保数据库已更新
             } else {
               console.log('⚠️ Automatic sync failed:', result.message);
             }
@@ -168,7 +168,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     autoSync();
   }, [user]);
 
-  // Load from local cache when not logged in (offline/first time)
+  // 未登录时，从本地缓存加载（离线/首次）
   useEffect(() => {
     if (!user) {
       const loadRecipes = async () => {
@@ -191,12 +191,12 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [user]);
 
-  // Save recipes to AsyncStorage
+  // 保存recipes到AsyncStorage
   useEffect(() => {
     const saveRecipes = async () => {
       if (state.recipes.length > 0) {
         try {
-          // Convert Date objects to strings for JSON serialization
+          // 转换Date对象为字符串，以便JSON序列化
           const recipesToSave = state.recipes.map(recipe => ({
             ...recipe,
             createdAt: recipe.createdAt.toISOString(),
@@ -240,15 +240,15 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       imageUri: newRecipe.imageUri ? 'Has image' : 'No image'
     });
     
-    // Detailed debug information
+    // 详细调试信息
     console.log('RecipeContext - Full newRecipe object:', JSON.stringify(newRecipe, null, 2));
     console.log('RecipeContext - Ingredients details:', newRecipe.ingredients);
     console.log('RecipeContext - Instructions details:', newRecipe.instructions);
     
     dispatch({ type: 'ADD_RECIPE', payload: newRecipe });
     
-    // Real-time sync to Supabase (using locally generated UUID)
-    // Since ID is already UUID, no need to update ID
+    // 实时同步到Supabase（使用本地生成的UUID）
+    // 由于ID已经是UUID，不需要更新ID了
     if (user) {
       RealTimeSyncService.syncRecipe(newRecipe, user.id)
         .then((dbRecipeId) => {
@@ -280,18 +280,18 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         })
         .catch(error => {
           console.error('❌ Failed to sync to Supabase:', error);
-          // Even if sync fails, continue to return recipe because it's saved locally
+          // 即使同步失败，也继续返回 recipe，因为本地已保存
         });
     }
     
-    return newRecipe; // Return created recipe object (ID is UUID, won't change)
+    return newRecipe; // 返回创建的recipe对象（ID是UUID，不会改变）
   };
 
   const updateRecipe = async (recipe: Recipe): Promise<Recipe | null> => {
     const updatedRecipe = { ...recipe, updatedAt: new Date() };
     dispatch({ type: 'UPDATE_RECIPE', payload: updatedRecipe });
     
-    // Real-time sync to Supabase (wait for completion to ensure data is saved successfully)
+    // 实时同步到Supabase（等待完成，确保数据保存成功）
     if (user) {
       try {
         const syncedRecipe = await RealTimeSyncService.syncRecipe(updatedRecipe, user.id);
@@ -350,7 +350,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const recipe = state.recipes.find(r => r.id === recipeId);
     dispatch({ type: 'DELETE_RECIPE', payload: recipeId });
 
-    // Sync deletion to Supabase (based on recipe ID)
+    // 同步删除到 Supabase（基于菜谱ID）
     if (user && recipeId) {
       RealTimeSyncService.deleteRecipeById(recipeId);
     }

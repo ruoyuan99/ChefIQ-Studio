@@ -1,11 +1,11 @@
 import { supabase } from '../config/supabase'
 
-// Test Supabase connection
+// 测试Supabase连接
 export const testSupabaseConnection = async () => {
   console.log('🔗 Testing Supabase connection...')
   
   try {
-    // Test basic connection
+    // 测试基本连接
     const { data, error } = await supabase
       .from('recipes')
       .select('count')
@@ -27,7 +27,7 @@ export const testSupabaseConnection = async () => {
   }
 }
 
-// Test if database tables exist
+// 测试数据库表是否存在
 export const testDatabaseTables = async () => {
   console.log('🗄️ Testing database tables...')
   
@@ -51,7 +51,7 @@ export const testDatabaseTables = async () => {
   }
 }
 
-// Create test user
+// 创建测试用户
 export const createTestUser = async () => {
   console.log('👤 Creating test user...')
   
@@ -81,7 +81,7 @@ export const createTestUser = async () => {
   }
 }
 
-// Create test recipe
+// 创建测试菜谱
 export const createTestRecipe = async (userId: string) => {
   console.log('🍳 Creating test recipe...')
   
@@ -149,7 +149,7 @@ export const createTestRecipe = async (userId: string) => {
   }
 }
 
-// Run all tests
+// 运行所有测试
 export const runAllTests = async () => {
   console.log('🚀 Starting Supabase integration test...\n')
   

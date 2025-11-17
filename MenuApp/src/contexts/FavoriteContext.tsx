@@ -14,7 +14,7 @@ type FavoriteAction =
   | { type: 'TOGGLE_FAVORITE'; payload: Recipe };
 
 const initialState: FavoriteState = {
-  favoriteRecipes: [...sampleRecipes], // Initialize with sample recipes
+  favoriteRecipes: [...sampleRecipes], // 初始化时包含示例recipes
 };
 
 const favoriteReducer = (state: FavoriteState, action: FavoriteAction): FavoriteState => {
@@ -68,7 +68,7 @@ export const FavoriteProvider: React.FC<{ children: ReactNode }> = ({ children }
   const addToFavorites = (recipe: Recipe) => {
     dispatch({ type: 'ADD_FAVORITE', payload: recipe });
     
-    // Real-time sync to Supabase
+    // 实时同步到Supabase
     if (user) {
       RealTimeSyncService.syncFavorite(recipe.id, user.id, true);
     }
@@ -77,7 +77,7 @@ export const FavoriteProvider: React.FC<{ children: ReactNode }> = ({ children }
   const removeFromFavorites = (recipeId: string) => {
     dispatch({ type: 'REMOVE_FAVORITE', payload: recipeId });
     
-    // Real-time sync to Supabase
+    // 实时同步到Supabase
     if (user) {
       RealTimeSyncService.syncFavorite(recipeId, user.id, false);
     }
@@ -87,7 +87,7 @@ export const FavoriteProvider: React.FC<{ children: ReactNode }> = ({ children }
     const isCurrentlyFavorite = state.favoriteRecipes.some(fav => fav.id === recipe.id);
     dispatch({ type: 'TOGGLE_FAVORITE', payload: recipe });
     
-    // Real-time sync to Supabase
+    // 实时同步到Supabase
     if (user) {
       RealTimeSyncService.syncFavorite(recipe.id, user.id, !isCurrentlyFavorite);
     }

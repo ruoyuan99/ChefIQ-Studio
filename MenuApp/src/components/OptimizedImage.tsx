@@ -6,7 +6,7 @@ export interface OptimizedImageProps extends Omit<ImageProps, 'source' | 'style'
   source: string | number | { uri: string } | null | undefined;
   style?: ViewStyle | ImageStyle | (ViewStyle | ImageStyle)[];
   placeholder?: string | number;
-  placeholderComponent?: React.ReactNode; // Custom placeholder component
+  placeholderComponent?: React.ReactNode; // 自定义占位图组件
   showLoader?: boolean;
   contentFit?: ImageContentFit;
   transition?: number;
@@ -112,7 +112,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   // If no source, show placeholder
   if (!imageSource) {
-    // If there's a custom placeholder component, use it
+    // 如果有自定义占位图组件，使用它
     if (placeholderComponent) {
       return (
         <View style={[styles.container, style]}>
@@ -121,7 +121,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
       );
     }
     
-    // Otherwise show default placeholder
+    // 否则显示默认占位图
     return (
       <View style={[styles.container, styles.placeholderContainer, style]}>
         {showLoader && (
