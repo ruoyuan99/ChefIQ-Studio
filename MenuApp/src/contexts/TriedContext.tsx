@@ -2,7 +2,7 @@ import React, { createContext, useReducer, useContext, ReactNode, useEffect } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface TriedState {
-  triedRecipes: string[]; // Store list of recipe IDs that user has tried
+  triedRecipes: string[]; // 存储用户尝试过的菜谱ID列表
 }
 
 type TriedAction =
@@ -47,7 +47,7 @@ const TriedContext = createContext<TriedContextType | undefined>(undefined);
 export const TriedProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(triedReducer, initialState);
 
-  // Load saved tried data
+  // 加载保存的尝试数据
   useEffect(() => {
     const loadTried = async () => {
       try {
@@ -62,7 +62,7 @@ export const TriedProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     loadTried();
   }, []);
 
-  // Save tried data to AsyncStorage
+  // 保存尝试数据到AsyncStorage
   useEffect(() => {
     const saveTried = async () => {
       if (state.triedRecipes.length > 0) {
@@ -85,8 +85,8 @@ export const TriedProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const getTriedCount = (recipeId: string) => {
-    // This can be extended to fetch real tried count from server
-    // Currently returns a mock number
+    // 这里可以扩展为从服务器获取真实的尝试人数
+    // 目前返回一个模拟的数字
     const mockCounts: { [key: string]: number } = {
       'sample_1': 15, // Jerk Fish
       'sample_2': 8,  // Chicken Curry

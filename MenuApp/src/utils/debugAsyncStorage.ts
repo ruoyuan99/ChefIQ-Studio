@@ -155,7 +155,7 @@ export const clearLocalPointsOnly = async () => {
   }
 };
 
-// Expose functions to global in development environment for easy calling in React Native Debugger
+// 在开发环境中将函数暴露到全局，方便在 React Native Debugger 中调用
 if (__DEV__) {
   (global as any).debugAsyncStorage = debugAsyncStorage;
   (global as any).debugSpecificKey = debugSpecificKey;

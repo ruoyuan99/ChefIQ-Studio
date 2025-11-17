@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export const clearLocalPoints = async (): Promise<{ success: boolean; message: string }> => {
   try {
-    // Clear userPoints
+    // 清除 userPoints
     await AsyncStorage.removeItem('userPoints');
     console.log('✅ Cleared userPoints from AsyncStorage');
     
@@ -48,7 +48,7 @@ export const clearAllAsyncStorage = async (): Promise<{ success: boolean; messag
   }
 };
 
-// Expose functions to global in development environment for easy calling in React Native Debugger
+// 在开发环境中将函数暴露到全局，方便在 React Native Debugger 中调用
 if (__DEV__) {
   (global as any).clearLocalPoints = clearLocalPoints;
   (global as any).clearAllAsyncStorage = clearAllAsyncStorage;

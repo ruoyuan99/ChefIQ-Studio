@@ -1,7 +1,7 @@
 import { supabase } from '../config/supabase'
 import { Database } from '../config/supabase'
 
-// Type definitions
+// 类型定义
 type Recipe = Database['public']['Tables']['recipes']['Row']
 type RecipeInsert = Database['public']['Tables']['recipes']['Insert']
 type RecipeUpdate = Database['public']['Tables']['recipes']['Update']
@@ -18,9 +18,9 @@ type CommentInsert = Database['public']['Tables']['comments']['Insert']
 type User = Database['public']['Tables']['users']['Row']
 type UserInsert = Database['public']['Tables']['users']['Insert']
 
-// Recipe service
+// 菜谱服务
 export class RecipeService {
-  // Get all recipes
+  // 获取所有菜谱
   static async getRecipes(): Promise<Recipe[]> {
     const { data, error } = await supabase
       .from('recipes')
@@ -31,7 +31,7 @@ export class RecipeService {
     return data || []
   }
 
-  // Get single recipe
+  // 获取单个菜谱
   static async getRecipe(id: string): Promise<Recipe | null> {
     const { data, error } = await supabase
       .from('recipes')
@@ -43,7 +43,7 @@ export class RecipeService {
     return data
   }
 
-  // Create recipe
+  // 创建菜谱
   static async createRecipe(recipe: RecipeInsert): Promise<Recipe> {
     const { data, error } = await supabase
       .from('recipes')
@@ -55,7 +55,7 @@ export class RecipeService {
     return data
   }
 
-  // Update recipe
+  // 更新菜谱
   static async updateRecipe(id: string, recipe: RecipeUpdate): Promise<Recipe> {
     const { data, error } = await supabase
       .from('recipes')
@@ -68,7 +68,7 @@ export class RecipeService {
     return data
   }
 
-  // Delete recipe
+  // 删除菜谱
   static async deleteRecipe(id: string): Promise<void> {
     const { error } = await supabase
       .from('recipes')
@@ -78,7 +78,7 @@ export class RecipeService {
     if (error) throw error
   }
 
-  // Search recipes
+  // 搜索菜谱
   static async searchRecipes(query: string): Promise<Recipe[]> {
     const { data, error } = await supabase
       .from('recipes')
@@ -91,9 +91,9 @@ export class RecipeService {
   }
 }
 
-// Ingredient service
+// 食材服务
 export class IngredientService {
-  // Get recipe ingredients
+  // 获取菜谱的食材
   static async getRecipeIngredients(recipeId: string): Promise<Ingredient[]> {
     const { data, error } = await supabase
       .from('ingredients')
@@ -105,7 +105,7 @@ export class IngredientService {
     return data || []
   }
 
-  // Add ingredient
+  // 添加食材
   static async addIngredient(ingredient: IngredientInsert): Promise<Ingredient> {
     const { data, error } = await supabase
       .from('ingredients')
@@ -117,7 +117,7 @@ export class IngredientService {
     return data
   }
 
-  // Batch add ingredients
+  // 批量添加食材
   static async addIngredients(ingredients: IngredientInsert[]): Promise<Ingredient[]> {
     const { data, error } = await supabase
       .from('ingredients')
@@ -128,7 +128,7 @@ export class IngredientService {
     return data || []
   }
 
-  // Delete ingredient
+  // 删除食材
   static async deleteIngredient(id: string): Promise<void> {
     const { error } = await supabase
       .from('ingredients')

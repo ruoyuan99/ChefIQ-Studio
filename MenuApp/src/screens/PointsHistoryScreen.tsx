@@ -20,7 +20,7 @@ interface PointsHistoryScreenProps {
 }
 
 const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation }) => {
-  const { state, getPointsHistory } = usePoints(); // clearAllPointsActivities removed - testing only
+  const { state, getPointsHistory, clearAllPointsActivities } = usePoints();
   const history = getPointsHistory();
   const [showRulesModal, setShowRulesModal] = useState(false);
   
@@ -125,41 +125,40 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
     });
   };
 
-  // COMMENTED OUT - Testing purposes only
-  // const handleClearAllHistory = () => {
-  //   if (history.length === 0) {
-  //     Alert.alert('No History', 'There is no points history to delete.');
-  //     return;
-  //   }
+  const handleClearAllHistory = () => {
+    if (history.length === 0) {
+      Alert.alert('No History', 'There is no points history to delete.');
+      return;
+    }
 
-  //   Alert.alert(
-  //     'Delete All Points History',
-  //     'Are you sure you want to delete all points history? This action cannot be undone.',
-  //     [
-  //       {
-  //         text: 'Cancel',
-  //         style: 'cancel',
-  //       },
-  //       {
-  //         text: 'Delete',
-  //         style: 'destructive',
-  //         onPress: async () => {
-  //           try {
-  //             const result = await clearAllPointsActivities();
-  //             if (result.success) {
-  //               Alert.alert('Success', 'All points history has been deleted.');
-  //             } else {
-  //               showError('Error', result.message || 'Failed to delete points history.');
-  //             }
-  //           } catch (error) {
-  //             console.error('Error clearing points history:', error);
-  //             showError('Error', 'Failed to delete points history. Please try again.');
-  //           }
-  //         },
-  //       },
-  //     ]
-  //   );
-  // };
+    Alert.alert(
+      'Delete All Points History',
+      'Are you sure you want to delete all points history? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await clearAllPointsActivities();
+              if (result.success) {
+                Alert.alert('Success', 'All points history has been deleted.');
+              } else {
+                showError('Error', result.message || 'Failed to delete points history.');
+              }
+            } catch (error) {
+              console.error('Error clearing points history:', error);
+              showError('Error', 'Failed to delete points history. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -181,8 +180,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
           >
             <Ionicons name="information-circle-outline" size={24} color="#FF6B35" />
           </TouchableOpacity>
-          {/* COMMENTED OUT - Testing purposes only */}
-          {/* <TouchableOpacity
+          <TouchableOpacity
             style={styles.deleteButton}
             onPress={handleClearAllHistory}
             disabled={history.length === 0}
@@ -192,7 +190,7 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
               size={24} 
               color={history.length === 0 ? "#ccc" : "#FF6B35"} 
             />
-          </TouchableOpacity> */}
+          </TouchableOpacity>
         </View>
       </View>
 

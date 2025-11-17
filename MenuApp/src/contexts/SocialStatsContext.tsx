@@ -105,7 +105,7 @@ const SocialStatsContext = createContext<SocialStatsContextType | undefined>(und
 export const SocialStatsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(socialStatsReducer, initialState);
 
-  // Load saved statistics data
+  // 加载保存的统计数据
   useEffect(() => {
     const loadStats = async () => {
       try {
@@ -120,7 +120,7 @@ export const SocialStatsProvider: React.FC<{ children: ReactNode }> = ({ childre
     loadStats();
   }, []);
 
-  // Save statistics data to AsyncStorage
+  // 保存统计数据到AsyncStorage
   useEffect(() => {
     const saveStats = async () => {
       try {
@@ -132,7 +132,7 @@ export const SocialStatsProvider: React.FC<{ children: ReactNode }> = ({ childre
     saveStats();
   }, [state.stats]);
 
-  // Load social statistics for a specific recipe from Supabase
+  // 从 Supabase 加载某个菜谱的社交统计
   const fetchStats = async (recipeId: string) => {
     // Skip non-UUID ids (e.g., sample_* recipes)
     if (!/^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(recipeId)) {

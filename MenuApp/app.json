@@ -3,10 +3,6 @@
     "name": "Chef iQ",
     "slug": "chef-iq",
     "version": "1.0.0",
-    "platforms": [
-      "ios",
-      "android"
-    ],
     "orientation": "portrait",
     "icon": "./assets/AppLogo.png",
     "userInterfaceStyle": "light",
@@ -25,7 +21,6 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of recipes.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select recipe images.",
-        "NSPhotoLibraryAddUsageDescription": "This app needs access to save recipe images to your photo library.",
         "NSMicrophoneUsageDescription": "This app needs access to your microphone for voice instructions.",
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -36,18 +31,16 @@
         "backgroundColor": "#DA6809"
       },
       "package": "com.chefiq.app",
-      "versionCode": 2,
+      "versionCode": 1,
       "permissions": [
-        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "android.permission.ACCESS_MEDIA_LOCATION",
-        "android.permission.INTERNET"
+        "android.permission.READ_MEDIA_AUDIO"
       ]
     },
     "web": {
@@ -66,8 +59,8 @@
         "expo-media-library",
         {
           "photosPermission": "The app needs access to your photos to save recipe images.",
-          "savePhotosPermission": "Allow Chef iQ to save recipe images to your photo library.",
-          "isAccessMediaLocationEnabled": true
+          "savePhotosPermission": "The app needs access to save images to your photo library.",
+          "isAccessMediaLocationEnabled": false
         }
       ]
     ],
@@ -76,12 +69,6 @@
         "projectId": "5697d7c6-4b5c-4d86-85cd-988c9043eef2"
       }
     },
-    "scheme": "chefiq",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/5697d7c6-4b5c-4d86-85cd-988c9043eef2"
-    }
+    "scheme": "chefiq"
   }
 }
