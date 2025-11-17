@@ -13,26 +13,26 @@ export const clearAllDailyCheckin = async (userId?: string): Promise<{ success: 
     let deletedCount = 0;
     let totalPointsToRemove = 0;
 
-    // 1. 清除 AsyncStorage 中的 daily_checkin 记录
+    // 1. Clear daily_checkin records from AsyncStorage
     try {
       const storedPoints = await AsyncStorage.getItem('userPoints');
       if (storedPoints) {
         const { totalPoints, activities } = JSON.parse(storedPoints);
         
-        // 过滤掉 daily_checkin 记录
+        // Filter out daily_checkin records
         const filteredActivities = activities.filter((activity: any) => {
           if (activity.type === 'daily_checkin') {
-            totalPointsToRemove += activity.points || 15; // daily_checkin 通常是 15 分
+            totalPointsToRemove += activity.points || 15; // daily_checkin is usually 15 points
             deletedCount++;
             return false;
           }
           return true;
         });
 
-        // 重新计算总积分
+        // Recalculate total points
         const newTotalPoints = Math.max(0, totalPoints - totalPointsToRemove);
 
-        // 保存更新后的数据
+        // Save updated data
         await AsyncStorage.setItem('userPoints', JSON.stringify({
           totalPoints: newTotalPoints,
           activities: filteredActivities,
@@ -45,7 +45,7 @@ export const clearAllDailyCheckin = async (userId?: string): Promise<{ success: 
       console.error('Error clearing AsyncStorage daily check-in records:', error);
     }
 
-    // 2. 清除 Supabase 中的 daily_checkin 记录
+    // 2. Clear daily_checkin records from Supabase
     if (userId) {
       try {
         // 先获取所有 daily_checkin 记录以计算需要移除的积分

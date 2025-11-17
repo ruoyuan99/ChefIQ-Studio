@@ -13,16 +13,16 @@ export const runClearDailyCheckin = async (): Promise<void> => {
   console.log('🧹 Starting to clear all daily check-in records...');
   
   try {
-    // 获取当前用户ID
+    // Get current user ID
     let userId: string | undefined;
     
-    // 尝试从 Supabase auth 获取
+    // Try to get from Supabase auth
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id) {
       userId = user.id;
       console.log('✅ Found user from Supabase auth:', userId);
     } else {
-      // 尝试从 AsyncStorage 获取
+      // Try to get from AsyncStorage
       const storedUser = await AsyncStorage.getItem('user');
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
@@ -35,7 +35,7 @@ export const runClearDailyCheckin = async (): Promise<void> => {
       console.log('⚠️ No user found. Will only clear AsyncStorage records.');
     }
 
-    // 执行清理
+    // Execute cleanup
     const result = await clearAllDailyCheckin(userId);
     
     if (result.success) {
@@ -49,10 +49,10 @@ export const runClearDailyCheckin = async (): Promise<void> => {
   }
 };
 
-// 如果直接运行此文件（在开发环境中）
+// If running this file directly (in development environment)
 if (__DEV__) {
-  // 可以通过 React Native Debugger 调用
-  // 在控制台输入: runClearDailyCheckin()
+  // Can be called through React Native Debugger
+  // Enter in console: runClearDailyCheckin()
   (global as any).runClearDailyCheckin = runClearDailyCheckin;
 }
 

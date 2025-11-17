@@ -50,7 +50,7 @@ const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ navigation, act
 
   const handleTabPress = (tab: any) => {
     if (tab.isCenter) {
-      // 中心按钮调用onCreatePress回调
+      // Center button calls onCreatePress callback
       if (onCreatePress) {
         onCreatePress();
       } else {
@@ -67,7 +67,7 @@ const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ navigation, act
 
   return (
     <View style={styles.container}>
-      {/* Android上的阴影渐变效果 - 使用多个半透明层来模拟渐变 */}
+      {/* Shadow gradient effect on Android - use multiple translucent layers to simulate gradient */}
       {Platform.OS === 'android' && (
         <View style={styles.shadowGradientContainer}>
           <View style={[styles.shadowGradientLayer, styles.shadowLayer1]} />
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    // 上边界阴影效果
+    // Top border shadow effect
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -213,8 +213,8 @@ const styles = StyleSheet.create({
       justifyContent: 'space-around',
       paddingVertical: 6,
       paddingHorizontal: 16,
-      height: 100, // 增加高度以容纳底部流白
-      paddingBottom: 24, // 增加底部流白
+      height: 100, // Increase height to accommodate bottom margin
+      paddingBottom: 24, // Add bottom margin
       paddingTop: 16,
       zIndex: 2,
       backgroundColor: 'white',
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
       backgroundColor: '#FFAB91',
       alignItems: 'center',
       justifyContent: 'center',
-      // 外发光效果
+      // Outer glow effect
       shadowColor: '#FF6B35',
       shadowOffset: {
         width: 0,
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
       backgroundColor: '#FF6B35',
       alignItems: 'center',
       justifyContent: 'center',
-      // 主要阴影效果 - 向下投射
+      // Main shadow effect - cast downward
       shadowColor: '#FF6B35',
       shadowOffset: {
         width: 0,
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.4,
       shadowRadius: 8,
       elevation: 8,
-      // 边框高光效果
+      // Border highlight effect
       borderWidth: 2,
       borderColor: '#FF8A65',
     },

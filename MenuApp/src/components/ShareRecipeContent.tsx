@@ -33,12 +33,12 @@ interface ShareRecipeContentProps {
 
 /**
  * Format cooking time to "x minutes" format
- * Handles various input formats: "15分钟", "15 min", "15", etc.
+ * Handles various input formats: "15分钟" (Chinese minutes), "15 min", "15", etc.
  */
 const formatCookingTime = (cookingTime: string | undefined | null): string => {
   if (!cookingTime) return '';
   
-  // Remove "分钟", "min", "minutes" and extract number
+  // Remove Chinese "分钟", "min", "minutes" and extract number
   const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
   const parsed = parseInt(cleaned, 10);
   if (!isNaN(parsed)) {

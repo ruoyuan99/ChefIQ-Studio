@@ -1,20 +1,20 @@
 #!/bin/bash
 
-# 重启后端服务器脚本
+# Restart backend server script
 
-echo "🛑 停止后端服务器..."
+echo "🛑 Stopping backend server..."
 PID=$(lsof -ti:3001 2>/dev/null | head -1)
 
 if [ -n "$PID" ]; then
-    echo "找到进程 PID: $PID"
+    echo "Found process PID: $PID"
     kill $PID
     sleep 2
-    echo "✅ 服务器已停止"
+    echo "✅ Server stopped"
 else
-    echo "ℹ️  没有找到运行中的服务器进程"
+    echo "ℹ️  No running server process found"
 fi
 
 echo ""
-echo "🚀 启动后端服务器..."
+echo "🚀 Starting backend server..."
 npm start
 
