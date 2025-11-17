@@ -12,7 +12,8 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -25,7 +26,8 @@
       "env": {
         "EXPO_PUBLIC_ENV": "preview"
       },
-      "node": "22.11.0"
+      "node": "22.11.0",
+      "channel": "preview"
     },
     "production": {
       "ios": {
@@ -37,7 +39,8 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production"
       },
-      "node": "22.11.0"
+      "node": "22.11.0",
+      "channel": "production"
     }
   },
   "submit": {
