@@ -47,6 +47,7 @@
       "favicon": "./assets/AppLogo.png"
     },
     "plugins": [
+      "expo-dev-client",
       [
         "expo-image-picker",
         {
@@ -54,7 +55,14 @@
         }
       ],
       "expo-file-system",
-      "expo-media-library"
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "The app needs access to your photos to save recipe images.",
+          "savePhotosPermission": "The app needs access to save images to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -1373,7 +1373,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
           console.log('✅ Recipe updated with new image_url:', savedRecipe.image_url);
         } else {
           console.log('⚠️ Using original recipe data (update may still be in progress)');
-          savedRecipe = updatedRecipe;
+      savedRecipe = updatedRecipe;
         }
         
         // Wait a bit more to ensure cloud data is refreshed

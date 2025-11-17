@@ -156,12 +156,33 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
 
   const saveCardImage = async () => {
     try {
-      if (!cardRef.current) return;
+      if (!cardRef.current) {
+        Alert.alert('Error', 'Unable to capture image. Please try again.');
+        return;
+      }
+      
       const uri = await captureCardToPng(cardRef.current, { width: Math.round(Dimensions.get('window').width * 2) });
+      
+      if (!uri) {
+        Alert.alert('Error', 'Failed to generate image. Please try again.');
+        return;
+      }
+      
       await saveToPhotos(uri);
-      Alert.alert('Saved', 'Image saved to Photos');
-    } catch (e) {
-      Alert.alert('Save Failed', 'Unable to save image to Photos');
+      Alert.alert('Saved', 'Image saved to Photos successfully!');
+    } catch (e: any) {
+      console.error('Save image error:', e);
+      const errorMessage = e?.message || 'Unknown error';
+      
+      if (errorMessage.includes('Permission')) {
+        // Permission error is already handled in saveToPhotos
+        return;
+      }
+      
+      Alert.alert(
+        'Save Failed', 
+        `Unable to save image to Photos. ${errorMessage}\n\nPlease make sure you have granted storage permissions.`
+      );
     }
   };
 

@@ -7,7 +7,7 @@ import { clearAllPointsActivities } from '../utils/clearAllPointsActivities';
 
 export interface PointsActivity {
   id: string;
-  type: 'create_recipe' | 'try_recipe' | 'favorite_recipe' | 'like_recipe' | 'share_recipe' | 'complete_profile' | 'add_comment' | 'daily_checkin';
+  type: 'create_recipe' | 'try_recipe' | 'favorite_recipe' | 'like_recipe' | 'share_recipe' | 'complete_profile' | 'add_comment' | 'daily_checkin' | 'complete_survey' | 'recipe_liked_by_others' | 'recipe_favorited_by_others' | 'recipe_tried_by_others';
   points: number;
   description: string;
   timestamp: Date;
@@ -43,6 +43,17 @@ export const POINTS_RULES = {
   complete_profile: 25,
   add_comment: 8,
   daily_checkin: 15,
+  complete_survey: 10, // 完成烹饪后Survey (5-10分，取上限10分以提升填写率)
+  recipe_liked_by_others: 1, // 被点赞 (每日上限10分)
+  recipe_favorited_by_others: 2, // 被收藏 (每日上限10分)
+  recipe_tried_by_others: 3, // 被尝试 (每日上限10分)
+};
+
+// Daily limits for creator rewards
+export const DAILY_LIMITS = {
+  recipe_liked_by_others: 10, // 每日最多10次被点赞 = 10分
+  recipe_favorited_by_others: 5, // 每日最多5次被收藏 = 10分
+  recipe_tried_by_others: 3, // 每日最多3次被尝试 = 9分 (接近10分)
 };
 
 // Level system
@@ -112,6 +123,7 @@ const calculatePointsToNextLevel = (points: number, currentLevel: number): numbe
 interface PointsContextType {
   state: PointsState;
   addPoints: (type: keyof typeof POINTS_RULES, description: string, recipeId?: string) => Promise<void>;
+  addPointsToCreator: (creatorUserId: string, type: 'recipe_liked_by_others' | 'recipe_favorited_by_others' | 'recipe_tried_by_others', recipeId: string, recipeTitle: string) => Promise<void>;
   getPointsHistory: () => PointsActivity[];
   getLevelInfo: () => { level: number; pointsToNextLevel: number; totalPoints: number };
   clearDailyCheckin: () => Promise<{ success: boolean; message: string; deletedCount?: number }>;
@@ -402,6 +414,45 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const addPoints = async (type: keyof typeof POINTS_RULES, description: string, recipeId?: string) => {
     const points = POINTS_RULES[type];
     
+    // 检查每日上限（针对被点赞/收藏/尝试）
+    const creatorRewardTypes: Array<'recipe_liked_by_others' | 'recipe_favorited_by_others' | 'recipe_tried_by_others'> = 
+      ['recipe_liked_by_others', 'recipe_favorited_by_others', 'recipe_tried_by_others'];
+    
+    if (creatorRewardTypes.includes(type as any) && user?.id) {
+      try {
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
+        
+        // 检查今天已经获得的该类型积分次数
+        const { data: todayActivities, error: checkError } = await supabase
+          .from('user_points')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('activity_type', type)
+          .gte('created_at', todayStart.toISOString())
+          .lt('created_at', todayEnd.toISOString());
+        
+        if (checkError) {
+          console.error('Error checking daily limit:', checkError);
+          // 不阻止，继续执行
+        } else {
+          const todayCount = todayActivities?.length || 0;
+          const dailyLimit = DAILY_LIMITS[type as keyof typeof DAILY_LIMITS];
+          
+          if (todayCount >= dailyLimit) {
+            // 已达到每日上限，不添加积分
+            console.log(`Daily limit reached for ${type}: ${todayCount}/${dailyLimit}`);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking daily limit:', error);
+        // 不阻止，继续执行
+      }
+    }
+    
     // 如果是 daily_checkin，先检查数据库中今天是否已经签到过
     if (type === 'daily_checkin' && user?.id) {
       try {
@@ -522,6 +573,120 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         console.error('Failed to sync points to Supabase:', error);
         // 如果失败，会在 useEffect 中重试同步
       }
+    }
+  };
+
+  /**
+   * 给食谱创作者添加积分（当他们的食谱被点赞/收藏/尝试时）
+   * @param creatorUserId 创作者的用户ID
+   * @param type 积分类型
+   * @param recipeId 食谱ID
+   * @param recipeTitle 食谱标题
+   */
+  const addPointsToCreator = async (
+    creatorUserId: string,
+    type: 'recipe_liked_by_others' | 'recipe_favorited_by_others' | 'recipe_tried_by_others',
+    recipeId: string,
+    recipeTitle: string
+  ) => {
+    // 如果创作者是当前用户，不需要给自己加分（避免重复）
+    if (creatorUserId === user?.id) {
+      return;
+    }
+
+    const points = POINTS_RULES[type];
+    const dailyLimit = DAILY_LIMITS[type];
+
+    try {
+      // 检查创作者今天已经获得的该类型积分次数
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+
+      const { data: todayActivities, error: checkError } = await supabase
+        .from('user_points')
+        .select('id')
+        .eq('user_id', creatorUserId)
+        .eq('activity_type', type)
+        .gte('created_at', todayStart.toISOString())
+        .lt('created_at', todayEnd.toISOString());
+
+      if (checkError) {
+        console.error('Error checking daily limit for creator:', checkError);
+        return;
+      }
+
+      const todayCount = todayActivities?.length || 0;
+      if (todayCount >= dailyLimit) {
+        // 已达到每日上限
+        console.log(`Creator daily limit reached for ${type}: ${todayCount}/${dailyLimit}`);
+        return;
+      }
+
+      // 获取创作者当前积分总数
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('users')
+        .select('total_points')
+        .eq('id', creatorUserId)
+        .single();
+
+      if (creatorError) {
+        console.error('Error fetching creator points:', creatorError);
+        return;
+      }
+
+      const currentTotalPoints = creatorData?.total_points || 0;
+      const newTotalPoints = currentTotalPoints + points;
+
+      // 更新创作者的积分总数
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          total_points: newTotalPoints,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', creatorUserId);
+
+      if (updateError) {
+        console.error('Error updating creator total_points:', updateError);
+        return;
+      }
+
+      // 添加积分活动记录
+      const description = type === 'recipe_liked_by_others'
+        ? `Your recipe "${recipeTitle}" was liked`
+        : type === 'recipe_favorited_by_others'
+        ? `Your recipe "${recipeTitle}" was favorited`
+        : `Your recipe "${recipeTitle}" was tried`;
+
+      const { error: insertError } = await supabase
+        .from('user_points')
+        .insert({
+          user_id: creatorUserId,
+          points: points,
+          activity_type: type,
+          description: description,
+          recipe_id: recipeId,
+          created_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        console.error('Error inserting creator points:', insertError);
+        // 回滚积分总数
+        await supabase
+          .from('users')
+          .update({
+            total_points: currentTotalPoints,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', creatorUserId);
+        return;
+      }
+
+      console.log(`✅ Added ${points} points to creator ${creatorUserId} for ${type}`);
+    } catch (error) {
+      console.error('Failed to add points to creator:', error);
     }
   };
 
@@ -708,7 +873,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   return (
-    <PointsContext.Provider value={{ state, addPoints, getPointsHistory, getLevelInfo, clearDailyCheckin, clearAllPointsActivities: clearAllPoints }}>
+    <PointsContext.Provider value={{ state, addPoints, addPointsToCreator, getPointsHistory, getLevelInfo, clearDailyCheckin, clearAllPointsActivities: clearAllPoints }}>
       {children}
     </PointsContext.Provider>
   );

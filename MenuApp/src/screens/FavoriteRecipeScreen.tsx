@@ -298,11 +298,11 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
             <View style={[styles.cardShadowLayer, styles.cardShadowLayer11]} />
             <View style={[styles.cardShadowLayer, styles.cardShadowLayer12]} />
           </View>
-          <TouchableOpacity 
-            style={styles.generateRecipeCard}
-            onPress={() => navigation.navigate('GenerateRecipe')}
+        <TouchableOpacity 
+          style={styles.generateRecipeCard}
+          onPress={() => navigation.navigate('GenerateRecipe')}
             activeOpacity={0.9}
-          >
+        >
             <OptimizedImage
               source={require('../../assets/GenerateFromIngredients2.png')}
               style={styles.generateRecipeImage}
@@ -313,12 +313,15 @@ const FavoriteRecipeScreen: React.FC<FavoriteRecipeScreenProps> = ({ navigation 
             />
             <View style={styles.generateRecipeContentContainer}>
               <View style={styles.generateRecipeInfo}>
-                <Text style={styles.generateRecipeTitle}>Generate from Ingredients</Text>
+                <View style={styles.generateRecipeTitleContainer}>
+                  <Ionicons name="sparkles" size={18} color="#FF6B35" />
+                  <Text style={styles.generateRecipeTitle}>Generate from Ingredients</Text>
+                </View>
                 <Text style={styles.generateRecipeDescription}>Not sure what to cook? Let AI turn your fridge into recipes.</Text>
-              </View>
+            </View>
             </View>
           </TouchableOpacity>
-        </View>
+          </View>
 
         <View style={styles.recipesSection}>
           <Text style={styles.sectionSubtitle}>
@@ -455,11 +458,16 @@ const styles = StyleSheet.create({
   generateRecipeInfo: {
     flex: 1,
   },
+  generateRecipeTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   generateRecipeTitle: {
     fontSize: 18,
     fontWeight: getFontWeight('600') as any,
     color: '#333',
-    marginBottom: 6,
+    marginLeft: 6,
   },
   generateRecipeDescription: {
     fontSize: 13,

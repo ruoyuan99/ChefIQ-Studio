@@ -15,10 +15,9 @@ import {
   ActivityIndicator,
   Linking,
   BackHandler,
-  SafeAreaView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRecipe } from '../contexts/RecipeContext';
 import { useFavorite } from '../contexts/FavoriteContext';
@@ -35,6 +34,8 @@ import { sampleRecipes } from '../data/sampleRecipes';
 import { MenuItem, Ingredient, Instruction, YouTubeVideo } from '../types';
 import OptimizedImage from '../components/OptimizedImage';
 import { Image } from 'react-native';
+import RecipeSurveyModal, { SurveyData } from '../components/RecipeSurveyModal';
+import { recipeSurveyService, RecipeSurveyStats } from '../services/recipeSurveyService';
 
 interface RecipeDetailScreenProps {
   navigation: any;
@@ -81,7 +82,7 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const { addItemsToGroceries } = useGroceries();
   const { toggleLike, isLiked } = useLike();
   const { toggleTried, isTried, getTriedCount } = useTried();
-  const { addPoints } = usePoints();
+  const { addPoints, addPointsToCreator } = usePoints();
   const { getStats, fetchStats, incrementViews, adjustLikes, adjustFavorites, adjustTried } = useSocialStats();
   const { checkBadgeUnlock, getBadgeById } = useBadges();
   const insets = useSafeAreaInsets();
@@ -109,6 +110,15 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const [commentText, setCommentText] = useState('');
   const { user: authUser } = useAuth();
   
+  // State for survey
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [surveyStats, setSurveyStats] = useState<RecipeSurveyStats | null>(null);
+  const [isLoadingSurveyStats, setIsLoadingSurveyStats] = useState(false);
+  
+  // State for fullscreen image
+  const [showFullscreenImage, setShowFullscreenImage] = useState(false);
+  const [fullscreenImageSource, setFullscreenImageSource] = useState<string | number | { uri: string } | null>(null);
+  
   // Determine data source based on recipe ID
   const recipeId = route.params.recipeId;
   const [recipe, setRecipe] = useState<any>(null);
@@ -119,6 +129,15 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
   const findRecipe = (id: string, recipes: any[]) => {
     // Check if this is a sample recipe (ID starts with 'sample_')
     if (id.startsWith('sample_')) {
+      // First check if it's in state.recipes (might have been imported/updated)
+      const foundInState = recipes.find((r: any) => r.id === id);
+      if (foundInState) {
+        setRecipe(foundInState);
+        setIsUserCreated(true); // Treat as user-created if it's in state
+        setIsLoading(false);
+        return true;
+      }
+      // Fallback to sampleRecipes
       const found = sampleRecipes.find(r => r.id === id);
       if (found) {
         setRecipe(found);
@@ -212,6 +231,49 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     }
   }, [recipeId]);
 
+  // Load survey stats - Always show stats (use fake data if no real data)
+  useEffect(() => {
+    const loadSurveyStats = async () => {
+      if (recipeId && !recipeId.startsWith('sample_')) {
+        setIsLoadingSurveyStats(true);
+        try {
+          const stats = await recipeSurveyService.getRecipeSurveyStats(recipeId);
+          // If no real data, use fake data so stats are always visible
+          if (stats.total === 0) {
+            setSurveyStats({
+              taste: { like: 8, neutral: 2, dislike: 1 },
+              difficulty: { easy: 5, medium: 4, hard: 2 },
+              willMakeAgain: { yes: 9, no: 2 },
+              total: 11,
+            });
+          } else {
+            setSurveyStats(stats);
+          }
+        } catch (error) {
+          console.error('Failed to load survey stats:', error);
+          // Use fake data if loading fails
+          setSurveyStats({
+            taste: { like: 8, neutral: 2, dislike: 1 },
+            difficulty: { easy: 5, medium: 4, hard: 2 },
+            willMakeAgain: { yes: 9, no: 2 },
+            total: 11,
+          });
+        } finally {
+          setIsLoadingSurveyStats(false);
+        }
+      } else {
+        // Use fake data for sample recipes or when recipeId is not available
+        setSurveyStats({
+          taste: { like: 8, neutral: 2, dislike: 1 },
+          difficulty: { easy: 5, medium: 4, hard: 2 },
+          willMakeAgain: { yes: 9, no: 2 },
+          total: 11,
+        });
+      }
+    };
+    loadSurveyStats();
+  }, [recipeId]);
+
   // Debug logging
   console.log('RecipeDetailScreen - Route params:', route.params);
   console.log('RecipeDetailScreen - Recipe ID:', recipeId);
@@ -229,7 +291,10 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     cookingTime: recipe?.cookingTime,
     servings: recipe?.servings,
     tags: recipe?.tags?.length || 0,
-    imageUri: recipe?.imageUri ? 'Has image' : 'No image'
+    image_url: recipe?.image_url || 'No image_url',
+    imageUri: recipe?.imageUri || 'No imageUri',
+    image: recipe?.image || 'No image',
+    imageSource: recipe?.image_url || recipe?.imageUri || recipe?.image || 'No image source'
   });
 
   // Custom in-app share button (non-native header)
@@ -348,12 +413,21 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     }
   };
 
-  const handleLike = () => {
+  const handleLike = async () => {
     const wasLiked = isLiked(recipe.id);
     toggleLike(recipe.id);
     
     if (!wasLiked) {
+      // Add points to user who liked
       addPoints('like_recipe', `Liked ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add points:', err));
+      
+      // Add points to recipe creator
+      const creatorId = await getRecipeCreatorId(recipeId);
+      if (creatorId) {
+        addPointsToCreator(creatorId, 'recipe_liked_by_others', recipeId, recipe.title).catch(err => 
+          console.error('Failed to add points to creator:', err)
+        );
+      }
     }
     // update social stats
     adjustLikes(recipe.id, wasLiked ? -1 : 1);
@@ -366,12 +440,21 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     );
   };
 
-  const handleFavorite = () => {
+  const handleFavorite = async () => {
     const wasFavorite = isFavorite(recipe.id);
     toggleFavorite(recipe);
     
     if (!wasFavorite) {
+      // Add points to user who favorited
       addPoints('favorite_recipe', `Favorited ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add points:', err));
+      
+      // Add points to recipe creator
+      const creatorId = await getRecipeCreatorId(recipeId);
+      if (creatorId) {
+        addPointsToCreator(creatorId, 'recipe_favorited_by_others', recipeId, recipe.title).catch(err => 
+          console.error('Failed to add points to creator:', err)
+        );
+      }
     }
     // update social stats
     adjustFavorites(recipe.id, wasFavorite ? -1 : 1);
@@ -386,12 +469,72 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
 
   const handleTried = async () => {
     const wasTried = isTried(recipe.id);
-    toggleTried(recipe.id);
-    // update social stats
-    adjustTried(recipe.id, wasTried ? -1 : 1);
     
     if (!wasTried) {
+      // First time trying - show survey modal
+      setShowSurveyModal(true);
+    } else {
+      // Already tried - just toggle off
+      toggleTried(recipe.id);
+      adjustTried(recipe.id, -1);
+      
+      // Delete survey if exists
+      if (authUser?.id && !recipeId.startsWith('sample_')) {
+        try {
+          await recipeSurveyService.deleteSurvey(recipeId, authUser.id);
+          // Reload stats
+          const stats = await recipeSurveyService.getRecipeSurveyStats(recipeId);
+          setSurveyStats(stats);
+        } catch (error) {
+          console.error('Failed to delete survey:', error);
+        }
+      }
+      
+      Alert.alert(
+        'Removed from Tried',
+        `You removed ${recipe.title} from your tried recipes.`
+      );
+    }
+  };
+
+  const handleSurveySubmit = async (surveyData: SurveyData) => {
+    if (!authUser?.id || recipeId.startsWith('sample_')) {
+      // For sample recipes or unauthenticated users, just mark as tried locally
+      toggleTried(recipe.id);
+      adjustTried(recipe.id, 1);
       addPoints('try_recipe', `Tried ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add points:', err));
+      Alert.alert(
+        'Added to Tried',
+        `You marked ${recipe.title} as tried! Great job!`
+      );
+      return;
+    }
+
+    try {
+      // Submit survey to database
+      await recipeSurveyService.submitSurvey(recipeId, authUser.id, surveyData);
+      
+      // Mark as tried
+      toggleTried(recipe.id);
+      adjustTried(recipe.id, 1);
+      
+      // Add points for trying recipe
+      addPoints('try_recipe', `Tried ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add points:', err));
+      
+      // Add points for completing survey
+      addPoints('complete_survey', `Completed survey for ${recipe.title}`, recipe.id).catch(err => console.error('Failed to add survey points:', err));
+      
+      // Add points to recipe creator
+      const creatorId = await getRecipeCreatorId(recipeId);
+      if (creatorId) {
+        addPointsToCreator(creatorId, 'recipe_tried_by_others', recipeId, recipe.title).catch(err => 
+          console.error('Failed to add points to creator:', err)
+        );
+      }
+      
+      // Reload survey stats
+      const stats = await recipeSurveyService.getRecipeSurveyStats(recipeId);
+      setSurveyStats(stats);
       
       // Check for badge unlocks
       setTimeout(async () => {
@@ -411,14 +554,15 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         await checkBadgeUnlock('cuisine_explorer_5');
         await checkBadgeUnlock('cuisine_explorer_10');
       }, 500);
+      
+      Alert.alert(
+        'Thank You!',
+        `You marked ${recipe.title} as tried! Your feedback helps improve our recipes.`
+      );
+    } catch (error) {
+      console.error('Failed to submit survey:', error);
+      showError('Error', 'Failed to submit survey. Please try again.');
     }
-    
-    Alert.alert(
-      wasTried ? 'Removed from Tried' : 'Added to Tried',
-      wasTried 
-        ? `You removed ${recipe.title} from your tried recipes.`
-        : `You marked ${recipe.title} as tried! Great job!`
-    );
   };
 
   const handleAddToGroceries = () => {
@@ -464,6 +608,40 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
     navigation.navigate('CookStep', { recipeId: recipe.id });
   };
 
+  // Handler for opening fullscreen image
+  const handleOpenFullscreenImage = (imageSource: string | number | { uri: string } | null) => {
+    if (imageSource) {
+      setFullscreenImageSource(imageSource);
+      setShowFullscreenImage(true);
+    }
+  };
+
+  // Helper function to get recipe creator user_id from database
+  const getRecipeCreatorId = async (recipeId: string): Promise<string | null> => {
+    // Skip for sample recipes
+    if (recipeId.startsWith('sample_')) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('recipes')
+        .select('user_id')
+        .eq('id', recipeId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching recipe creator:', error);
+        return null;
+      }
+
+      return data?.user_id || null;
+    } catch (error) {
+      console.error('Failed to get recipe creator ID:', error);
+      return null;
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -496,47 +674,111 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
       >
         {/* Recipe Main Image */}
         <View style={styles.recipeImageSection}>
-          <OptimizedImage
-            key={recipe.image_url || recipe.imageUri || recipe.image} // Add key to force re-render when image changes
-            source={recipe.image_url || recipe.imageUri || recipe.image}
-            style={styles.recipeImage}
-            contentFit="cover"
-            showLoader={true}
-            cachePolicy="memory-disk"
-            priority="high"
-          />
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              // Get image source with proper fallback
+              const imageSource = recipe.image_url || recipe.imageUri || recipe.image;
+              handleOpenFullscreenImage(imageSource);
+            }}
+          >
+            <OptimizedImage
+              key={`${recipe.id}-${recipe.image_url || recipe.imageUri || recipe.image || 'no-image'}`} // Add key to force re-render when image changes
+              source={(() => {
+                // Priority: imageUri (for imported recipes) > image_url (from database) > image (fallback)
+                // This matches CreateRecipeScreen which uses imageUri
+                // Handle empty strings as null
+                const imageUri = recipe.imageUri;
+                const imageUrl = recipe.image_url;
+                const image = recipe.image;
+                
+                // Return first non-empty value
+                // Priority: imageUri first (matches CreateRecipeScreen behavior)
+                if (imageUri && typeof imageUri === 'string' && imageUri.trim() !== '') {
+                  console.log('📸 RecipeDetailScreen - Using imageUri:', imageUri);
+                  return imageUri;
+                }
+                if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+                  console.log('📸 RecipeDetailScreen - Using image_url:', imageUrl);
+                  return imageUrl;
+                }
+                if (image) {
+                  console.log('📸 RecipeDetailScreen - Using image:', image);
+                  return image;
+                }
+                console.log('📸 RecipeDetailScreen - No image source found');
+                return null;
+              })()}
+              style={styles.recipeImage}
+              contentFit="cover"
+              showLoader={true}
+              cachePolicy="memory-disk"
+              priority="high"
+            />
+          </TouchableOpacity>
+          {/* Chef iQ Challenge Badge */}
+          {recipe.tags && recipe.tags.includes('Chef iQ Challenge') && (
+            <View style={styles.challengeBadge}>
+              <Ionicons name="trophy" size={14} color="#d96709" />
+              <Text style={styles.challengeBadgeText}>Chef iQ Challenge</Text>
+            </View>
+          )}
         </View>
 
         {/* Recipe Name */}
         <View style={styles.recipeNameSection}>
           <Text style={styles.recipeName}>{recipe.title}</Text>
-          
-          {/* Tried it Section */}
-          <View style={styles.triedSection}>
-            <TouchableOpacity 
-              style={[
-                styles.triedButton,
-                isTried(recipe.id) && styles.triedButtonActive
-              ]}
-              onPress={handleTried}
-            >
-              <Ionicons 
-                name={isTried(recipe.id) ? "checkmark-circle" : "checkmark-circle-outline"} 
-                size={20} 
-                color={isTried(recipe.id) ? "#4CAF50" : "#666"} 
-              />
-              <Text style={[
-                styles.triedButtonText,
-                isTried(recipe.id) && styles.triedButtonTextActive
-              ]}>
-                Tried it!
-              </Text>
-            </TouchableOpacity>
-          <Text style={styles.triedCount}>
-            {getTriedCount(recipe.id)} people tried this recipe
-          </Text>
         </View>
 
+        {/* Tried it Section - Moved below recipe name */}
+        <View style={styles.triedSection}>
+          <TouchableOpacity 
+            style={[
+              styles.triedButton,
+              isTried(recipe.id) && styles.triedButtonActive
+            ]}
+            onPress={handleTried}
+          >
+            <Ionicons 
+              name={isTried(recipe.id) ? "checkmark-circle" : "checkmark-circle-outline"} 
+              size={20} 
+              color={isTried(recipe.id) ? "#4CAF50" : "#666"} 
+            />
+            <Text style={[
+              styles.triedButtonText,
+              isTried(recipe.id) && styles.triedButtonTextActive
+            ]}>
+              Tried it!
+            </Text>
+          </TouchableOpacity>
+        
+          {/* Survey Stats - Always show, merged with tried count in same line */}
+          {surveyStats && surveyStats.total > 0 && (
+            <View style={styles.surveyStatsRow}>
+              <Text style={styles.triedCount}>
+                {surveyStats.total} people tried
+              </Text>
+              <Text style={styles.surveyStatItem}>
+                <Text style={styles.surveyStatPercent}>
+                  {Math.round((surveyStats.taste.like / surveyStats.total) * 100)}%
+                </Text>
+                <Text style={styles.surveyStatText}> liked</Text>
+              </Text>
+              <Text style={styles.surveyStatItem}>
+                <Text style={styles.surveyStatPercent}>
+                  {Math.round((surveyStats.difficulty.hard / surveyStats.total) * 100)}%
+                </Text>
+                <Text style={styles.surveyStatText}> hard</Text>
+              </Text>
+              <Text style={styles.surveyStatItem}>
+                <Text style={styles.surveyStatPercent}>
+                  {Math.round((surveyStats.willMakeAgain.yes / surveyStats.total) * 100)}%
+                </Text>
+                <Text style={styles.surveyStatText}> again</Text>
+              </Text>
+            </View>
+          )}
+        </View>
           
           <View style={styles.authorInfo}>
             <View style={styles.authorAvatar}>
@@ -568,7 +810,6 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
               ) : null}
             </View>
           </View>
-        </View>
 
         {/* Cooking Time and Cookware */}
         <View style={styles.cookingInfoSection}>
@@ -576,16 +817,56 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
             <View style={styles.cookingInfoItem}>
               <Ionicons name="time-outline" size={20} color="#666" />
               <Text style={styles.cookingInfoLabel}>Cooking Time (Minutes)</Text>
-              <Text style={styles.cookingInfoValue}>{formatCookingTimeNumber(recipe.cookingTime)}</Text>
+              <Text style={styles.cookingInfoValue} numberOfLines={2} ellipsizeMode="tail">
+                {formatCookingTimeNumber(recipe.cookingTime)}
+              </Text>
             </View>
-            {recipe.cookware && (
+            {recipe.cookware ? (
               <View style={styles.cookingInfoItem}>
                 <Ionicons name="restaurant-outline" size={20} color="#666" />
                 <Text style={styles.cookingInfoLabel}>Cookware</Text>
-                <Text style={styles.cookingInfoValue}>{recipe.cookware}</Text>
+                <Text style={styles.cookingInfoValue} numberOfLines={2} ellipsizeMode="tail">
+                  {recipe.cookware}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.cookingInfoItem}>
+                <Ionicons name="restaurant-outline" size={20} color="#666" />
+                <Text style={styles.cookingInfoLabel}>Cookware</Text>
+                <Text style={styles.cookingInfoValue} numberOfLines={2} ellipsizeMode="tail">
+                  Not specified
+                </Text>
               </View>
             )}
           </View>
+          {/* Buy Cookware Button - at the bottom of cooking info card */}
+          {(recipe.cookware === 'Chef iQ Mini Oven' || 
+            (recipe.cookware && recipe.cookware.toLowerCase().includes('air fryer'))) && (
+            <View style={styles.buyMiniOvenContainer}>
+              <View style={styles.buyMiniOvenRow}>
+                <TouchableOpacity
+                  style={styles.buyMiniOvenButton}
+                  onPress={() => {
+                    let url = '';
+                    if (recipe.cookware === 'Chef iQ Mini Oven') {
+                      url = 'https://chefiq.com/products/iq-minioven?srsltid=AfmBOoqgyPds4lLsbQE9oYQK9cqunBqRZU_fjvsng31_NPxZ6_QWU8tU';
+                    } else if (recipe.cookware && recipe.cookware.toLowerCase().includes('air fryer')) {
+                      url = 'https://chefman.com/collections/air-fryers-1/products/turbofry%C2%AE-touch-4-quart-digital-air-fryer';
+                    }
+                    if (url) {
+                      Linking.openURL(url).catch(err => console.error('Failed to open URL:', err));
+                    }
+                  }}
+                >
+                  <Ionicons name="cart-outline" size={16} color="#d96709" />
+                  <Text style={styles.buyMiniOvenButtonText}>Buy Now</Text>
+                </TouchableOpacity>
+                <Text style={styles.buyMiniOvenHint}>
+                  Don't have this cookware? Order now with discount!
+                </Text>
+              </View>
+            </View>
+          )}
           
           {/* Recipe Description */}
           {recipe.description && (
@@ -710,14 +991,19 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
                   <View style={styles.instructionContent}>
                     <Text style={styles.instructionDescription}>{instruction.description}</Text>
                     {instruction.imageUri && (
-                      <OptimizedImage
-                        source={instruction.imageUri}
-                        style={styles.instructionImage}
-                        contentFit="cover"
-                        showLoader={true}
-                        cachePolicy="memory-disk"
-                        priority="normal"
-                      />
+                      <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => handleOpenFullscreenImage(instruction.imageUri || null)}
+                      >
+                        <OptimizedImage
+                          source={instruction.imageUri}
+                          style={styles.instructionImage}
+                          contentFit="cover"
+                          showLoader={true}
+                          cachePolicy="memory-disk"
+                          priority="normal"
+                        />
+                      </TouchableOpacity>
                     )}
                   </View>
                 </View>
@@ -994,6 +1280,46 @@ const RecipeDetailScreen: React.FC<RecipeDetailScreenProps> = ({
         </View>
       </Modal>
 
+      {/* Survey Modal */}
+      <RecipeSurveyModal
+        visible={showSurveyModal}
+        onClose={() => setShowSurveyModal(false)}
+        onSubmit={handleSurveySubmit}
+        recipeTitle={recipe?.title}
+      />
+
+      {/* Fullscreen Image Modal */}
+      <Modal
+        visible={showFullscreenImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFullscreenImage(false)}
+      >
+        <View style={styles.fullscreenImageContainer}>
+          <TouchableOpacity
+            style={styles.fullscreenImageCloseButton}
+            onPress={() => setShowFullscreenImage(false)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={32} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.fullscreenImageBackground}
+            activeOpacity={1}
+            onPress={() => setShowFullscreenImage(false)}
+          >
+            <OptimizedImage
+              source={fullscreenImageSource}
+              style={styles.fullscreenImage}
+              contentFit="contain"
+              showLoader={true}
+              cachePolicy="memory-disk"
+              priority="high"
+            />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -1045,15 +1371,38 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 12,
     overflow: 'hidden',
+    position: 'relative',
   },
   recipeImage: {
     width: '100%',
     height: 250,
     resizeMode: 'cover',
   },
+  challengeBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  challengeBadgeText: {
+    fontSize: 12,
+    color: '#d96709',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
   // Recipe Name Section
   recipeNameSection: {
-    marginBottom: 20,
+    marginBottom: 8,
     alignItems: 'center',
   },
   recipeName: {
@@ -1068,6 +1417,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'center',
     marginTop: 16,
+    marginBottom: 24,
     paddingHorizontal: 20,
   },
   authorAvatar: {
@@ -1108,7 +1458,8 @@ const styles = StyleSheet.create({
   // Tried it Section
   triedSection: {
     alignItems: 'center',
-    marginVertical: 16,
+    marginTop: 0,
+    marginBottom: 16,
   },
   triedButton: {
     flexDirection: 'row',
@@ -1135,8 +1486,38 @@ const styles = StyleSheet.create({
   },
   triedCount: {
     fontSize: 12,
-    color: '#999',
-    marginTop: 6,
+    color: '#666',
+    fontWeight: '500',
+  },
+  surveyStatsInline: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  surveyStatsRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  surveyStatItem: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  surveyStatText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  surveyStatPercent: {
+    fontSize: 12,
+    color: '#d96709',
+    fontWeight: 'bold',
   },
   // Cooking Info Section
   cookingInfoSection: {
@@ -1153,21 +1534,62 @@ const styles = StyleSheet.create({
   cookingInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'flex-start',
   },
   cookingInfoItem: {
     alignItems: 'center',
     flex: 1,
+    justifyContent: 'flex-start',
   },
   cookingInfoLabel: {
     fontSize: 12,
     color: '#666',
     marginTop: 8,
     marginBottom: 4,
+    textAlign: 'center',
   },
   cookingInfoValue: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    textAlign: 'center',
+    minHeight: 22, // Ensure consistent line height
+    lineHeight: 22,
+  },
+  buyMiniOvenContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  buyMiniOvenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  buyMiniOvenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#d96709',
+    flexShrink: 0,
+  },
+  buyMiniOvenButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#d96709',
+    marginLeft: 8,
+  },
+  buyMiniOvenHint: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 12,
+    flex: 1,
+    lineHeight: 18,
   },
   // Description Section
   descriptionSection: {
@@ -1737,6 +2159,106 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  // Survey Stats Styles
+  surveyStatsSection: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 20,
+    marginHorizontal: 20,
+  },
+  surveyStatsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  surveyStatRow: {
+    marginBottom: 16,
+  },
+  surveyStatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  surveyStatBars: {
+    gap: 8,
+  },
+  surveyStatBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  surveyStatBarWrapper: {
+    flex: 1,
+    height: 24,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+    marginRight: 8,
+    overflow: 'hidden',
+  },
+  surveyStatBar: {
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 24,
+  },
+  surveyStatBarLike: {
+    backgroundColor: '#4CAF50',
+  },
+  surveyStatBarNeutral: {
+    backgroundColor: '#FFA500',
+  },
+  surveyStatBarDislike: {
+    backgroundColor: '#FF6B35',
+  },
+  surveyStatBarEasy: {
+    backgroundColor: '#4CAF50',
+  },
+  surveyStatBarMedium: {
+    backgroundColor: '#FFA500',
+  },
+  surveyStatBarHard: {
+    backgroundColor: '#FF6B35',
+  },
+  surveyStatBarYes: {
+    backgroundColor: '#4CAF50',
+  },
+  surveyStatBarNo: {
+    backgroundColor: '#FF6B35',
+  },
+  // Fullscreen Image Modal Styles
+  fullscreenImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImageBackground: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullscreenImageCloseButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 40,
+    right: 20,
+    zIndex: 1000,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { usePoints, PointsActivity } from '../contexts/PointsContext';
 import { showError } from '../utils/errorHandler';
+import PointsRulesModal from '../components/PointsRulesModal';
 
 interface PointsHistoryScreenProps {
   navigation: any;
@@ -21,6 +22,7 @@ interface PointsHistoryScreenProps {
 const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation }) => {
   const { state, getPointsHistory, clearAllPointsActivities } = usePoints();
   const history = getPointsHistory();
+  const [showRulesModal, setShowRulesModal] = useState(false);
   
   // Force refresh when state changes
   useEffect(() => {
@@ -72,6 +74,10 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       complete_profile: 'person',
       add_comment: 'chatbubble',
       daily_checkin: 'calendar',
+      complete_survey: 'clipboard',
+      recipe_liked_by_others: 'thumbs-up',
+      recipe_favorited_by_others: 'bookmark',
+      recipe_tried_by_others: 'checkmark-circle',
     };
     return icons[type] || 'star';
   };
@@ -86,6 +92,10 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       complete_profile: '#FF9800',
       add_comment: '#00BCD4',
       daily_checkin: '#FF6B35',
+      complete_survey: '#4CAF50',
+      recipe_liked_by_others: '#2196F3',
+      recipe_favorited_by_others: '#E91E63',
+      recipe_tried_by_others: '#4CAF50',
     };
     return colors[type] || '#666';
   };
@@ -100,6 +110,10 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
       complete_profile: 'Completed Profile',
       add_comment: 'Added Comment',
       daily_checkin: 'Daily Check-in',
+      complete_survey: 'Completed Survey',
+      recipe_liked_by_others: 'Recipe Liked by Others',
+      recipe_favorited_by_others: 'Recipe Favorited by Others',
+      recipe_tried_by_others: 'Recipe Tried by Others',
     };
     return labels[type] || type;
   };
@@ -159,17 +173,25 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Points History</Text>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={handleClearAllHistory}
-          disabled={history.length === 0}
-        >
-          <Ionicons 
-            name="trash-outline" 
-            size={24} 
-            color={history.length === 0 ? "#ccc" : "#FF6B35"} 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => setShowRulesModal(true)}
+          >
+            <Ionicons name="information-circle-outline" size={24} color="#FF6B35" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleClearAllHistory}
+            disabled={history.length === 0}
+          >
+            <Ionicons 
+              name="trash-outline" 
+              size={24} 
+              color={history.length === 0 ? "#ccc" : "#FF6B35"} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -253,6 +275,12 @@ const PointsHistoryScreen: React.FC<PointsHistoryScreenProps> = ({ navigation })
           )}
         </View>
       </ScrollView>
+
+      {/* Points Rules Modal */}
+      <PointsRulesModal
+        visible={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -282,13 +310,15 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   headerRight: {
-    width: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoButton: {
+    padding: 8,
+    marginRight: 4,
   },
   deleteButton: {
     padding: 8,
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,

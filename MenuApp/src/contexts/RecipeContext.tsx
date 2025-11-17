@@ -213,7 +213,14 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const addRecipe = async (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => {
     // Generate UUID locally before creating recipe
-    const recipeId = generateUUID();
+    // Ensure we never use sample recipe IDs (sample_1, sample_2, etc.)
+    let recipeId = generateUUID();
+    
+    // Safety check: if somehow a sample ID was passed, generate a new UUID
+    if (recipeId.startsWith('sample_')) {
+      console.warn('⚠️ Generated ID starts with "sample_", regenerating...');
+      recipeId = generateUUID();
+    }
     
     const newRecipe: Recipe = {
       ...recipeData,
@@ -287,7 +294,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (user) {
       try {
         const syncedRecipe = await RealTimeSyncService.syncRecipe(updatedRecipe, user.id);
-        console.log('✅ Update sync completed, refreshing data from cloud');
+          console.log('✅ Update sync completed, refreshing data from cloud');
         
         // If syncRecipe returned updated recipe data, use it
         if (syncedRecipe && typeof syncedRecipe === 'object' && 'image_url' in syncedRecipe) {
@@ -330,9 +337,9 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           }, 1500); // Increased to 1500ms to ensure image upload and DB update are complete
         });
       } catch (error) {
-        console.error('❌ Failed to sync update to Supabase:', error);
+          console.error('❌ Failed to sync update to Supabase:', error);
         return updatedRecipe;
-      }
+    }
     }
     
     return updatedRecipe;

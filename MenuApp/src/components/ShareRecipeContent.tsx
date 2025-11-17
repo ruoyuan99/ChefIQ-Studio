@@ -31,6 +31,35 @@ interface ShareRecipeContentProps {
   // qrSource?: any;   // deprecated
 }
 
+/**
+ * Format cooking time to "x minutes" format
+ * Handles various input formats: "15分钟", "15 min", "15", etc.
+ */
+const formatCookingTime = (cookingTime: string | undefined | null): string => {
+  if (!cookingTime) return '';
+  
+  // Remove "分钟", "min", "minutes" and extract number
+  const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
+  const parsed = parseInt(cleaned, 10);
+  if (!isNaN(parsed)) {
+    return `${parsed} minutes`;
+  }
+  
+  // If no number found, try to extract any number from the string
+  const numberMatch = cookingTime.match(/\d+/);
+  if (numberMatch) {
+    return `${numberMatch[0]} minutes`;
+  }
+  
+  // If it's already in "x minutes" format, return as is
+  if (cookingTime.toLowerCase().includes('minute')) {
+    return cookingTime;
+  }
+  
+  // Fallback: return as is
+  return cookingTime;
+};
+
 const ShareRecipeContent: React.FC<ShareRecipeContentProps> = ({
   width,
   title,
@@ -68,7 +97,7 @@ const ShareRecipeContent: React.FC<ShareRecipeContentProps> = ({
           {cookingTime ? (
             <View style={styles.metaPill}>
               <Text style={styles.metaLabel}>Time</Text>
-              <Text style={styles.metaValue}>{cookingTime}</Text>
+              <Text style={styles.metaValue}>{formatCookingTime(cookingTime)}</Text>
             </View>
           ) : null}
           {servings ? (

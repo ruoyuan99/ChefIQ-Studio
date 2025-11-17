@@ -10,9 +10,10 @@ import {
   Platform,
   Alert,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useBeforeRemove } from '@react-navigation/native';
 import { generateRecipeFromIngredients } from '../services/recipeImportService';
 import { RecipeOption, CookingTimeCategory } from '../types';
 import { showError } from '../utils/errorHandler';
@@ -234,6 +235,83 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
   // Local ref for timeout cleanup
   const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Handle navigation removal (back button, swipe back, etc.)
+  const handleNavigationRemove = React.useCallback((e: any) => {
+    // Prevent default navigation
+    e.preventDefault();
+
+    // Show confirmation dialog
+    Alert.alert(
+      'Cancel Generation?',
+      'Are you sure you want to cancel recipe generation? This action cannot be undone.',
+      [
+        {
+          text: 'Continue Generating',
+          style: 'cancel',
+          onPress: () => {
+            // Do nothing, stay on screen
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'destructive',
+          onPress: () => {
+            // Clean up generation state
+            if (generationTimeoutRef.current) {
+              clearTimeout(generationTimeoutRef.current);
+              generationTimeoutRef.current = null;
+            }
+            isGenerationInProgress = false;
+            activeGenerationKey = null;
+            mountCount = 0;
+            // Navigate back - useBeforeRemove will allow this after we remove the listener
+            navigation.dispatch(e.data.action);
+          },
+        },
+      ]
+    );
+  }, [navigation]);
+
+  // Handle navigation removal (works for both back button and swipe gestures)
+  useBeforeRemove(handleNavigationRemove);
+
+  // Handle Android hardware back button specifically
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        // Show confirmation dialog
+        Alert.alert(
+          'Cancel Generation?',
+          'Are you sure you want to cancel recipe generation? This action cannot be undone.',
+          [
+            {
+              text: 'Continue Generating',
+              style: 'cancel',
+            },
+            {
+              text: 'Cancel',
+              style: 'destructive',
+              onPress: () => {
+                // Clean up generation state
+                if (generationTimeoutRef.current) {
+                  clearTimeout(generationTimeoutRef.current);
+                  generationTimeoutRef.current = null;
+                }
+                isGenerationInProgress = false;
+                activeGenerationKey = null;
+                mountCount = 0;
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+        return true; // Prevent default back behavior
+      });
+
+      return () => backHandler.remove();
+    }
+  }, [navigation]);
+
   // Generate recipes - use useFocusEffect to ensure it only runs when screen is focused
   // and use module-level tracking to prevent duplicate executions even across remounts
   useFocusEffect(
@@ -417,7 +495,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
               ]}
             >
               <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon as any} size={14} color="#d96709" />
+                <Ionicons name={feature.icon as any} size={Platform.OS === 'android' ? 18 : 14} color="#d96709" />
               </View>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -505,11 +583,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 40,
+    marginBottom: Platform.OS === 'android' ? 0 : 40,
     textAlign: 'center',
   },
   cardsScrollView: {
-    marginBottom: 16, // 从 24 减小到 16，删除空白
+    marginBottom: Platform.OS === 'android' ? 0 : 16,
+    height: Platform.OS === 'android' ? 25 : undefined, // Android: 降低为原来的一半（卡片minHeight 50的一半）
   },
   cardsScrollContent: {
     paddingHorizontal: 0,
@@ -517,27 +596,27 @@ const styles = StyleSheet.create({
   featureCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 4, // Reduced to 1/2 of 8
+    padding: Platform.OS === 'android' ? 0 : 4,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0,
-    shadowRadius: Platform.OS === 'ios' ? 4 : 0,
-    elevation: Platform.OS === 'android' ? 3 : 3,
+    shadowColor: '#E0E0E0', // 浅灰色阴影
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: Platform.OS === 'ios' ? 0.6 : 0,
+    shadowRadius: Platform.OS === 'ios' ? 8 : 0,
+    elevation: 0, // Android 不使用 elevation，改用边框
     marginRight: 0,
-    minHeight: 50, // Reduced to 1/2 of 100
+    minHeight: 100,
     justifyContent: 'center',
-    borderWidth: Platform.OS === 'android' ? 0 : 0,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0', // 浅灰色边框
   },
   featureIconContainer: {
-    width: 24, // Reduced to 1/2 of 48
-    height: 24, // Reduced to 1/2 of 48
-    borderRadius: 12, // Reduced to 1/2 of 24
+    width: Platform.OS === 'android' ? 32 : 24, // Android: 增大图标容器
+    height: Platform.OS === 'android' ? 32 : 24, // Android: 增大图标容器
+    borderRadius: Platform.OS === 'android' ? 16 : 12, // Android: 相应调整圆角
     backgroundColor: '#fff5f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4, // Reduced to 1/2 of 8
+    marginBottom: Platform.OS === 'android' ? 0 : 4,
     shadowColor: '#d96709',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0,
@@ -547,18 +626,18 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   featureTitle: {
-    fontSize: 12, // Reduced from 15 to maintain readability
+    fontSize: Platform.OS === 'android' ? 18 : 12, // Android: 再增大 (15 + 3 = 18)
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 2, // Reduced to 1/2 of 4
+    marginBottom: Platform.OS === 'android' ? 0 : 2,
     textAlign: 'center',
     letterSpacing: 0.1,
   },
   featureDescription: {
-    fontSize: 10, // Reduced from 12 to maintain readability
+    fontSize: Platform.OS === 'android' ? 15 : 10, // Android: 再增大 (13 + 2 = 15)
     color: '#666',
     textAlign: 'center',
-    lineHeight: 14, // Reduced from 18 to maintain proportion
+    lineHeight: Platform.OS === 'android' ? 20 : 14, // Android: 相应增加行高 (17 + 3 = 20)
     paddingHorizontal: 0,
   },
   progressContainer: {

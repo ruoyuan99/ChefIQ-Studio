@@ -116,20 +116,36 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   }, []);
 
   // 合并用户创建的公开菜谱、云端public recipes和示例菜谱
+  // 统一来源：示例食谱只从硬编码的 sampleRecipes 数组获取，不从数据库获取
   // 去重：如果本地recipe和云端recipe有相同的ID，优先使用本地版本（可能更新）
   const allPublicRecipes = useMemo(() => {
+    // 本地公开食谱（用户创建的）
     const localPublicRecipes = state.recipes.filter(recipe => recipe.isPublic);
     const localRecipeIds = new Set(localPublicRecipes.map(r => r.id));
     
-    // 过滤掉云端recipes中与本地recipes重复的部分
+    // 云端公开食谱（已过滤掉示例食谱，只包含用户创建的公开食谱）
+    // 过滤掉与本地recipes重复的部分（优先使用本地版本）
     const uniqueCloudRecipes = cloudPublicRecipes.filter(
       cloudRecipe => !localRecipeIds.has(cloudRecipe.id)
     );
     
+    // 创建所有已存在的recipe IDs集合（本地 + 云端）
+    const allExistingIds = new Set([
+      ...localRecipeIds,
+      ...uniqueCloudRecipes.map(r => r.id)
+    ]);
+    
+    // 示例食谱（只从硬编码的 sampleRecipes 数组获取）
+    // 过滤掉与本地或云端recipes重复的部分（如果用户保存了示例食谱，不重复显示）
+    const uniqueSampleRecipes = sampleRecipes.filter(
+      sampleRecipe => !allExistingIds.has(sampleRecipe.id)
+    );
+    
+    // 合并所有来源
     return [
       ...localPublicRecipes,
       ...uniqueCloudRecipes,
-      ...sampleRecipes,
+      ...uniqueSampleRecipes,
     ];
   }, [state.recipes, cloudPublicRecipes]);
 
@@ -401,7 +417,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         activeOpacity={0.9}
       >
         <View style={styles.challengeImageContainer}>
-          <Ionicons name="trophy" size={48} color="#FF6B35" />
+          <OptimizedImage
+            source={require('../../assets/ChefiQChallenge.png')}
+            style={styles.challengeImage}
+            contentFit="cover"
+            showLoader={true}
+            cachePolicy="memory-disk"
+            priority="normal"
+          />
         </View>
         <View style={styles.recipeContent}>
           <View style={styles.recipeHeader}>
@@ -425,6 +448,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
 
   const DEFAULT_HEADER_HEIGHT = (Platform.OS === 'ios' ? 8 : (StatusBar.currentHeight || 24)) + 6 + 8 + 40 + 32;
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [filtersPanelHeight, setFiltersPanelHeight] = useState(0);
 
   return (
     <View style={styles.container}>
@@ -482,112 +506,117 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Filter Panel - Fixed at top */}
+        {showFilters && (
+          <View 
+            style={styles.filtersPanel}
+            onLayout={(event) => setFiltersPanelHeight(event.nativeEvent.layout.height)}
+          >
+            <ScrollView style={styles.filtersScroll} showsVerticalScrollIndicator={false}>
+              {/* 烹饪时间筛选 */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Cooking Time</Text>
+                <View style={styles.filterOptions}>
+                  {['quick', 'medium', 'long'].map((time) => (
+                    <TouchableOpacity
+                      key={time}
+                      style={[
+                        styles.filterOption,
+                        filters.cookingTime === time && styles.filterOptionActive,
+                      ]}
+                      onPress={() => setFilters(prev => ({
+                        ...prev,
+                        cookingTime: prev.cookingTime === time ? null : time,
+                      }))}
+                    >
+                      <Text style={[
+                        styles.filterOptionText,
+                        filters.cookingTime === time && styles.filterOptionTextActive,
+                      ]}>
+                        {time === 'quick' ? '< 30 min' : time === 'medium' ? '30-60 min' : '> 60 min'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* 厨具筛选 */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Cookware</Text>
+                <View style={styles.filterOptions}>
+                  {COOKWARE_OPTIONS.map((ware) => (
+                    <TouchableOpacity
+                      key={ware}
+                      style={[
+                        styles.filterOption,
+                        filters.cookware === ware && styles.filterOptionActive,
+                      ]}
+                      onPress={() => setFilters(prev => ({
+                        ...prev,
+                        cookware: prev.cookware === ware ? null : ware,
+                      }))}
+                    >
+                      <Text style={[
+                        styles.filterOptionText,
+                        filters.cookware === ware && styles.filterOptionTextActive,
+                      ]}>
+                        {ware}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+
+              {/* 标签筛选 */}
+              {availableOptions.tags.length > 0 && (
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Tags</Text>
+                  <View style={styles.filterOptions}>
+                    {availableOptions.tags.slice(0, 10).map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        style={[
+                          styles.filterOption,
+                          filters.selectedTags.includes(tag) && styles.filterOptionActive,
+                        ]}
+                        onPress={() => toggleTag(tag)}
+                      >
+                        <Text style={[
+                          styles.filterOptionText,
+                          filters.selectedTags.includes(tag) && styles.filterOptionTextActive,
+                        ]}>
+                          {tag}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* 清除筛选按钮 */}
+              {hasActiveFilters && (
+                <TouchableOpacity
+                  style={styles.clearFiltersButton}
+                  onPress={clearFilters}
+                >
+                  <Ionicons name="close-circle" size={20} color="#d96709" />
+                  <Text style={styles.clearFiltersText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       <ScrollView 
         style={styles.contentScroll}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: (headerHeight || DEFAULT_HEADER_HEIGHT) + 8 },
+          { paddingTop: (headerHeight || DEFAULT_HEADER_HEIGHT) + (showFilters ? filtersPanelHeight : 0) + 8 },
         ]}
       >
-        {showFilters && (
-        <View style={styles.filtersPanel}>
-          <ScrollView style={styles.filtersScroll} showsVerticalScrollIndicator={false}>
-            {/* 烹饪时间筛选 */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Cooking Time</Text>
-              <View style={styles.filterOptions}>
-                {['quick', 'medium', 'long'].map((time) => (
-                  <TouchableOpacity
-                    key={time}
-                    style={[
-                      styles.filterOption,
-                      filters.cookingTime === time && styles.filterOptionActive,
-                    ]}
-                    onPress={() => setFilters(prev => ({
-                      ...prev,
-                      cookingTime: prev.cookingTime === time ? null : time,
-                    }))}
-                  >
-                    <Text style={[
-                      styles.filterOptionText,
-                      filters.cookingTime === time && styles.filterOptionTextActive,
-                    ]}>
-                      {time === 'quick' ? '< 30 min' : time === 'medium' ? '30-60 min' : '> 60 min'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* 厨具筛选 */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Cookware</Text>
-              <View style={styles.filterOptions}>
-                {COOKWARE_OPTIONS.map((ware) => (
-                  <TouchableOpacity
-                    key={ware}
-                    style={[
-                      styles.filterOption,
-                      filters.cookware === ware && styles.filterOptionActive,
-                    ]}
-                    onPress={() => setFilters(prev => ({
-                      ...prev,
-                      cookware: prev.cookware === ware ? null : ware,
-                    }))}
-                  >
-                    <Text style={[
-                      styles.filterOptionText,
-                      filters.cookware === ware && styles.filterOptionTextActive,
-                    ]}>
-                      {ware}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-
-            {/* 标签筛选 */}
-            {availableOptions.tags.length > 0 && (
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Tags</Text>
-                <View style={styles.filterOptions}>
-                  {availableOptions.tags.slice(0, 10).map((tag) => (
-                    <TouchableOpacity
-                      key={tag}
-                      style={[
-                        styles.filterOption,
-                        filters.selectedTags.includes(tag) && styles.filterOptionActive,
-                      ]}
-                      onPress={() => toggleTag(tag)}
-                    >
-                      <Text style={[
-                        styles.filterOptionText,
-                        filters.selectedTags.includes(tag) && styles.filterOptionTextActive,
-                      ]}>
-                        {tag}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* 清除筛选按钮 */}
-            {hasActiveFilters && (
-              <TouchableOpacity
-                style={styles.clearFiltersButton}
-                onPress={clearFilters}
-              >
-                <Ionicons name="close-circle" size={20} color="#d96709" />
-                <Text style={styles.clearFiltersText}>Clear All Filters</Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
-        </View>
-      )}
 
       {/* 排序选项 Modal */}
       <Modal
@@ -679,22 +708,52 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               </>
             )}
             <View style={styles.recipesGrid}>
-              {filteredRecipes.map((recipe, index) => {
-                // Insert Chef iQ Challenge card at position 4 (index 3)
-                if (index === 3) {
-                  return (
-                    <React.Fragment key={`challenge-${index}`}>
-                      {renderChallengeCard()}
-                      {renderRecipeCard(recipe)}
-                    </React.Fragment>
-                  );
-                }
-                return renderRecipeCard(recipe);
-              })}
-              {/* If there are fewer than 4 recipes, show challenge card after the last recipe (at position 4) */}
-              {filteredRecipes.length > 0 && filteredRecipes.length < 4 && renderChallengeCard()}
-              {/* If there are no recipes, show challenge card first */}
-              {filteredRecipes.length === 0 && renderChallengeCard()}
+              {/* Left column: even indices (0, 2, 4, 6, 8, 10, 12, 14...) */}
+              <View style={styles.recipeColumn}>
+                {filteredRecipes.map((recipe, index) => {
+                  // Left column: even indices (0, 2, 4, 6, 8, 10, 12, 14...)
+                  if (index % 2 === 0) {
+                    // Left column positions: 1st (index 0), 2nd (index 2), 3rd (index 4), 4th (index 6),
+                    // 5th (index 8), 6th (index 10), 7th (index 12), 8th (index 14)...
+                    // Challenge card should be at 8th position (after index 14) if left column has 8+ items
+                    if (index === 14) {
+                      // Check if there are at least 8 items in left column (indices 0, 2, 4, 6, 8, 10, 12, 14)
+                      // This means filteredRecipes.length >= 15 (indices 0-14)
+                      return (
+                        <React.Fragment key={`left-${index}`}>
+                          {renderRecipeCard(recipe)}
+                          {filteredRecipes.length >= 15 && renderChallengeCard()}
+                        </React.Fragment>
+                      );
+                    }
+                    return renderRecipeCard(recipe);
+                  }
+                  return null;
+                })}
+                {/* If there are no recipes, show challenge card first */}
+                {filteredRecipes.length === 0 && renderChallengeCard()}
+              </View>
+              {/* Right column: odd indices (1, 3, 5, 7, 9, 11, 13, 15...) */}
+              <View style={styles.recipeColumn}>
+                {filteredRecipes.map((recipe, index) => {
+                  // Right column: odd indices (1, 3, 5, 7, 9, 11, 13, 15...)
+                  if (index % 2 === 1) {
+                    // Right column positions: 1st (index 1), 2nd (index 3), 3rd (index 5)...
+                    // Challenge card should always be at 2nd position (before index 3)
+                    if (index === 3) {
+                      // Always show challenge card before index 3 (right column 2nd position)
+                      return (
+                        <React.Fragment key={`right-${index}`}>
+                          {renderChallengeCard()}
+                          {renderRecipeCard(recipe)}
+                        </React.Fragment>
+                      );
+                    }
+                    return renderRecipeCard(recipe);
+                  }
+                  return null;
+                })}
+              </View>
             </View>
           </>
         )}
@@ -872,6 +931,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    maxHeight: 300, // Limit max height for scrollable content
   },
   filtersScroll: {
     // 移除 maxHeight，完全展开
@@ -953,11 +1013,15 @@ const styles = StyleSheet.create({
   },
   recipesGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  recipeColumn: {
+    flex: 1,
+    marginHorizontal: 4,
   },
   recipeCardWrapper: {
-    width: '48%',
+    width: '100%',
     marginBottom: 16,
     position: 'relative',
     ...(Platform.OS === 'ios' ? {
@@ -974,6 +1038,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
+    // No fixed height - height will be determined by content
   },
   // Android渐变阴影效果 - 使用多层同心矩形模拟向外扩散的阴影
   cardShadowContainer: {
@@ -1151,6 +1216,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF3E0',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  challengeImage: {
+    width: '100%',
+    height: 120,
+    resizeMode: 'cover',
   },
   challengeDescription: {
     marginTop: 8,

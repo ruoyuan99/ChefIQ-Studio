@@ -221,7 +221,7 @@ const AppNavigator: React.FC = () => {
           options={{
             title: 'Generating Recipes',
             headerShown: false,
-            gestureEnabled: false, // Prevent going back during loading
+            gestureEnabled: true, // Allow swipe back on Android
           }}
         />
         <Stack.Screen
