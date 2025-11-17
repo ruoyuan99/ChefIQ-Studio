@@ -46,41 +46,69 @@ export class RealTimeSyncService {
         instructions: recipe.instructions,
       });
 
-      // Prepare image URL (upload if local path)
-      // Priority: imageUri (new local image) > image_url (existing remote URL) > image (fallback)
-      // This ensures that when user changes image, the new local imageUri is used instead of old image_url
+      // Prepare image URL (upload to Supabase Storage)
+      // Priority: imageUri (new local/remote image) > image_url (existing remote URL) > image (fallback)
+      // For imported recipes from websites, we download and upload the remote image to our own storage
+      // This ensures all images are stored in our database and won't break if the original source is removed
       let imageUrl: string | null = null;
       
-      // Check if there's a new local image (imageUri with local path)
-      const hasNewLocalImage = recipe.imageUri && 
+      // Check if there's a new image (local path or remote URL)
+      const hasNewImage = recipe.imageUri && 
         typeof recipe.imageUri === 'string' && 
-        !recipe.imageUri.startsWith('http://') && 
-        !recipe.imageUri.startsWith('https://');
+        recipe.imageUri.trim() !== '';
       
-      // Priority: new local imageUri > existing image_url > image (fallback)
-      const candidate = hasNewLocalImage 
+      // Priority: new imageUri > existing image_url > image (fallback)
+      const candidate = hasNewImage 
         ? recipe.imageUri 
         : (recipe.image_url || recipe.image);
       
-      if (candidate) {
-        const isRemote = typeof candidate === 'string' && (candidate.startsWith('http://') || candidate.startsWith('https://'));
-        if (isRemote) {
-          imageUrl = candidate as string;
-          console.log('📸 Using existing remote image URL:', imageUrl);
-        } else {
+      if (candidate && typeof candidate === 'string' && candidate.trim() !== '') {
+        const isRemote = candidate.startsWith('http://') || candidate.startsWith('https://');
+        const isLocalPath = !isRemote && (candidate.startsWith('file://') || candidate.startsWith('/'));
+        
+        // For remote URLs (e.g., from website imports), download and upload to our storage
+        // For local paths, upload directly
+        // For existing Supabase URLs, check if they're already in our storage
+        const isOurStorageUrl = candidate.includes('supabase.co/storage');
+        
+        console.log('🖼️ [SYNC] Image processing decision:');
+        console.log('   - Candidate:', candidate);
+        console.log('   - Is remote URL:', isRemote);
+        console.log('   - Is local path:', isLocalPath);
+        console.log('   - Is our storage URL:', isOurStorageUrl);
+        
+        if (isOurStorageUrl) {
+          // Already in our storage, use as-is
+          imageUrl = candidate;
+          console.log('✅ [SYNC] Using existing Supabase Storage URL:', imageUrl);
+        } else if (isRemote || isLocalPath) {
+          // Upload to our storage (will download if remote, upload if local)
           try {
-            console.log('📸 Uploading new recipe image:', candidate);
-            imageUrl = await uploadRecipeImage(candidate as string, userId);
-            console.log('✅ Recipe image uploaded successfully:', imageUrl);
+            console.log('🔄 [SYNC] Starting image upload process...');
+            console.log('   - Source type:', isRemote ? 'Remote URL (will download first)' : 'Local file');
+            const startTime = Date.now();
+            imageUrl = await uploadRecipeImage(candidate, userId);
+            const duration = Date.now() - startTime;
+            console.log('✅ [SYNC] Recipe image uploaded successfully to our storage');
+            console.log('   - New URL:', imageUrl);
+            console.log('   - Upload duration:', duration, 'ms');
           } catch (error) {
-            console.error('❌ Failed to upload recipe image:', error);
+            console.error('❌ [SYNC] Failed to upload recipe image:', error);
             // If upload fails, fall back to existing image_url if available
             imageUrl = recipe.image_url || null;
             if (imageUrl) {
-              console.log('⚠️ Falling back to existing image_url:', imageUrl);
+              console.log('⚠️ [SYNC] Falling back to existing image_url:', imageUrl);
+            } else {
+              console.warn('⚠️ [SYNC] No fallback image URL available');
             }
           }
+        } else {
+          // Unknown format, try to use as-is
+          console.warn('⚠️ [SYNC] Unknown image format, using as-is:', candidate);
+          imageUrl = candidate;
         }
+      } else {
+        console.log('ℹ️ [SYNC] No image candidate found');
       }
       // 检查菜谱是否已存在
       // 优先通过 recipe.id 查找（如果 recipe 有数据库 UUID）

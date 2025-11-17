@@ -128,7 +128,26 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
       onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
     >
       <OptimizedImage
-        source={item.imageUri || item.image_url || undefined}
+        source={(() => {
+          // Priority: imageUri (for imported recipes) > image_url (from database) > image (fallback)
+          // Handle empty strings as null - same logic as RecipeDetailScreen
+          const imageUri = item.imageUri;
+          const imageUrl = item.image_url;
+          const image = item.image;
+          
+          // Return first non-empty value
+          // Priority: imageUri first (matches CreateRecipeScreen and RecipeDetailScreen behavior)
+          if (imageUri && typeof imageUri === 'string' && imageUri.trim() !== '') {
+            return imageUri;
+          }
+          if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+            return imageUrl;
+          }
+          if (image) {
+            return image;
+          }
+          return null;
+        })()}
         style={styles.recipeImage}
         contentFit="cover"
         showLoader={true}

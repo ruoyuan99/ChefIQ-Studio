@@ -456,7 +456,24 @@ const GenerateRecipeResultsScreen: React.FC<GenerateRecipeResultsScreenProps> = 
                 onPress={() => handleSelectRecipe(recipe)}
               >
                 <OptimizedImage
-                  source={(recipe.imageUri || recipe.image_url) as string}
+                  source={(() => {
+                    // Priority: imageUri (for imported recipes) > image_url (from database) > image (fallback)
+                    // Handle empty strings as null
+                    const imageUri = recipe.imageUri;
+                    const imageUrl = recipe.image_url;
+                    const image = recipe.image;
+                    
+                    if (imageUri && typeof imageUri === 'string' && imageUri.trim() !== '') {
+                      return imageUri;
+                    }
+                    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+                      return imageUrl;
+                    }
+                    if (image) {
+                      return image;
+                    }
+                    return null;
+                  })()}
                   style={styles.relatedRecipeImage}
                   contentFit="cover"
                   showLoader={true}

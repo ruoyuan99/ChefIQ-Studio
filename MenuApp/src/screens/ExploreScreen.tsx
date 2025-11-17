@@ -330,7 +330,25 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       >
       <View style={styles.recipeImageContainer}>
         <OptimizedImage
-          source={recipe.image_url || recipe.imageUri || recipe.image}
+          source={(() => {
+            // Priority: imageUri (for imported recipes) > image_url (from database) > image (fallback)
+            // Handle empty strings as null - same logic as RecipeDetailScreen
+            const imageUri = recipe.imageUri;
+            const imageUrl = recipe.image_url;
+            const image = recipe.image;
+            
+            // Return first non-empty value
+            if (imageUri && typeof imageUri === 'string' && imageUri.trim() !== '') {
+              return imageUri;
+            }
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+              return imageUrl;
+            }
+            if (image) {
+              return image;
+            }
+            return null;
+          })()}
           style={styles.recipeImage}
           contentFit="cover"
           showLoader={true}

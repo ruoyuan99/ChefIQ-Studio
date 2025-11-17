@@ -205,7 +205,24 @@ const ShareRecipeScreen: React.FC<ShareRecipeScreenProps> = ({
             <ShareRecipeContent
               width={Math.round(screenWidth * 0.95)}
               title={recipe.title}
-              imageUri={recipe.image_url || recipe.imageUri}
+              imageUri={(() => {
+                // Priority: imageUri (for imported recipes) > image_url (from database) > image (fallback)
+                // Handle empty strings as null
+                const imageUri = recipe.imageUri;
+                const imageUrl = recipe.image_url;
+                const image = recipe.image;
+                
+                if (imageUri && typeof imageUri === 'string' && imageUri.trim() !== '') {
+                  return imageUri;
+                }
+                if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+                  return imageUrl;
+                }
+                if (image) {
+                  return image;
+                }
+                return null;
+              })()}
               cookingTime={recipe.cookingTime}
               servings={recipe.servings}
               authorName={recipe.authorName}
