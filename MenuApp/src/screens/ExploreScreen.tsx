@@ -9,6 +9,7 @@ import {
   StatusBar,
   Platform,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getFontWeight } from '../styles/theme';
@@ -81,7 +82,7 @@ const formatCookingTimeMinutes = (cookingTime: string | number | undefined | nul
 };
 
 const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
-  const { state } = useRecipe();
+  const { state, reloadRecipes } = useRecipe();
   const { getTriedCount } = useTried();
   const { getStats } = useSocialStats();
   const likeContext = useLike();
@@ -94,6 +95,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const [showSortOptions, setShowSortOptions] = useState(false);
   const [sortBy, setSortBy] = useState<'relevance' | 'popular' | 'newest' | 'oldest' | 'title' | 'recommend'>('relevance');
   const [cloudPublicRecipes, setCloudPublicRecipes] = useState<Recipe[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   
   const [filters, setFilters] = useState<FilterState>({
     cookingTime: null,
@@ -114,6 +116,26 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
 
     fetchPublicRecipes();
   }, []);
+
+  // Refresh handler for pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Reload both user's recipes and public recipes in parallel
+      await Promise.all([
+        reloadRecipes(),
+        (async () => {
+          const publicRecipes = await CloudRecipeService.fetchPublicRecipes();
+          setCloudPublicRecipes(publicRecipes);
+        })()
+      ]);
+      console.log('✅ Refresh completed successfully');
+    } catch (error) {
+      console.error('Failed to refresh recipes:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Merge user-created public recipes, cloud public recipes, and sample recipes
   // Unified source: Sample recipes only from hardcoded sampleRecipes array, not from database
@@ -629,11 +651,23 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       </View>
 
       <ScrollView 
-        style={styles.contentScroll}
+        style={[
+          styles.contentScroll,
+          { marginTop: (headerHeight || DEFAULT_HEADER_HEIGHT) + (showFilters ? filtersPanelHeight : 0) }
+        ]}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: (headerHeight || DEFAULT_HEADER_HEIGHT) + (showFilters ? filtersPanelHeight : 0) + 8 },
+          { paddingTop: 8 },
         ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#d96709']}
+            tintColor="#d96709"
+            progressBackgroundColor="#ffffff"
+          />
+        }
       >
 
       {/* Sort options Modal */}

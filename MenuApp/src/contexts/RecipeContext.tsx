@@ -90,11 +90,12 @@ const recipeReducer = (state: RecipeState, action: RecipeAction): RecipeState =>
 
 interface RecipeContextType {
   state: RecipeState;
-  addRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => Recipe;
+  addRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Recipe>;
   updateRecipe: (recipe: Recipe) => Promise<Recipe | null>;
   deleteRecipe: (recipeId: string) => void;
   setCurrentRecipe: (recipe: Recipe | null) => void;
   getRecipeById: (recipeId: string) => Recipe | undefined;
+  reloadRecipes: () => Promise<void>;
 }
 
 const RecipeContext = createContext<RecipeContextType | undefined>(undefined);
@@ -363,6 +364,19 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return state.recipes.find(recipe => recipe.id === recipeId);
   };
 
+  const reloadRecipes = async () => {
+    if (user?.id) {
+      try {
+        console.log('🔄 Reloading recipes from cloud...');
+        const cloudRecipes = await CloudRecipeService.fetchUserRecipes(user.id);
+        console.log('☁️ Reloaded recipes from cloud:', cloudRecipes.length);
+        dispatch({ type: 'SET_RECIPES', payload: cloudRecipes });
+      } catch (error) {
+        console.error('❌ Failed to reload recipes:', error);
+      }
+    }
+  };
+
   const value: RecipeContextType = {
     state,
     addRecipe,
@@ -370,6 +384,7 @@ export const RecipeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     deleteRecipe,
     setCurrentRecipe,
     getRecipeById,
+    reloadRecipes,
   };
 
   return <RecipeContext.Provider value={value}>{children}</RecipeContext.Provider>;

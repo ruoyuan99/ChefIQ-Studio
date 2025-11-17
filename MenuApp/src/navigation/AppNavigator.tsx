@@ -91,7 +91,7 @@ const AppNavigator: React.FC = () => {
               <TouchableOpacity
                 onPress={() => {
                   // Navigate to Home with More (profile) tab active
-                  navigation.navigate('Home', { initialTab: 'profile' });
+                  navigation.popTo('Home', { initialTab: 'profile' });
                 }}
                 style={{ marginLeft: Platform.OS === 'ios' ? 0 : 16, padding: 8 }}
               >
@@ -221,7 +221,7 @@ const AppNavigator: React.FC = () => {
           options={{
             title: 'Generating Recipes',
             headerShown: false,
-            gestureEnabled: true, // Allow swipe back on Android
+            gestureEnabled: false, // Disable swipe back - force user to stay during generation
           }}
         />
         <Stack.Screen
