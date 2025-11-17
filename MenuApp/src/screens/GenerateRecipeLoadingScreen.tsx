@@ -13,7 +13,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useBeforeRemove } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { generateRecipeFromIngredients } from '../services/recipeImportService';
 import { RecipeOption, CookingTimeCategory } from '../types';
 import { showError } from '../utils/errorHandler';
@@ -148,6 +148,16 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
     return () => rotateAnimation.stop();
   }, [rotateAnim]);
 
+  // Ensure first card is centered on initial load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ x: 20, animated: false });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-scroll through feature introductions
   useEffect(() => {
     const scrollToNext = () => {
@@ -156,7 +166,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
       }
 
       const nextIndex = (currentFeatureIndex + 1) % FEATURE_INTRODUCTIONS.length;
-      const cardWidth = SCREEN_WIDTH - 80;
+      const cardWidth = SCREEN_WIDTH;
       const targetX = nextIndex * cardWidth;
       
       console.log(`🔄 Auto-scrolling to card ${nextIndex}, targetX: ${targetX}, currentIndex: ${currentFeatureIndex}`);
@@ -187,7 +197,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
 
   // Handle manual scroll - use onMomentumScrollEnd for more accurate index detection
   const handleScroll = (event: any) => {
-    const cardWidth = SCREEN_WIDTH - 80;
+    const cardWidth = SCREEN_WIDTH;
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / cardWidth);
     
@@ -210,7 +220,7 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
 
   // Handle scroll end to ensure index is correctly updated
   const handleMomentumScrollEnd = (event: any) => {
-    const cardWidth = SCREEN_WIDTH - 80;
+    const cardWidth = SCREEN_WIDTH;
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / cardWidth);
     
@@ -234,83 +244,43 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
 
   // Local ref for timeout cleanup
   const generationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Flag to allow navigation when generation is complete
+  const allowNavigationRef = useRef(false);
 
   // Handle navigation removal (back button, swipe back, etc.)
   const handleNavigationRemove = React.useCallback((e: any) => {
-    // Prevent default navigation
+    // Allow navigation if generation is complete
+    if (allowNavigationRef.current || !isGenerationInProgress) {
+      return;
+    }
+    
+    // Prevent navigation completely - force user to stay on page
     e.preventDefault();
-
-    // Show confirmation dialog
-    Alert.alert(
-      'Cancel Generation?',
-      'Are you sure you want to cancel recipe generation? This action cannot be undone.',
-      [
-        {
-          text: 'Continue Generating',
-          style: 'cancel',
-          onPress: () => {
-            // Do nothing, stay on screen
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'destructive',
-          onPress: () => {
-            // Clean up generation state
-            if (generationTimeoutRef.current) {
-              clearTimeout(generationTimeoutRef.current);
-              generationTimeoutRef.current = null;
-            }
-            isGenerationInProgress = false;
-            activeGenerationKey = null;
-            mountCount = 0;
-            // Navigate back - useBeforeRemove will allow this after we remove the listener
-            navigation.dispatch(e.data.action);
-          },
-        },
-      ]
-    );
-  }, [navigation]);
+  }, []);
 
   // Handle navigation removal (works for both back button and swipe gestures)
-  useBeforeRemove(handleNavigationRemove);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', handleNavigationRemove);
+    return unsubscribe;
+  }, [navigation, handleNavigationRemove]);
 
   // Handle Android hardware back button specifically
   useEffect(() => {
     if (Platform.OS === 'android') {
       const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        // Show confirmation dialog
-        Alert.alert(
-          'Cancel Generation?',
-          'Are you sure you want to cancel recipe generation? This action cannot be undone.',
-          [
-            {
-              text: 'Continue Generating',
-              style: 'cancel',
-            },
-            {
-              text: 'Cancel',
-              style: 'destructive',
-              onPress: () => {
-                // Clean up generation state
-                if (generationTimeoutRef.current) {
-                  clearTimeout(generationTimeoutRef.current);
-                  generationTimeoutRef.current = null;
-                }
-                isGenerationInProgress = false;
-                activeGenerationKey = null;
-                mountCount = 0;
-                navigation.goBack();
-              },
-            },
-          ]
-        );
+        // Allow back if generation is complete
+        if (allowNavigationRef.current || !isGenerationInProgress) {
+          return false; // Allow default back behavior
+        }
+        
+        // Prevent back navigation completely - force user to stay on page
         return true; // Prevent default back behavior
       });
 
       return () => backHandler.remove();
     }
-  }, [navigation]);
+  }, []);
 
   // Generate recipes - use useFocusEffect to ensure it only runs when screen is focused
   // and use module-level tracking to prevent duplicate executions even across remounts
@@ -382,6 +352,9 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
           // Reset mount count for next generation
           mountCount = 0;
           
+          // Allow navigation without showing alert
+          allowNavigationRef.current = true;
+          
           // Navigate to results screen
           navigation.replace('GenerateRecipeResults', {
             recipeOptions,
@@ -401,6 +374,9 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
           activeGenerationKey = null;
           // Reset mount count for next generation
           mountCount = 0;
+          
+          // Allow navigation without showing alert
+          allowNavigationRef.current = true;
           
           // Navigate back to generate screen
           navigation.goBack();
@@ -482,8 +458,8 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
           scrollEventThrottle={16}
           style={styles.cardsScrollView}
           contentContainerStyle={styles.cardsScrollContent}
-          snapToInterval={SCREEN_WIDTH - 80}
-          snapToAlignment="start"
+          snapToInterval={SCREEN_WIDTH}
+          snapToAlignment="center"
           decelerationRate="fast"
         >
           {FEATURE_INTRODUCTIONS.map((feature, index) => (
@@ -491,11 +467,11 @@ const GenerateRecipeLoadingScreen: React.FC<GenerateRecipeLoadingScreenProps> = 
               key={index}
               style={[
                 styles.featureCard,
-                { width: SCREEN_WIDTH - 80 },
+                { width: SCREEN_WIDTH - 64 },
               ]}
             >
               <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon as any} size={Platform.OS === 'android' ? 18 : 14} color="#d96709" />
+                <Ionicons name={feature.icon as any} size={32} color="#d96709" />
               </View>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -535,17 +511,17 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20,
+    paddingTop: 70,
   },
   loadingContainer: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 24,
     position: 'relative',
   },
   loadingCircle: {
@@ -564,111 +540,110 @@ const styles = StyleSheet.create({
   },
   outerRing: {
     position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
     borderColor: '#d96709',
     borderTopColor: 'transparent',
     borderRightColor: 'transparent',
     opacity: 0.5,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    marginBottom: Platform.OS === 'android' ? 0 : 40,
+    marginBottom: 16,
     textAlign: 'center',
   },
   cardsScrollView: {
-    marginBottom: Platform.OS === 'android' ? 0 : 16,
-    height: Platform.OS === 'android' ? 25 : undefined, // Android: 降低为原来的一半（卡片minHeight 50的一半）
+    marginBottom: 16,
+    marginTop: 8,
   },
   cardsScrollContent: {
-    paddingHorizontal: 0,
+    alignItems: 'center',
   },
   featureCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: Platform.OS === 'android' ? 0 : 4,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 32,
+    marginHorizontal: 32,
     alignItems: 'center',
-    shadowColor: '#E0E0E0', // 浅灰色阴影
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: Platform.OS === 'ios' ? 0.6 : 0,
-    shadowRadius: Platform.OS === 'ios' ? 8 : 0,
-    elevation: 0, // Android 不使用 elevation，改用边框
-    marginRight: 0,
-    minHeight: 100,
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0', // 浅灰色边框
+    minHeight: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   featureIconContainer: {
-    width: Platform.OS === 'android' ? 32 : 24, // Android: 增大图标容器
-    height: Platform.OS === 'android' ? 32 : 24, // Android: 增大图标容器
-    borderRadius: Platform.OS === 'android' ? 16 : 12, // Android: 相应调整圆角
-    backgroundColor: '#fff5f0',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF3E0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Platform.OS === 'android' ? 0 : 4,
+    marginBottom: 20,
     shadowColor: '#d96709',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0,
-    shadowRadius: Platform.OS === 'ios' ? 2 : 0,
-    elevation: Platform.OS === 'android' ? 2 : 0,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   featureTitle: {
-    fontSize: Platform.OS === 'android' ? 18 : 12, // Android: 再增大 (15 + 3 = 18)
+    fontSize: 18,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: Platform.OS === 'android' ? 0 : 2,
+    marginBottom: 12,
     textAlign: 'center',
-    letterSpacing: 0.1,
+    letterSpacing: 0.3,
   },
   featureDescription: {
-    fontSize: Platform.OS === 'android' ? 15 : 10, // Android: 再增大 (13 + 2 = 15)
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    lineHeight: Platform.OS === 'android' ? 20 : 14, // Android: 相应增加行高 (17 + 3 = 20)
-    paddingHorizontal: 0,
+    lineHeight: 22,
+    paddingHorizontal: 8,
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   progressDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ddd',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#e0e0e0',
     marginHorizontal: 4,
   },
   progressDotActive: {
     backgroundColor: '#d96709',
-    width: 24,
+    width: 20,
+    borderRadius: 3,
   },
   bottomInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    paddingTop: 20,
+    paddingHorizontal: 32,
+    paddingBottom: 24,
+    paddingTop: 16,
   },
   bottomInfoText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
-    marginLeft: 8,
+    marginLeft: 6,
     textAlign: 'center',
     flex: 1,
   },

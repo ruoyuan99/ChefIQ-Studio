@@ -2260,13 +2260,17 @@ const handleIngredientTagPress = (ingredientName: string) => {
                     >
                       {Platform.OS === 'android' ? (
                         <ScrollView
-                          nestedScrollEnabled={true}
+                          nestedScrollEnabled={false}
                           showsVerticalScrollIndicator={true}
                           scrollEnabled={true}
                           bounces={false}
-                          style={{ maxHeight: 300 }}
+                          overScrollMode="never"
+                          style={{ maxHeight: 250 }}
                           contentContainerStyle={{ flexGrow: 0 }}
                           keyboardShouldPersistTaps="handled"
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
                         >
                           {UNIT_OPTIONS.map((unit) => (
                             <TouchableOpacity
@@ -2287,7 +2291,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                           showsVerticalScrollIndicator={true}
                           scrollEnabled={true}
                           bounces={false}
-                          style={{ maxHeight: 300 }}
+                          style={{ maxHeight: 250 }}
                           contentContainerStyle={{ paddingBottom: 0 }}
                           keyboardShouldPersistTaps="handled"
                         >
