@@ -39,7 +39,7 @@ const RecipeListScreen: React.FC<RecipeListScreenProps> = ({ navigation }) => {
     // Always navigate to Home screen with More (profile) tab active
     // This ensures the bottom navigation bar is visible
     // Use navigate instead of reset to avoid clearing the entire stack
-    navigation.navigate('Home', { initialTab: 'profile' });
+    navigation.popTo('Home', { initialTab: 'profile' });
 
     // Reset flag after a short delay
     setTimeout(() => {
