@@ -12,15 +12,15 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
   const { checkBadgeUnlock, getBadgeById } = useBadges();
   const { user } = useAuth();
   const { level, pointsToNextLevel, totalPoints } = getLevelInfo();
-  // 使用 useMemo 确保 history 能正确响应 state.activities 的变化
+  // Use useMemo to ensure history correctly responds to state.activities changes
   const history = useMemo(() => getPointsHistory(), [state.activities]);
-  // 获取今天的日期键（格式：YYYY-M-D），使用 state 确保跨天时更新
+  // Get today's date key (format: YYYY-M-D), use state to ensure update when crossing days
   const [todayKey, setTodayKey] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
   });
   
-  // 每分钟检查一次日期是否变化（用于跨天检测）
+  // Check date change every minute (for cross-day detection)
   useEffect(() => {
     const checkDate = () => {
       const d = new Date();
@@ -30,10 +30,10 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
       }
     };
     
-    // 立即检查一次
+    // Check immediately once
     checkDate();
     
-    // 每分钟检查一次
+    // Check every minute
     const interval = setInterval(checkDate, 60000);
     return () => clearInterval(interval);
   }, [todayKey]);
@@ -48,15 +48,15 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
   const likedToday = useMemo(() => isTodayActivity('like_recipe'), [history, todayKey]);
   const triedToday = useMemo(() => isTodayActivity('try_recipe'), [history, todayKey]);
   
-  // 根据数据库 points 信息判断当天是否已签到
-  // checkinActive = true 表示已签到（激活状态，不可点击）
-  // checkinActive = false 表示未签到（未激活状态，可点击）
+  // Determine if checked in today based on database points information
+  // checkinActive = true means already checked in (active state, not clickable)
+  // checkinActive = false means not checked in (inactive state, clickable)
   const [checkinActive, setCheckinActive] = useState<boolean>(false);
   
   useEffect(() => {
-    // 根据 points history 判断今天是否已签到
-    // 如果 checkedInToday 为 true，说明今天已经签到过，按钮应该是激活状态（不可点击）
-    // 如果 checkedInToday 为 false，说明今天还没签到，按钮应该是未激活状态（可点击）
+    // Determine if checked in today based on points history
+    // If checkedInToday is true, it means already checked in today, button should be active state (not clickable)
+    // If checkedInToday is false, it means not checked in yet today, button should be inactive state (clickable)
     setCheckinActive(checkedInToday);
   }, [checkedInToday, history, todayKey]);
 
@@ -250,19 +250,19 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
             style={styles.bubbleContent}
             disabled={checkinActive}
             onPress={async () => {
-              // 如果已经激活（已签到），不允许再次点击
+              // If already active (checked in), don't allow clicking again
               if (checkinActive) {
                 Alert.alert('Already Checked In', 'You have already checked in today.');
                 return;
               }
               
-              // 检查是否已经登录
+              // Check if already logged in
               if (!user?.id) {
                 Alert.alert('Login Required', 'Please log in to check in.');
                 return;
               }
 
-              // 再次检查是否已经签到过（防止重复点击）
+              // Check again if already checked in (prevent duplicate clicks)
               if (checkedInToday) {
                 setCheckinActive(true);
                 Alert.alert('Already Checked In', 'You have already checked in today.');
@@ -270,12 +270,12 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
               }
 
               try {
-                // 执行签到，添加积分
+                // Perform check-in, add points
                 await addPoints('daily_checkin', 'Daily Check-in');
-                // 更新按钮状态为已激活（已签到）
+                // Update button state to active (checked in)
                 setCheckinActive(true);
                 
-                // 检查徽章解锁
+                // Check badge unlock
                 const unlocked = await checkBadgeUnlock('first_checkin');
                 if (unlocked) {
                   const badge = getBadgeById('first_checkin');
@@ -287,12 +287,12 @@ const PointsDisplay: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
                     );
                   }
                 }
-                // 检查连续签到徽章
+                // Check consecutive check-in badges
                 await checkBadgeUnlock('checkin_streak_7');
                 await checkBadgeUnlock('checkin_streak_30');
               } catch (e) {
                 console.error('Error during check-in:', e);
-                // 如果是重复签到错误，显示特定消息
+                // If duplicate check-in error, show specific message
                 if (e instanceof Error && e.message === 'You have already checked in today.') {
                   Alert.alert('Already Checked In', 'You have already checked in today.');
                   setCheckinActive(true);
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#DA6809',
     borderRadius: 0,
-    paddingVertical: 18, // 适中的垂直padding
+    paddingVertical: 18, // Moderate vertical padding
     paddingHorizontal: 24,
     overflow: 'hidden',
   },
@@ -377,35 +377,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   circleOuter: {
-    marginTop: 14, // 适中的顶部间距
+    marginTop: 14, // Moderate top spacing
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 215, // 适中的最小高度
+    minHeight: 215, // Moderate minimum height
   },
   // Layered glow rings (no extra deps)
   circleGlowOuter: {
     position: 'absolute',
-    width: 200, // 适中的尺寸
+    width: 200, // Moderate size
     height: 200,
     borderRadius: 100,
     backgroundColor: 'rgba(255,255,255,0.14)',
   },
   circleGlowMid: {
     position: 'absolute',
-    width: 185, // 适中的尺寸
+    width: 185, // Moderate size
     height: 185,
     borderRadius: 92.5,
     backgroundColor: 'rgba(255,255,255,0.24)',
   },
   circleGlowInner: {
     position: 'absolute',
-    width: 170, // 适中的尺寸
+    width: 170, // Moderate size
     height: 170,
     borderRadius: 85,
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   circleInner: {
-    width: 155, // 适中的尺寸
+    width: 155, // Moderate size
     height: 155,
     borderRadius: 77.5,
     backgroundColor: 'rgba(255,255,255,0.22)',
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14, // 适中的内部padding
+    padding: 14, // Moderate internal padding
   },
   bubble: {
     position: 'absolute',
@@ -481,24 +481,24 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
   },
   circlePoints: {
-    marginTop: 5, // 适中的顶部间距
-    fontSize: 29, // 适中的字体大小
+    marginTop: 5, // Moderate top spacing
+    fontSize: 29, // Moderate font size
     fontWeight: '700',
     color: '#FFFFFF',
   },
   circleLevel: {
-    marginTop: 8, // 适中的顶部间距
+    marginTop: 8, // Moderate top spacing
     fontSize: 11,
     color: 'rgba(255,255,255,0.95)',
     fontWeight: '700',
   },
   footerRow: {
-    marginTop: 18, // 适中的顶部间距
+    marginTop: 18, // Moderate top spacing
   },
   progressLabel: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.95)',
-    marginBottom: 7, // 适中的底部间距
+    marginBottom: 7, // Moderate bottom spacing
   },
   progressBar: {
     height: 6,

@@ -43,17 +43,17 @@ export const POINTS_RULES = {
   complete_profile: 25,
   add_comment: 8,
   daily_checkin: 15,
-  complete_survey: 10, // 完成烹饪后Survey (5-10分，取上限10分以提升填写率)
-  recipe_liked_by_others: 1, // 被点赞 (每日上限10分)
-  recipe_favorited_by_others: 2, // 被收藏 (每日上限10分)
-  recipe_tried_by_others: 3, // 被尝试 (每日上限10分)
+  complete_survey: 10, // Complete survey after cooking (5-10 points, using max 10 points to improve completion rate)
+  recipe_liked_by_others: 1, // Recipe liked by others (daily limit: 10 points)
+  recipe_favorited_by_others: 2, // Recipe favorited by others (daily limit: 10 points)
+  recipe_tried_by_others: 3, // Recipe tried by others (daily limit: 10 points)
 };
 
 // Daily limits for creator rewards
 export const DAILY_LIMITS = {
-  recipe_liked_by_others: 10, // 每日最多10次被点赞 = 10分
-  recipe_favorited_by_others: 5, // 每日最多5次被收藏 = 10分
-  recipe_tried_by_others: 3, // 每日最多3次被尝试 = 9分 (接近10分)
+  recipe_liked_by_others: 10, // Max 10 likes per day = 10 points
+  recipe_favorited_by_others: 5, // Max 5 favorites per day = 10 points
+  recipe_tried_by_others: 3, // Max 3 tries per day = 9 points (close to 10 points)
 };
 
 // Level system
@@ -214,7 +214,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const storedPoints = await AsyncStorage.getItem('userPoints');
         if (storedPoints) {
           const { totalPoints, activities } = JSON.parse(storedPoints);
-          // 转换日期字符串为Date对象
+          // Convert date strings to Date objects
           const parsedActivities = activities.map((activity: any) => ({
             ...activity,
             timestamp: new Date(activity.timestamp),
@@ -233,12 +233,12 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [user?.id]);
 
-  // 保存积分数据到AsyncStorage和Supabase
+  // Save points data to AsyncStorage and Supabase
   useEffect(() => {
     const savePoints = async () => {
-      // 保存到 AsyncStorage
+      // Save to AsyncStorage
       try {
-        // 转换Date对象为字符串，以便JSON序列化
+        // Convert Date objects to strings for JSON serialization
         const activitiesToSave = state.activities.map(activity => ({
           ...activity,
           timestamp: activity.timestamp.toISOString(),
@@ -251,10 +251,10 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         console.error('Failed to save points to storage', error);
       }
 
-      // 同步到 Supabase（如果用户已登录）
+      // Sync to Supabase (if user is logged in)
       if (user?.id && state.activities.length > 0) {
         try {
-          // 更新 users 表的积分总数
+          // Update total points in users table
           const { error: updateError } = await supabase
             .from('users')
             .update({ 
@@ -264,33 +264,33 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             .eq('id', user.id);
 
           if (updateError) {
-            // 如果字段不存在，这是正常的，只记录日志
+            // If field doesn't exist, this is normal, just log
             console.log('total_points field may not exist in users table:', updateError.message);
           }
 
-          // 获取数据库中已有的活动（用于去重）
-          // 由于数据库中的 ID 是 UUID，而本地 ID 是时间戳，我们通过 type + description + created_at 匹配
+          // Get existing activities from database (for deduplication)
+          // Since database IDs are UUIDs and local IDs are timestamps, we match by type + description + created_at
           const { data: existingPoints } = await supabase
             .from('user_points')
             .select('activity_type, description, created_at, points')
             .eq('user_id', user.id);
 
-          // 创建已存在活动的标识（使用 type + description + timestamp 的组合）
-          // 时间戳匹配允许 1 秒的误差（因为可能存在毫秒级差异）
+          // Create identifiers for existing activities (using combination of type + description + timestamp)
+          // Timestamp matching allows 1 second error (due to possible millisecond differences)
           const existingKeys = new Set<string>();
           if (existingPoints) {
             existingPoints.forEach((point: any) => {
               const timestamp = new Date(point.created_at).getTime();
-              // 使用秒级精度匹配（允许 1 秒误差）
+              // Use second-level precision matching (allow 1 second error)
               const timestampKey = Math.floor(timestamp / 1000);
               const key = `${point.activity_type}_${point.description}_${timestampKey}`;
               existingKeys.add(key);
             });
           }
 
-          // 同步所有未同步的积分活动到 user_points 表
+          // Sync all unsynced points activities to user_points table
           const activitiesToSync = state.activities.filter(activity => {
-            // 检查这个活动是否已经在数据库中
+            // Check if this activity already exists in database
             const timestamp = activity.timestamp.getTime();
             const timestampKey = Math.floor(timestamp / 1000);
             const key = `${activity.type}_${activity.description}_${timestampKey}`;
@@ -366,7 +366,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (success) {
               console.log(`✅ Synced ${pointsToInsert.length} activities to database`);
               
-              // 验证数据已成功保存到数据库后，清除所有 AsyncStorage 中的积分数据
+              // After verifying data is successfully saved to database, clear all points data in AsyncStorage
               setTimeout(async () => {
                 try {
                   const { count } = await supabase
@@ -374,7 +374,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                     .select('*', { count: 'exact', head: true })
                     .eq('user_id', user.id);
 
-                  // 如果数据库中有数据，说明同步成功，清除所有本地 AsyncStorage 中的积分数据
+                  // If there is data in database, sync was successful, clear all points data in local AsyncStorage
                   if (count !== null && count > 0) {
                     await AsyncStorage.removeItem('userPoints');
                     console.log('✅ Cleared all userPoints from AsyncStorage after successful sync');
@@ -382,10 +382,10 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 } catch (error) {
                   console.error('Error verifying sync and clearing AsyncStorage:', error);
                 }
-              }, 1000); // 延迟 1 秒确保数据库已更新
+              }, 1000); // Delay 1 second to ensure database is updated
             }
           } else {
-            // 如果所有活动都已同步（activitiesToSync.length === 0），验证后清除所有 AsyncStorage
+            // If all activities are synced (activitiesToSync.length === 0), verify then clear all AsyncStorage
             setTimeout(async () => {
               try {
                 const { count } = await supabase
@@ -393,7 +393,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                   .select('*', { count: 'exact', head: true })
                   .eq('user_id', user.id);
 
-                // 如果数据库中有数据，清除所有本地 AsyncStorage 中的积分数据
+                // If there is data in database, clear all points data in local AsyncStorage
                 if (count !== null && count > 0) {
                   await AsyncStorage.removeItem('userPoints');
                   console.log('✅ Cleared all userPoints from AsyncStorage (all activities already synced)');
@@ -414,7 +414,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const addPoints = async (type: keyof typeof POINTS_RULES, description: string, recipeId?: string) => {
     const points = POINTS_RULES[type];
     
-    // 检查每日上限（针对被点赞/收藏/尝试）
+    // Check daily limits (for being liked/favorited/tried)
     const creatorRewardTypes: Array<'recipe_liked_by_others' | 'recipe_favorited_by_others' | 'recipe_tried_by_others'> = 
       ['recipe_liked_by_others', 'recipe_favorited_by_others', 'recipe_tried_by_others'];
     
@@ -425,7 +425,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const todayEnd = new Date(todayStart);
         todayEnd.setDate(todayEnd.getDate() + 1);
         
-        // 检查今天已经获得的该类型积分次数
+        // Check how many times this type of points has been earned today
         const { data: todayActivities, error: checkError } = await supabase
           .from('user_points')
           .select('id')
@@ -436,24 +436,24 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         
         if (checkError) {
           console.error('Error checking daily limit:', checkError);
-          // 不阻止，继续执行
+          // Don't block, continue execution
         } else {
           const todayCount = todayActivities?.length || 0;
           const dailyLimit = DAILY_LIMITS[type as keyof typeof DAILY_LIMITS];
           
           if (todayCount >= dailyLimit) {
-            // 已达到每日上限，不添加积分
+            // Daily limit reached, don't add points
             console.log(`Daily limit reached for ${type}: ${todayCount}/${dailyLimit}`);
             return;
           }
         }
       } catch (error) {
         console.error('Error checking daily limit:', error);
-        // 不阻止，继续执行
+        // Don't block, continue execution
       }
     }
     
-    // 如果是 daily_checkin，先检查数据库中今天是否已经签到过
+    // If it's daily_checkin, first check if already checked in today in database
     if (type === 'daily_checkin' && user?.id) {
       try {
         const today = new Date();
@@ -461,7 +461,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const todayEnd = new Date(todayStart);
         todayEnd.setDate(todayEnd.getDate() + 1);
         
-        // 检查数据库中今天是否已经有 daily_checkin 记录
+        // Check if there's already a daily_checkin record today in database
         const { data: existingCheckin, error: checkError } = await supabase
           .from('user_points')
           .select('id')
@@ -477,15 +477,15 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
 
         if (existingCheckin && existingCheckin.length > 0) {
-          // 今天已经签到过了，不允许重复签到
+          // Already checked in today, don't allow duplicate check-in
           throw new Error('You have already checked in today.');
         }
       } catch (error) {
-        // 如果是重复签到错误，直接抛出
+        // If it's a duplicate check-in error, throw directly
         if (error instanceof Error && error.message === 'You have already checked in today.') {
           throw error;
         }
-        // 其他错误也抛出
+        // Throw other errors as well
         throw error;
       }
     }
@@ -498,18 +498,18 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       timestamp: new Date(),
       recipeId,
     };
-    // 更新本地状态
+    // Update local state
     dispatch({ type: 'ADD_POINTS', payload: activity });
 
-    // 立即同步到 Supabase（如果用户已登录）
-    // 注意：这里使用 state.totalPoints + points 来计算新的总数
-    // 因为 dispatch 是异步的，我们需要手动计算
+    // Immediately sync to Supabase (if user is logged in)
+    // Note: Here we use state.totalPoints + points to calculate new total
+    // Because dispatch is async, we need to manually calculate
     if (user?.id) {
       try {
-        // 获取当前积分总数并计算新的总数
+        // Get current total points and calculate new total
         const newTotalPoints = state.totalPoints + points;
         
-        // 更新 users 表的积分总数
+        // Update total points in users table
         const { error: updateError } = await supabase
           .from('users')
           .update({ 
@@ -522,8 +522,8 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.log('Failed to update total_points:', updateError.message);
         }
 
-        // 立即添加新的积分活动到 user_points 表
-        // 这样可以确保新活动立即保存，而不需要等待 useEffect 触发
+        // Immediately add new points activity to user_points table
+        // This ensures new activity is saved immediately without waiting for useEffect to trigger
         // Helper function to insert points with retry logic (for newly created recipes)
         const insertPoints = async (retryCount = 0): Promise<boolean> => {
           const { error: insertError } = await supabase
@@ -557,7 +557,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               } else {
                 console.log('Failed to insert user_points:', insertError.message);
               }
-              // 如果插入失败，会在 useEffect 中重试同步
+              // If insert fails, will retry sync in useEffect
               return false;
             }
           }
@@ -571,17 +571,17 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       } catch (error) {
         console.error('Failed to sync points to Supabase:', error);
-        // 如果失败，会在 useEffect 中重试同步
+        // If fails, will retry sync in useEffect
       }
     }
   };
 
   /**
-   * 给食谱创作者添加积分（当他们的食谱被点赞/收藏/尝试时）
-   * @param creatorUserId 创作者的用户ID
-   * @param type 积分类型
-   * @param recipeId 食谱ID
-   * @param recipeTitle 食谱标题
+   * Add points to recipe creator (when their recipe is liked/favorited/tried)
+   * @param creatorUserId Creator's user ID
+   * @param type Points type
+   * @param recipeId Recipe ID
+   * @param recipeTitle Recipe title
    */
   const addPointsToCreator = async (
     creatorUserId: string,
@@ -589,7 +589,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     recipeId: string,
     recipeTitle: string
   ) => {
-    // 如果创作者是当前用户，不需要给自己加分（避免重复）
+    // If creator is current user, don't add points to self (avoid duplication)
     if (creatorUserId === user?.id) {
       return;
     }
@@ -598,7 +598,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const dailyLimit = DAILY_LIMITS[type];
 
     try {
-      // 检查创作者今天已经获得的该类型积分次数
+      // Check how many times creator has earned this type of points today
       const today = new Date();
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const todayEnd = new Date(todayStart);
@@ -619,12 +619,12 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       const todayCount = todayActivities?.length || 0;
       if (todayCount >= dailyLimit) {
-        // 已达到每日上限
+        // Daily limit reached
         console.log(`Creator daily limit reached for ${type}: ${todayCount}/${dailyLimit}`);
         return;
       }
 
-      // 获取创作者当前积分总数
+      // Get creator's current total points
       const { data: creatorData, error: creatorError } = await supabase
         .from('users')
         .select('total_points')
@@ -639,7 +639,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const currentTotalPoints = creatorData?.total_points || 0;
       const newTotalPoints = currentTotalPoints + points;
 
-      // 更新创作者的积分总数
+      // Update creator's total points
       const { error: updateError } = await supabase
         .from('users')
         .update({
@@ -653,7 +653,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return;
       }
 
-      // 添加积分活动记录
+      // Add points activity record
       const description = type === 'recipe_liked_by_others'
         ? `Your recipe "${recipeTitle}" was liked`
         : type === 'recipe_favorited_by_others'
@@ -673,7 +673,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       if (insertError) {
         console.error('Error inserting creator points:', insertError);
-        // 回滚积分总数
+        // Rollback total points
         await supabase
           .from('users')
           .update({
@@ -705,9 +705,9 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const clearDailyCheckin = async () => {
     const result = await clearAllDailyCheckin(user?.id);
     
-    // 如果清理成功，重新加载积分数据
+    // If clear successful, reload points data
     if (result.success) {
-      // 重新加载积分数据
+      // Reload points data
       if (user?.id) {
         try {
           const { data: pointsHistory } = await supabase
@@ -744,7 +744,7 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.error('Error reloading points after clearing check-in:', error);
         }
       } else {
-        // 从 AsyncStorage 重新加载
+        // Reload from AsyncStorage
         try {
           const storedPoints = await AsyncStorage.getItem('userPoints');
           if (storedPoints) {
@@ -772,12 +772,12 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     
     console.log('Clear result:', result);
     
-    // 无论成功与否，都重置本地状态并强制重新加载
+    // Regardless of success, reset local state and force reload
     if (result.success) {
-      // 先重置本地状态
+      // First reset local state
       dispatch({ type: 'RESET_POINTS' });
       
-      // 清除 AsyncStorage（再次确认）
+      // Clear AsyncStorage (confirm again)
       try {
         await AsyncStorage.removeItem('userPoints');
         console.log('✅ Confirmed: AsyncStorage cleared');
@@ -785,13 +785,13 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         console.error('Error clearing AsyncStorage:', error);
       }
       
-      // 等待一下，确保数据库操作完成
+      // Wait a bit to ensure database operation completes
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // 强制重新加载积分数据（应该为空）
+      // Force reload points data (should be empty)
       if (user?.id) {
         try {
-          // 从数据库加载（应该为空）
+          // Load from database (should be empty)
           const { data: pointsHistory, error: historyError } = await supabase
             .from('user_points')
             .select('*')
@@ -832,11 +832,11 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           dispatch({ type: 'SET_POINTS', payload: { totalPoints, activities } });
         } catch (error) {
           console.error('Error reloading points after clearing:', error);
-          // 即使出错，也确保状态为空
+          // Even if error, ensure state is empty
           dispatch({ type: 'RESET_POINTS' });
         }
       } else {
-        // 从 AsyncStorage 重新加载（应该为空）
+        // Reload from AsyncStorage (should be empty)
         try {
           const storedPoints = await AsyncStorage.getItem('userPoints');
           if (storedPoints) {
@@ -849,17 +849,17 @@ export const PointsProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             dispatch({ type: 'SET_POINTS', payload: { totalPoints, activities: parsedActivities } });
           } else {
             console.log('✅ Confirmed: AsyncStorage is empty');
-            // 如果没有数据，确保状态为空
+            // If no data, ensure state is empty
             dispatch({ type: 'RESET_POINTS' });
           }
         } catch (error) {
           console.error('Error reloading points from storage:', error);
-          // 即使出错，也确保状态为空
+          // Even if error, ensure state is empty
           dispatch({ type: 'RESET_POINTS' });
         }
       }
     } else {
-      // 即使清理失败，也尝试重置本地状态
+      // Even if clear failed, try to reset local state
       console.error('❌ Clear failed, but resetting local state anyway');
       dispatch({ type: 'RESET_POINTS' });
       try {

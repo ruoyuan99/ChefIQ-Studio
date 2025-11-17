@@ -44,7 +44,7 @@ interface RecipeDetailScreenProps {
 
 /**
  * Format cooking time to display as number only
- * Extracts and returns only the number, without "分钟" or "min"
+ * Extracts and returns only the number, without "min" or "minutes"
  */
 const formatCookingTimeNumber = (cookingTime: string | number | undefined | null): string => {
   if (!cookingTime) return 'Not specified';

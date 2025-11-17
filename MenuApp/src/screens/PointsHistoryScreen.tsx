@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, // Android添加状态栏高度
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0, // Add status bar height for Android
   },
   header: {
     flexDirection: 'row',

@@ -58,7 +58,7 @@ const formatCookingTimeMinutes = (cookingTime: string | number | undefined | nul
   if (typeof cookingTime === 'number') {
     minutes = cookingTime;
   } else if (typeof cookingTime === 'string') {
-    // Remove "分钟", "min", "minutes" and extract number
+    // Remove "min", "minutes" and extract number
     const cleaned = cookingTime.replace(/分钟|min|minutes/gi, '').trim();
     const parsed = parseInt(cleaned, 10);
     if (!isNaN(parsed)) {
@@ -101,7 +101,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     selectedTags: [],
   });
 
-  // 从云端获取所有public recipes
+  // Fetch all public recipes from cloud
   useEffect(() => {
     const fetchPublicRecipes = async () => {
       try {
@@ -115,33 +115,33 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     fetchPublicRecipes();
   }, []);
 
-  // 合并用户创建的公开菜谱、云端public recipes和示例菜谱
-  // 统一来源：示例食谱只从硬编码的 sampleRecipes 数组获取，不从数据库获取
-  // 去重：如果本地recipe和云端recipe有相同的ID，优先使用本地版本（可能更新）
+  // Merge user-created public recipes, cloud public recipes, and sample recipes
+  // Unified source: Sample recipes only from hardcoded sampleRecipes array, not from database
+  // Deduplication: If local recipe and cloud recipe have same ID, prioritize local version (may be updated)
   const allPublicRecipes = useMemo(() => {
-    // 本地公开食谱（用户创建的）
+    // Local public recipes (user-created)
     const localPublicRecipes = state.recipes.filter(recipe => recipe.isPublic);
     const localRecipeIds = new Set(localPublicRecipes.map(r => r.id));
     
-    // 云端公开食谱（已过滤掉示例食谱，只包含用户创建的公开食谱）
-    // 过滤掉与本地recipes重复的部分（优先使用本地版本）
+    // Cloud public recipes (sample recipes filtered out, only user-created public recipes)
+    // Filter out duplicates with local recipes (prioritize local version)
     const uniqueCloudRecipes = cloudPublicRecipes.filter(
       cloudRecipe => !localRecipeIds.has(cloudRecipe.id)
     );
     
-    // 创建所有已存在的recipe IDs集合（本地 + 云端）
+    // Create set of all existing recipe IDs (local + cloud)
     const allExistingIds = new Set([
       ...localRecipeIds,
       ...uniqueCloudRecipes.map(r => r.id)
     ]);
     
-    // 示例食谱（只从硬编码的 sampleRecipes 数组获取）
-    // 过滤掉与本地或云端recipes重复的部分（如果用户保存了示例食谱，不重复显示）
+    // Sample recipes (only from hardcoded sampleRecipes array)
+    // Filter out duplicates with local or cloud recipes (if user saved sample recipe, don't show duplicate)
     const uniqueSampleRecipes = sampleRecipes.filter(
       sampleRecipe => !allExistingIds.has(sampleRecipe.id)
     );
     
-    // 合并所有来源
+    // Merge all sources
     return [
       ...localPublicRecipes,
       ...uniqueCloudRecipes,
@@ -169,7 +169,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     return UserPreferenceService.hasEnoughData(userPreference);
   }, [userPreference]);
 
-  // 获取所有可用的筛选选项
+  // Get all available filter options
   const availableOptions = useMemo(() => {
     const cookwareSet = new Set<string>();
     const tagsSet = new Set<string>();
@@ -185,7 +185,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     };
   }, [allPublicRecipes]);
 
-  // 烹饪时间筛选函数
+  // Cooking time filter function
   const matchesCookingTime = (recipe: any): boolean => {
     if (!filters.cookingTime) return true;
     const timeStr = recipe.cookingTime || '';
@@ -202,10 +202,10 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     }
   };
 
-  // 应用所有筛选和排序
+  // Apply all filters and sorting
   const filteredRecipes = useMemo(() => {
     let filtered = allPublicRecipes.filter(recipe => {
-      // 搜索筛选
+      // Search filter
       const matchesSearch = 
         !searchQuery ||
         recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -214,13 +214,13 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       
       if (!matchesSearch) return false;
       
-      // 烹饪时间筛选
+      // Cooking time filter
       if (!matchesCookingTime(recipe)) return false;
       
-      // 厨具筛选
+      // Cookware filter
       if (filters.cookware && recipe.cookware !== filters.cookware) return false;
       
-      // 标签筛选（至少匹配一个）
+      // Tag filter (match at least one)
       if (filters.selectedTags.length > 0) {
         const hasMatchingTag = filters.selectedTags.some(selectedTag =>
           recipe.tags?.some((tag: string) => tag.toLowerCase() === selectedTag.toLowerCase())
@@ -231,7 +231,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       return true;
     });
 
-    // 应用排序
+    // Apply sorting
     let sorted = [...filtered];
     
     if (sortBy === 'recommend') {
@@ -267,7 +267,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             return a.title.localeCompare(b.title);
           case 'relevance':
           default:
-            // 如果有搜索词，按相关性排序（标题匹配优先）
+            // If there's a search term, sort by relevance (title match priority)
             if (searchQuery) {
               const aTitleMatch = a.title.toLowerCase().includes(searchQuery.toLowerCase());
               const bTitleMatch = b.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -282,7 +282,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     return sorted;
   }, [allPublicRecipes, searchQuery, filters, sortBy, getStats, getTriedCount, userPreference, hasEnoughDataForRecommendation]);
 
-  // 清除所有筛选
+  // Clear all filters
   const clearFilters = () => {
     setFilters({
       cookingTime: null,
@@ -291,11 +291,11 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
     });
   };
 
-  // 检查是否有活动的筛选
+  // Check if there are active filters
   const hasActiveFilters = filters.cookingTime || filters.cookware || 
     filters.selectedTags.length > 0;
 
-  // 切换标签选择
+  // Toggle tag selection
   const toggleTag = (tag: string) => {
     setFilters(prev => ({
       ...prev,
@@ -307,7 +307,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
 
   const renderRecipeCard = (recipe: any) => (
     <View key={recipe.id} style={styles.recipeCardWrapper}>
-      {/* Android上的渐变阴影效果 - 在卡片外部 */}
+      {/* Android gradient shadow effect - outside card */}
       {Platform.OS === 'android' && (
         <View style={styles.cardShadowContainer}>
           <View style={[styles.cardShadowLayer, styles.cardShadowLayer1]} />
@@ -412,7 +412,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   // Render Chef iQ Challenge card - same style as recipe cards
   const renderChallengeCard = () => (
     <View key="chef-iq-challenge" style={styles.recipeCardWrapper}>
-      {/* Android上的渐变阴影效果 - 在卡片外部 */}
+      {/* Android gradient shadow effect - outside card */}
       {Platform.OS === 'android' && (
         <View style={styles.cardShadowContainer}>
           <View style={[styles.cardShadowLayer, styles.cardShadowLayer1]} />
@@ -532,7 +532,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             onLayout={(event) => setFiltersPanelHeight(event.nativeEvent.layout.height)}
           >
             <ScrollView style={styles.filtersScroll} showsVerticalScrollIndicator={false}>
-              {/* 烹饪时间筛选 */}
+              {/* Cooking time filter */}
               <View style={styles.filterSection}>
                 <Text style={styles.filterSectionTitle}>Cooking Time</Text>
                 <View style={styles.filterOptions}>
@@ -559,7 +559,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* 厨具筛选 */}
+              {/* Cookware filter */}
               <View style={styles.filterSection}>
                 <Text style={styles.filterSectionTitle}>Cookware</Text>
                 <View style={styles.filterOptions}>
@@ -587,7 +587,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               </View>
 
 
-              {/* 标签筛选 */}
+              {/* Tag filter */}
               {availableOptions.tags.length > 0 && (
                 <View style={styles.filterSection}>
                   <Text style={styles.filterSectionTitle}>Tags</Text>
@@ -613,7 +613,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
                 </View>
               )}
 
-              {/* 清除筛选按钮 */}
+              {/* Clear filter button */}
               {hasActiveFilters && (
                 <TouchableOpacity
                   style={styles.clearFiltersButton}
@@ -636,7 +636,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
         ]}
       >
 
-      {/* 排序选项 Modal */}
+      {/* Sort options Modal */}
       <Modal
         visible={showSortOptions}
         transparent={true}
@@ -952,39 +952,39 @@ const styles = StyleSheet.create({
     maxHeight: 300, // Limit max height for scrollable content
   },
   filtersScroll: {
-    // 移除 maxHeight，完全展开
+    // Remove maxHeight, fully expand
   },
   filterSection: {
-    padding: 12, // 从 16 减小到 12，使布局更紧凑
+    padding: 12, // Reduced from 16 to 12 for more compact layout
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   filterSectionTitle: {
-    fontSize: 15, // 从 16 减小到 15，调小一号
+    fontSize: 15, // Reduced from 16 to 15, one size smaller
     fontWeight: getFontWeight('600') as any,
     color: '#333',
-    marginBottom: 8, // 从 12 减小到 8，使布局更紧凑
+    marginBottom: 8, // Reduced from 12 to 8 for more compact layout
   },
   filterOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   filterOption: {
-    paddingHorizontal: 12, // 从 16 减小到 12，使布局更紧凑
-    paddingVertical: 6, // 从 8 减小到 6，使布局更紧凑
-    borderRadius: 16, // 从 20 减小到 16，使布局更紧凑
+    paddingHorizontal: 12, // Reduced from 16 to 12 for more compact layout
+    paddingVertical: 6, // Reduced from 8 to 6 for more compact layout
+    borderRadius: 16, // Reduced from 20 to 16 for more compact layout
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    marginRight: 6, // 从 8 减小到 6，使布局更紧凑
-    marginBottom: 6, // 从 8 减小到 6，使布局更紧凑
+    marginRight: 6, // Reduced from 8 to 6 for more compact layout
+    marginBottom: 6, // Reduced from 8 to 6 for more compact layout
   },
   filterOptionActive: {
     backgroundColor: '#d96709',
     borderColor: '#d96709',
   },
   filterOptionText: {
-    fontSize: 11, // 从 11.5 减小到 11，调小一号
+    fontSize: 11, // Reduced from 11.5 to 11, one size smaller
     color: '#666',
     fontWeight: '500',
   },
@@ -995,15 +995,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12, // 从 16 减小到 12，使布局更紧凑
-    marginTop: 6, // 从 8 减小到 6，使布局更紧凑
-    marginBottom: 12, // 从 16 减小到 12，使布局更紧凑
+    padding: 12, // Reduced from 16 to 12 for more compact layout
+    marginTop: 6, // Reduced from 8 to 6 for more compact layout
+    marginBottom: 12, // Reduced from 16 to 12 for more compact layout
   },
   clearFiltersText: {
-    fontSize: 15, // 从 16 减小到 15，调小一号
+    fontSize: 15, // Reduced from 16 to 15, one size smaller
     fontWeight: getFontWeight('600') as any,
     color: '#d96709',
-    marginLeft: 6, // 从 8 减小到 6，使布局更紧凑
+    marginLeft: 6, // Reduced from 8 to 6 for more compact layout
   },
   emptyState: {
     flex: 1,
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100, // 为底部标签栏留出空间
+    paddingBottom: 100, // Reserve space for bottom tab bar
   },
   recipesGrid: {
     flexDirection: 'row',
@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     // No fixed height - height will be determined by content
   },
-  // Android渐变阴影效果 - 使用多层同心矩形模拟向外扩散的阴影
+  // Android gradient shadow effect - use multiple concentric rectangles to simulate outward spreading shadow
   cardShadowContainer: {
     position: 'absolute',
     top: -3.5,

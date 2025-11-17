@@ -55,12 +55,12 @@ const CreateRecipeScreen: React.FC<CreateRecipeScreenProps> = ({
   // Set default cookware to "Chef iQ Mini Oven" if from challenge
   const defaultCookware = fromChallenge ? 'Chef iQ Mini Oven' : (existingRecipe?.cookware || '');
 
-  // Helper function to extract numeric value from cookingTime (e.g., "122分钟" -> "122")
+  // Helper function to extract numeric value from cookingTime (e.g., "122 min" -> "122")
   const extractCookingTimeNumber = (cookingTime: any): string => {
     if (!cookingTime) return '';
     if (typeof cookingTime === 'number') return String(cookingTime);
     const str = String(cookingTime);
-    // Extract numeric part (remove "分钟" or any non-numeric characters)
+    // Extract numeric part (remove "min" or any non-numeric characters)
     const numericValue = str.replace(/[^0-9]/g, '');
     return numericValue;
   };
@@ -1790,7 +1790,7 @@ const handleIngredientTagPress = (ingredientName: string) => {
                 </TouchableOpacity>
               </View>
             ) : importedRecipe && !scannedImageUri && !recipeData.imageUri ? (
-              // AI生成的菜谱没有主图时，显示橙色背景、白色文字的占位图，并自动生成图片
+              // When AI-generated recipe has no main image, show placeholder with orange background and white text, and auto-generate image
               <View style={styles.recipeImagePreview}>
                 <View 
                   ref={placeholderImageRef}
