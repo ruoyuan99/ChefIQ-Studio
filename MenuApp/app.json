@@ -20,8 +20,9 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chefiq.max.app",
+      "bundleIdentifier": "com.chefiq.max1.app",
       "buildNumber": "1",
+      "icon": "./assets/AppLogo.png",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of recipes.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select recipe images.",
